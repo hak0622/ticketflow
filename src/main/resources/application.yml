@@ -15,6 +15,9 @@ spring:
   h2:
     console:
       enabled: true
+jwt:
+  issuer: ajufresh@gmail.com
+  secret_key: [REMOVED_ROTATED_JWT_SECRET]
 
 logging:
   level:
