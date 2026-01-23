@@ -5,7 +5,7 @@ spring:
       password: zx134679!
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     defer-datasource-initialization: true
     properties:
       hibernate:
@@ -21,9 +21,6 @@ spring:
             scope:
               - email
               - profile
-  sql:
-    init:
-      mode: always
 
   h2:
     console:
