@@ -1,9 +1,8 @@
 spring:
   datasource:
-    url: jdbc:h2:tcp://localhost/~/testdb
-    username: sa
-    driver-class-name: org.h2.Driver
-
+      url: jdbc:mysql://awseb-e-mzbqpdtvky-stack-awsebrdsdatabase-sjylbijxdh7z.chgccwso2yba.ap-northeast-2.rds.amazonaws.com/blog
+      username: hak0622
+      password: zx134679!
   jpa:
     hibernate:
       ddl-auto: update
@@ -12,12 +11,26 @@ spring:
       hibernate:
         format_sql: true
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id:
+            client-secret:
+            scope:
+              - email
+              - profile
+  sql:
+    init:
+      mode: always
+
   h2:
     console:
       enabled: true
 jwt:
   issuer: ajufresh@gmail.com
-  secret_key: [REMOVED_ROTATED_JWT_SECRET]
+  secret_key:
 
 logging:
   level:
