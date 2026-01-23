@@ -16,8 +16,8 @@ spring:
       client:
         registration:
           google:
-            client-id:
-            client-secret:
+            client-id: ${SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID}
+            client-secret: ${SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET}
             scope:
               - email
               - profile
@@ -30,7 +30,7 @@ spring:
       enabled: true
 jwt:
   issuer: ajufresh@gmail.com
-  secret_key:
+  secret_key: ${JWT_SECRET_KEY}
 
 logging:
   level:
