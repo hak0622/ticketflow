@@ -5,9 +5,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import studying.blog.domain.Article;
+import studying.blog.domain.User;
 import studying.blog.dto.AddArticleRequest;
 import studying.blog.dto.UpdateArticleRequest;
 import studying.blog.repository.BlogRepository;
+import studying.blog.repository.UserRepository;
 
 import java.util.List;
 
@@ -15,9 +17,11 @@ import java.util.List;
 @Service
 public class BlogService {
     private final BlogRepository blogRepository;
+    private final UserRepository userRepository;
 
     public Article save(AddArticleRequest request,String userName){
-        return blogRepository.save(request.toEntity(userName));
+        User user = userRepository.findByEmail(userName).orElseThrow(() -> new IllegalArgumentException("not found: " + userName));
+        return blogRepository.save(request.toEntity(user));
     }
 
     public List<Article> findAll(){
@@ -45,7 +49,7 @@ public class BlogService {
     private static void authorizeArticleAuthor(Article article){
         String userName = SecurityContextHolder.getContext().getAuthentication().getName();
 
-        if(!article.getAuthor().equals(userName)){
+        if(!article.getAuthor().getEmail().equals(userName)){
             throw new IllegalArgumentException("not authorized");
         }
     }
