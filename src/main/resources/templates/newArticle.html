@@ -2,33 +2,111 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>블로그 글</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css">
+    <title>My Blog | Editor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --point-color: #222;
+            --border-color: #eee;
+            --input-focus: #f0f0f0;
+        }
+        body {
+            background-color: #ffffff;
+            font-family: 'Pretendard', sans-serif;
+            color: #333;
+        }
+        .header-section {
+            padding: 60px 0 40px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 50px;
+        }
+        .editor-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        /* 입력창 스타일 커스텀 */
+        .form-control {
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px 20px;
+            transition: all 0.2s ease;
+            box-shadow: none;
+        }
+        .form-control:focus {
+            border-color: var(--point-color);
+            background-color: #fafafa;
+            box-shadow: none;
+        }
+        #title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+        #content {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            resize: none; /* 크기 조절 비활성화로 깔끔함 유지 */
+            min-height: 450px;
+        }
+        .btn-action {
+            background-color: var(--point-color);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: 600;
+            width: 100%; /* 모바일/데스크탑 모두 시원하게 배치 */
+            margin-top: 20px;
+            transition: background 0.2s;
+        }
+        .btn-action:hover {
+            background-color: #000;
+            color: #fff;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #888;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .back-link:hover {
+            color: #222;
+        }
+    </style>
 </head>
 <body>
-<div class="p-5 mb-5 text-center</> bg-light">
-    <h1 class="mb-3">My Blog</h1>
-    <h4 class="mb-3">블로그에 오신 것을 환영합니다.</h4>
+
+<div class="header-section">
+    <h1 style="cursor:pointer; font-weight: 800;" onclick="location.href='/articles'">My Blog</h1>
+    <p class="text-muted" th:text="${article.id} != null ? '글 수정하기' : '새로운 생각 기록하기'"></p>
 </div>
 
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-lg-8">
-            <article>
-                <input type="hidden" id="article-id" th:value="${article.id}">
+<div class="editor-container">
+    <article>
+        <input type="hidden" id="article-id" th:value="${article.id}">
 
-                <header class="mb-4">
-                    <input type="text" class="form-control" placeholder="제목" id="title" th:value="${article.title}">
-                </header>
-                <section class="mb-5">
-                    <textarea class="form-control h-25" rows="10" placeholder="내용" id="content" th:text="${article.content}"></textarea>
-                </section>
-                <button th:if="${article.id} != null" type="button" id="modify-btn" class="btn btn-primary btn-sm">수정</button>
-                <button th:if="${article.id} == null" type="button" id="create-btn" class="btn btn-primary btn-sm">등록</button>
-            </article>
+        <div class="mb-3">
+            <label for="title" class="form-label d-none">제목</label>
+            <input type="text" class="form-control" placeholder="제목을 입력하세요" id="title" th:value="${article.title}">
         </div>
-    </div>
+
+        <div class="mb-4">
+            <label for="content" class="form-label d-none">내용</label>
+            <textarea class="form-control" rows="12" placeholder="당신의 이야기를 들려주세요." id="content" th:text="${article.content}"></textarea>
+        </div>
+
+        <button th:if="${article.id} != null" type="button" id="modify-btn" class="btn-action">수정 완료</button>
+        <button th:if="${article.id} == null" type="button" id="create-btn" class="btn-action">발행하기</button>
+
+        <div class="text-center">
+            <a href="javascript:history.back();" class="back-link">← 돌아가기</a>
+        </div>
+    </article>
 </div>
 
 <script src="/js/article.js"></script>
 </body>
+</html>

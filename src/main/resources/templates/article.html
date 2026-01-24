@@ -2,36 +2,128 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>블로그 글</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css">
+    <title>My Blog | 상세 보기</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --point-color: #222;
+            --sub-color: #888;
+            --border-color: #eee;
+        }
+        body {
+            background-color: #ffffff;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            color: #333;
+            line-height: 1.8;
+        }
+        .header-section {
+            padding: 60px 0 40px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 50px;
+        }
+        .header-section h1 {
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
+        .article-container {
+            max-width: 740px; /* 읽기 가장 편한 너비 */
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        .article-header {
+            margin-bottom: 40px;
+        }
+        .article-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            line-height: 1.3;
+            margin-bottom: 15px;
+            word-break: keep-all;
+        }
+        .article-meta {
+            color: var(--sub-color);
+            font-size: 0.95rem;
+            display: flex;
+            gap: 15px;
+            justify-content: flex-start;
+        }
+        .article-content {
+            font-size: 1.15rem;
+            color: #444;
+            margin-bottom: 60px;
+            min-height: 300px;
+            white-space: pre-wrap; /* 줄바꿈 유지 */
+        }
+        .btn-group-custom {
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 30px;
+            margin-bottom: 80px;
+        }
+        .btn-modify {
+            background-color: var(--point-color);
+            color: white;
+            border: none;
+            padding: 8px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        .btn-modify:hover {
+            background-color: #000;
+            color: #fff;
+        }
+        .btn-delete {
+            background-color: #fff;
+            color: #ff4d4f;
+            border: 1px solid #ff4d4f;
+            padding: 8px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        .btn-delete:hover {
+            background-color: #fff1f0;
+        }
+    </style>
 </head>
 <body>
-<div class="p-5 mb-5 text-center</> bg-light">
-    <h1 class="mb-3">My Blog</h1>
-    <h4 class="mb-3">블로그에 오신 것을 환영합니다.</h4>
+
+<div class="header-section">
+    <h1 class="mb-0" style="cursor:pointer" onclick="location.href='/articles'">My Blog</h1>
 </div>
 
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-lg-8">
-            <article>
-                <input type="hidden" id="article-id" th:value="${article.id}">
-                <header class="mb-4">
-                    <h1 class="fw-bolder mb-1" th:text="${article.title}"></h1>
-                    <div class="text-muted fst-italic mb-2" th:text="|Posted on ${#temporals.format(article.createdAt, 'yyyy-MM-dd HH:mm')} By ${article.author}|"></div>
-                </header>
-                <section class="mb-5">
-                    <p class="fs-5 mb-4" th:text="${article.content}"></p>
-                </section>
-                <button type="button" id="modify-btn"
-                        th:onclick="|location.href='@{/new-article?id={articleId}(articleId=${article.id})}'|"
-                        class="btn btn-primary btn-sm">수정</button>
-                <button type="button" id="delete-btn"
-                        class="btn btn-secondary btn-sm">삭제</button>
-            </article>
+<div class="article-container">
+    <article>
+        <input type="hidden" id="article-id" th:value="${article.id}">
+
+        <header class="article-header">
+            <h1 class="article-title" th:text="${article.title}">제목입니다</h1>
+            <div class="article-meta">
+                <span th:text="${article.author}">작성자</span>
+                <span style="color: #ddd;">|</span>
+                <span th:text="${#temporals.format(article.createdAt, 'yyyy. MM. dd. HH:mm')}">2026.01.24</span>
+            </div>
+        </header>
+
+        <section class="article-content">
+            <p th:text="${article.content}">본문 내용이 들어갑니다.</p>
+        </section>
+
+        <div class="btn-group-custom">
+            <button type="button" id="modify-btn"
+                    th:onclick="|location.href='@{/new-article?id={articleId}(articleId=${article.id})}'|"
+                    class="btn-modify">수정하기</button>
+
+            <button type="button" id="delete-btn"
+                    class="btn-delete">삭제</button>
+
+            <button type="button" onclick="location.href='/articles'"
+                    class="btn btn-link text-secondary text-decoration-none ms-auto">목록으로</button>
         </div>
-    </div>
+    </article>
 </div>
 
 <script src="/js/article.js"></script>
 </body>
+</html>
