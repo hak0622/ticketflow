@@ -21,9 +21,9 @@ public class BlogApiController {
     private final BlogService blogService;
 
     @PostMapping("/api/articles")
-    public ResponseEntity<Article> addArticle(@RequestBody AddArticleRequest request, Principal principal){
+    public ResponseEntity<ArticleResponse> addArticle(@RequestBody AddArticleRequest request, Principal principal){
         Article savedArticle = blogService.save(request, principal.getName());
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedArticle);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ArticleResponse(savedArticle));
     }
 
     @GetMapping("/api/articles")
@@ -49,8 +49,8 @@ public class BlogApiController {
     }
 
     @PutMapping("/api/articles/{id}")
-    public ResponseEntity<Article>updateArticle(@PathVariable long id, @RequestBody UpdateArticleRequest request){
+    public ResponseEntity<ArticleResponse>updateArticle(@PathVariable long id, @RequestBody UpdateArticleRequest request){
         Article updatedArticle = blogService.update(id, request);
-        return ResponseEntity.ok().body(updatedArticle);
+        return ResponseEntity.ok().body(new ArticleResponse(updatedArticle));
     }
 }
