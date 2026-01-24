@@ -1,6 +1,8 @@
 package studying.blog.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,8 +26,8 @@ public class BlogService {
         return blogRepository.save(request.toEntity(user));
     }
 
-    public List<Article> findAll(){
-        return blogRepository.findAll();
+    public Page<Article> findAll(Pageable pageable){
+        return blogRepository.findAll(pageable);
     }
 
     public Article findById(Long id){

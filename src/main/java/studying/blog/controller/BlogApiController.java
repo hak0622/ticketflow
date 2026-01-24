@@ -2,6 +2,9 @@ package studying.blog.controller;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -27,8 +30,9 @@ public class BlogApiController {
     }
 
     @GetMapping("/api/articles")
-    public ResponseEntity<List<ArticleResponse>>findAllArticles(){
-        List<ArticleResponse> articles = blogService.findAll()
+    public ResponseEntity<List<ArticleResponse>>findAllArticles(
+            @PageableDefault(size = 10,sort="id",direction = Sort.Direction.DESC) Pageable pageable){
+        List<ArticleResponse> articles = blogService.findAll(pageable)
                 .stream()
                 .map(ArticleResponse::new)
                 .toList();
