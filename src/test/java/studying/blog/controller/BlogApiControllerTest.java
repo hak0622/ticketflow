@@ -1,6 +1,7 @@
 package studying.blog.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import studying.blog.dto.AddArticleRequest;
 import studying.blog.dto.UpdateArticleRequest;
 import studying.blog.repository.BlogRepository;
 import org.springframework.http.MediaType;
+import studying.blog.repository.RefreshTokenRepository;
 import studying.blog.repository.UserRepository;
 
 import java.security.Principal;
@@ -34,32 +36,46 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@Transactional
 class BlogApiControllerTest {
     @Autowired private MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @Autowired private WebApplicationContext context;
     @Autowired BlogRepository blogRepository;
     @Autowired UserRepository userRepository;
+    @Autowired RefreshTokenRepository refreshTokenRepository;
 
     User user;
 
     @BeforeEach
     public void mockMvcSetUp(){
         this.mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+
         blogRepository.deleteAll();
+        refreshTokenRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     @BeforeEach
     void setSecurityContext(){
-        userRepository.deleteAll();
+        String uniq = String.valueOf(System.nanoTime());
+
         user = userRepository.save(User.builder()
-                .email("user@gmail.com")
+                .email("user" + uniq + "@gmail.com")
                 .password("test")
+                .nickname("nick" + uniq)   // nickname unique 대비
                 .build());
 
         SecurityContext context = SecurityContextHolder.getContext();
-        context.setAuthentication(new UsernamePasswordAuthenticationToken(user,user.getPassword(),user.getAuthorities()));
+        context.setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        user,
+                        user.getPassword(),
+                        user.getAuthorities()
+                )
+        );
     }
+
 
 
     @DisplayName("addArticle: 블로그 글 추가에 성공한다.")
@@ -73,7 +89,7 @@ class BlogApiControllerTest {
         final String requestBody = objectMapper.writeValueAsString(userRequest);
 
         Principal principal = Mockito.mock(Principal.class);
-        Mockito.when(principal.getName()).thenReturn("username");
+        Mockito.when(principal.getName()).thenReturn(user.getEmail());
 
         ResultActions result = mockMvc.perform(post(url)
                 .contentType(MediaType.APPLICATION_JSON_VALUE)
@@ -154,7 +170,7 @@ class BlogApiControllerTest {
     private Article createDefaultArticle(){
         return blogRepository.save(Article.builder()
                 .title("title")
-                .author(user.getUsername())
+                .author(user)
                 .content("content")
                 .build());
     }
