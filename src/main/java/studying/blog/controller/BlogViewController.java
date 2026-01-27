@@ -24,7 +24,7 @@ public class BlogViewController {
 
     @GetMapping("/articles")
     public String getArticles(
-            @PageableDefault(size = 10, sort = "id", direction = Sort.Direction.DESC) Pageable pageable,Model model){
+            @PageableDefault(size = 5, sort = "id", direction = Sort.Direction.DESC) Pageable pageable,Model model){
 
         Page<Article> articlePage = blogService.findAll(pageable);
 
