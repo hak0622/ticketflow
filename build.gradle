@@ -37,6 +37,16 @@ dependencies {
 
     implementation 'com.mysql:mysql-connector-j'
 
+    implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.10.0'
+
+    // Querydsl (Spring Boot 3.x / Jakarta)
+    implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
+    annotationProcessor 'com.querydsl:querydsl-apt:5.0.0:jakarta'
+
+    // Jakarta (Q 클래스 생성 시 필요)
+    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
 
