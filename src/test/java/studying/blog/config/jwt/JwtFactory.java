@@ -40,7 +40,7 @@ public class JwtFactory {
                 .setIssuedAt(issuedAt)
                 .setExpiration(expiration)
                 .addClaims(claims)
-                .signWith(SignatureAlgorithm.HS256,jwtProperties.getSecretKey())
+                .signWith(jwtProperties.signingKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 }

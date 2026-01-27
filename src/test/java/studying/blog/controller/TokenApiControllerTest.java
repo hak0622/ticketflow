@@ -1,6 +1,7 @@
 package studying.blog.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@Transactional
 public class TokenApiControllerTest {
     @Autowired protected MockMvc mockMvc;
     @Autowired protected ObjectMapper objectMapper;
@@ -40,18 +42,25 @@ public class TokenApiControllerTest {
     @BeforeEach
     public void mockMvcSetUp(){
         this.mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+
+        refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
     }
+
 
     @DisplayName("createNewAccesToken: 새로운 액세스 토큰을 발급한다.")
     @Test
     public void createNewAccessToken() throws Exception{
         final String url = "/api/token";
 
+        String uniq = String.valueOf(System.nanoTime());
+
         User testUser = userRepository.save(User.builder()
-                .email("user@gmail.com")
+                .email("user" + uniq + "@gmail.com")
                 .password("test")
+                .nickname("nick" + uniq)
                 .build());
+
 
         String refreshToken = JwtFactory.builder()
                 .claims(Map.of("id", testUser.getId()))
