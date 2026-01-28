@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,9 +51,19 @@ public class BlogViewController {
     }
 
     @GetMapping("/articles/{id}")
-    public String getArticle(@PathVariable Long id,Model model){
+    public String getArticle(@PathVariable Long id, Model model) {
         Article article = blogService.findById(id);
-        model.addAttribute("article",new ArticleViewResponse(article));
+
+        String loginUserEmail =
+                SecurityContextHolder.getContext().getAuthentication().getName();
+        System.out.println("loginUserEmail = " + loginUserEmail);
+
+        boolean isAuthor =
+                article.getAuthor().getEmail().equals(loginUserEmail);
+
+        model.addAttribute("article", new ArticleViewResponse(article));
+        model.addAttribute("isAuthor", isAuthor); // ⭐ 추가
+
         return "article";
     }
 

@@ -47,6 +47,7 @@
             display: flex;
             gap: 15px;
             justify-content: flex-start;
+            flex-wrap: wrap; /* 줄바꿈 허용 */
         }
         .article-content {
             font-size: 1.15rem;
@@ -85,6 +86,14 @@
         .btn-delete:hover {
             background-color: #fff1f0;
         }
+        .meta-divider {
+            color: #ddd;
+        }
+        .meta-label {
+            color: #aaa;
+            font-weight: 600;
+            margin-right: 4px;
+        }
     </style>
 </head>
 <body>
@@ -95,14 +104,29 @@
 
 <div class="article-container">
     <article>
+        <!-- 게시글 ID -->
         <input type="hidden" id="article-id" th:value="${article.id}">
+
+        <!-- 작성자 이메일 (JS에서 비교용) -->
+        <input type="hidden" id="author-email" th:value="${article.authorEmail}">
 
         <header class="article-header">
             <h1 class="article-title" th:text="${article.title}">제목입니다</h1>
+
             <div class="article-meta">
                 <span th:text="${article.author}">작성자</span>
-                <span style="color: #ddd;">|</span>
-                <span th:text="${#temporals.format(article.createdAt, 'yyyy. MM. dd. HH:mm')}">2026.01.24</span>
+                <span class="meta-divider">|</span>
+
+                <span>
+                    <span class="meta-label">작성:</span>
+                    <span th:text="${#temporals.format(article.createdAt, 'yy. MM. dd. HH:mm')}">2026.01.24</span>
+                </span>
+
+                <span th:if="${article.updatedAt != null and article.updatedAt != article.createdAt}">
+                    <span class="meta-divider">|</span>
+                    <span class="meta-label">수정:</span>
+                    <span th:text="${#temporals.format(article.updatedAt, 'yy. MM. dd. HH:mm')}">2026.01.25</span>
+                </span>
             </div>
         </header>
 
@@ -111,15 +135,22 @@
         </section>
 
         <div class="btn-group-custom">
-            <button type="button" id="modify-btn"
+            <button type="button"
+                    id="modify-btn"
+                    style="display:none"
                     th:onclick="|location.href='@{/new-article?id={articleId}(articleId=${article.id})}'|"
-                    class="btn-modify">수정하기</button>
+                    class="btn-modify">
+                수정하기
+            </button>
 
             <button type="button" id="delete-btn"
-                    class="btn-delete">삭제</button>
+                    style="display:none"
+                    class="btn-delete">삭제
+            </button>
 
             <button type="button" onclick="location.href='/articles'"
-                    class="btn btn-link text-secondary text-decoration-none ms-auto">목록으로</button>
+                    class="btn btn-link text-secondary text-decoration-none ms-auto">목록으로
+            </button>
         </div>
     </article>
 </div>
