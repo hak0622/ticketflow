@@ -18,9 +18,9 @@ spring:
         format_sql: true
         default_batch_fetch_size: 50
 
-logging:
-  level:
-    org.hibernate.SQL: debug
+#logging:
+#  level:
+#    org.hibernate.SQL: debug
 
 jwt:
   secret_key: ${JWT_SECRET_KEY}
