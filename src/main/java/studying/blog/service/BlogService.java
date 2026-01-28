@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import studying.blog.domain.Article;
 import studying.blog.domain.User;
 import studying.blog.dto.AddArticleRequest;
+import studying.blog.dto.ArticleSearchCondition;
 import studying.blog.dto.UpdateArticleRequest;
 import studying.blog.repository.BlogRepository;
 import studying.blog.repository.UserRepository;
@@ -29,6 +30,11 @@ public class BlogService {
     public Page<Article> findAll(Pageable pageable){
         return blogRepository.findAll(pageable);
     }
+
+    public Page<Article> search(ArticleSearchCondition condition, Pageable pageable) {
+        return blogRepository.search(condition, pageable);
+    }
+
 
     public Article findById(Long id){
         return blogRepository.findById(id).orElseThrow(()-> new IllegalArgumentException("not found: " + id));

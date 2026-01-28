@@ -10,7 +10,7 @@ import studying.blog.domain.Article;
 
 import java.util.List;
 
-public interface BlogRepository extends JpaRepository<Article,Long> {
+public interface BlogRepository extends JpaRepository<Article,Long> ,BlogRepositoryCustom{
     @Override
     @EntityGraph(attributePaths = {"author"})
     Page<Article> findAll(Pageable pageable);
