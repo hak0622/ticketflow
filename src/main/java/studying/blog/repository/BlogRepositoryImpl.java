@@ -1,6 +1,5 @@
 package studying.blog.repository;
 
-import com.querydsl.core.types.Predicate;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
@@ -8,8 +7,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import studying.blog.domain.Article;
-import studying.blog.domain.QArticle;
-import studying.blog.domain.QUser;
 import studying.blog.dto.ArticleSearchCondition;
 
 import java.util.List;

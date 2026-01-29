@@ -56,13 +56,12 @@ public class BlogViewController {
 
         String loginUserEmail =
                 SecurityContextHolder.getContext().getAuthentication().getName();
-        System.out.println("loginUserEmail = " + loginUserEmail);
 
         boolean isAuthor =
                 article.getAuthor().getEmail().equals(loginUserEmail);
 
         model.addAttribute("article", new ArticleViewResponse(article));
-        model.addAttribute("isAuthor", isAuthor); // ⭐ 추가
+        model.addAttribute("isAuthor", isAuthor);
 
         return "article";
     }
