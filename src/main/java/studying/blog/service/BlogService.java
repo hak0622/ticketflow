@@ -35,20 +35,30 @@ public class BlogService {
         return blogRepository.search(condition, pageable);
     }
 
+    //수정/ 삭제 / 내부 검증용으로 사용(조회수 증가 없음)
+    public Article getArticle(Long id){
+        return blogRepository.findById(id).orElseThrow(()->new IllegalArgumentException("not found : " + id));
+    }
 
-    public Article findById(Long id){
-        return blogRepository.findById(id).orElseThrow(()-> new IllegalArgumentException("not found: " + id));
+    //상세 조회 전용(조회수 증가 포함)
+    @Transactional
+    public Article viewArticle(Long id){
+        int updated = blogRepository.incrementViewCount(id);
+        if(updated == 0){
+            throw new IllegalArgumentException("not found : " + id);
+        }
+        return blogRepository.findById(id).orElseThrow(()->new IllegalArgumentException("not found : " + id));
     }
 
     public void delete(Long id){
-        Article article = blogRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("not found : " + id));
+        Article article = getArticle(id);
         authorizeArticleAuthor(article);
         blogRepository.delete(article);
     }
 
     @Transactional
     public Article update(long id, UpdateArticleRequest request){
-        Article article = blogRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("not found : " + id));
+        Article article = getArticle(id);
         authorizeArticleAuthor(article);
         article.update(request.getTitle(),request.getContent());
         return article;
