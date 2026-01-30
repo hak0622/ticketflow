@@ -16,6 +16,7 @@ public class ArticleViewResponse {
     private LocalDateTime updatedAt;
     private String author;
     private String authorEmail;
+    private long viewCount;
 
     public ArticleViewResponse(Article article) {
         this.id = article.getId();
@@ -25,5 +26,6 @@ public class ArticleViewResponse {
         this.updatedAt = article.getUpdatedAt();
         this.author = article.getAuthor().getNickname();
         this.authorEmail = article.getAuthor().getEmail();
+        this.viewCount = article.getViewCount();
     }
 }

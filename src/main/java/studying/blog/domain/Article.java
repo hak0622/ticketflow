@@ -40,6 +40,9 @@ public class Article {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "view_count",nullable = false)
+    private long viewCount = 0L;
+
     @Builder
     public Article(User author,String title,String content) {
         this.author = author;
