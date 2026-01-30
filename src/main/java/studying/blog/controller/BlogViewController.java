@@ -52,7 +52,7 @@ public class BlogViewController {
 
     @GetMapping("/articles/{id}")
     public String getArticle(@PathVariable Long id, Model model) {
-        Article article = blogService.findById(id);
+        Article article = blogService.viewArticle(id);
 
         String loginUserEmail =
                 SecurityContextHolder.getContext().getAuthentication().getName();
@@ -71,7 +71,7 @@ public class BlogViewController {
         if(id == null){
             model.addAttribute("article",new ArticleViewResponse());
         }else{
-            Article article = blogService.findById(id);
+            Article article = blogService.getArticle(id);
             model.addAttribute("article",new ArticleViewResponse(article));
         }
         return "newArticle";
