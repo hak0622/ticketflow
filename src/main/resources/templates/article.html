@@ -133,6 +133,12 @@
                     <span class="meta-label">조회:</span>
                     <span th:text="${article.viewCount}">0</span>
                 </span>
+
+                <span class="meta-divider">|</span>
+                <span>
+                    <span class="meta-label">좋아요:</span>
+                    <span id="like-count" th:text="${article.likeCount}">0</span>
+                </span>
             </div>
         </header>
 
@@ -141,6 +147,13 @@
         </section>
 
         <div class="btn-group-custom">
+            <button type="button"
+                    id="like-btn"
+                    class="btn btn-outline-dark"
+                    style="border-radius: 8px; font-weight: 600;">
+                🤍 좋아요
+            </button>
+
             <button type="button"
                     id="modify-btn"
                     style="display:none"
