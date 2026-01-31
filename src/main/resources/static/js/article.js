@@ -176,3 +176,101 @@ function httpRequest(method, url, body, success, fail) {
         }
     });
 }
+
+// 좋아요 토글 (JSON 응답용 요청 함수)
+function httpRequestJson(method, url, body, success, fail) {
+    fetch(url, {
+        method: method,
+        headers: {
+            Authorization: 'Bearer ' + localStorage.getItem('access_token'),
+            'Content-Type': 'application/json',
+        },
+        body: body,
+    }).then(response => {
+
+        if (response.status === 200 || response.status === 201) {
+            return response.json().then(data => success(data));
+        }
+
+        const refresh_token = getCookie('refresh_token');
+
+        if (response.status === 401 && refresh_token) {
+            fetch('/api/token', {
+                method: 'POST',
+                headers: {
+                    Authorization: 'Bearer ' + localStorage.getItem('access_token'),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    refreshToken: getCookie('refresh_token'),
+                }),
+            })
+                .then(res => {
+                    if (!res.ok) throw new Error("token refresh fail");
+                    return res.json();
+                })
+                .then(result => {
+                    localStorage.setItem('access_token', result.accessToken);
+                    httpRequestJson(method, url, body, success, fail);
+                })
+                .catch(() => fail());
+        } else {
+            fail();
+        }
+    }).catch(() => fail());
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const likeButton = document.getElementById('like-btn');
+    if (!likeButton) return;
+
+    let likeInFlight = false;     // ✅ 연타 방지
+    let reqSeq = 0;               // ✅ 응답 순서 꼬임 방지(마지막 요청만 반영)
+
+    likeButton.addEventListener('click', () => {
+        if (likeInFlight) return;
+
+        const articleId = document.getElementById('article-id')?.value;
+        if (!articleId) return;
+
+        likeInFlight = true;
+        likeButton.disabled = true;
+
+        const mySeq = ++reqSeq;   // 이번 요청 번호
+
+        httpRequestJson(
+            'POST',
+            `/api/articles/${articleId}/like`,
+            null,
+            (data) => {
+                // ✅ 더 늦게 시작한 요청이 이미 있다면, 현재 응답은 무시
+                if (mySeq !== reqSeq) return;
+
+                // 서버 응답: { liked: boolean, likeCount: number }
+                const likeCountEl = document.getElementById('like-count');
+                if (likeCountEl) likeCountEl.innerText = data.likeCount;
+
+                if (data.liked) {
+                    likeButton.innerText = '❤️ 좋아요 취소';
+                    likeButton.classList.remove('btn-outline-dark');
+                    likeButton.classList.add('btn-dark');
+                } else {
+                    likeButton.innerText = '🤍 좋아요';
+                    likeButton.classList.remove('btn-dark');
+                    likeButton.classList.add('btn-outline-dark');
+                }
+
+                likeInFlight = false;
+                likeButton.disabled = false;
+            },
+            () => {
+                // ✅ 실패도 마찬가지: 마지막 요청만 처리
+                if (mySeq !== reqSeq) return;
+
+                alert('좋아요 처리 실패 (로그인 필요)');
+                likeInFlight = false;
+                likeButton.disabled = false;
+            }
+        );
+    });
+});
