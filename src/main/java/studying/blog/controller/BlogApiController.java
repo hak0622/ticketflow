@@ -12,6 +12,7 @@ import studying.blog.dto.AddArticleRequest;
 import studying.blog.dto.ArticleResponse;
 import studying.blog.dto.UpdateArticleRequest;
 import studying.blog.service.BlogService;
+import studying.blog.service.LikeService;
 
 import java.security.Principal;
 import java.util.List;
@@ -20,6 +21,7 @@ import java.util.List;
 @RestController
 public class BlogApiController {
     private final BlogService blogService;
+    private final LikeService likeService;
 
     @PostMapping("/api/articles")
     public ResponseEntity<ArticleResponse> addArticle(@RequestBody AddArticleRequest request, Principal principal){
@@ -55,4 +57,12 @@ public class BlogApiController {
         Article updatedArticle = blogService.update(id, request);
         return ResponseEntity.ok().body(new ArticleResponse(updatedArticle));
     }
+
+    @PostMapping("/api/articles/{id}/like")
+    public ResponseEntity<LikeResponse>toggleLike(@PathVariable Long id,Principal principal){
+        LikeService.LikeToggleResult result = likeService.toggleLike(id, principal.getName());
+        return ResponseEntity.ok(new LikeResponse(result.liked(),result.likeCount()));
+    }
+
+    public record LikeResponse(boolean liked, long likeCount){}
 }
