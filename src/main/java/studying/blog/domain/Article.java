@@ -43,6 +43,9 @@ public class Article {
     @Column(name = "view_count",nullable = false)
     private long viewCount = 0L;
 
+    @Column(name = "like_count",nullable = false)
+    private long likeCount = 0L;
+
     @Builder
     public Article(User author,String title,String content) {
         this.author = author;

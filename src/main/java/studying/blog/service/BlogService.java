@@ -35,7 +35,7 @@ public class BlogService {
         return blogRepository.search(condition, pageable);
     }
 
-    //수정/ 삭제 / 내부 검증용으로 사용(조회수 증가 없음)
+    //수정,삭제,내부 검증용으로 사용(조회수 증가 없음)
     public Article getArticle(Long id){
         return blogRepository.findById(id).orElseThrow(()->new IllegalArgumentException("not found : " + id));
     }
