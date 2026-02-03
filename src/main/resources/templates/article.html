@@ -149,9 +149,9 @@
         <div class="btn-group-custom">
             <button type="button"
                     id="like-btn"
-                    class="btn btn-outline-dark"
-                    style="border-radius: 8px; font-weight: 600;">
-                🤍 좋아요
+                    th:class="${article.liked} ? 'btn btn-dark' : 'btn btn-outline-dark'"
+                    style="border-radius: 8px; font-weight: 600;"
+                    th:text="${article.liked} ? '❤️ 좋아요 취소' : '🤍 좋아요'">
             </button>
 
             <button type="button"

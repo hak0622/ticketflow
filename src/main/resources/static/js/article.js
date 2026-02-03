@@ -179,15 +179,20 @@ function httpRequest(method, url, body, success, fail) {
 
 // 좋아요 토글 (JSON 응답용 요청 함수)
 function httpRequestJson(method, url, body, success, fail) {
-    fetch(url, {
+    const options = {
         method: method,
         headers: {
             Authorization: 'Bearer ' + localStorage.getItem('access_token'),
             'Content-Type': 'application/json',
-        },
-        body: body,
-    }).then(response => {
+        }
+    };
 
+    // body가 있을 때만 넣기 (GET에서는 넣지 않음)
+    if (body != null) {
+        options.body = body;
+    }
+
+    fetch(url, options).then(response => {
         if (response.status === 200 || response.status === 201) {
             return response.json().then(data => success(data));
         }
@@ -224,49 +229,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const likeButton = document.getElementById('like-btn');
     if (!likeButton) return;
 
-    let likeInFlight = false;     // ✅ 연타 방지
-    let reqSeq = 0;               // ✅ 응답 순서 꼬임 방지(마지막 요청만 반영)
+    //articleId를 맨 위에서 꺼내서 initLikeState에서도 사용 가능
+    const articleId = document.getElementById('article-id')?.value;
+    if (!articleId) return;
+
+    let likeInFlight = false;
+    let reqSeq = 0;
+
+    function applyLikeUI(data) {
+        const likeCountEl = document.getElementById('like-count');
+        if (likeCountEl) likeCountEl.innerText = data.likeCount;
+
+        if (data.liked) {
+            likeButton.innerText = '❤️ 좋아요 취소';
+            likeButton.classList.remove('btn-outline-dark');
+            likeButton.classList.add('btn-dark');
+        } else {
+            likeButton.innerText = '🤍 좋아요';
+            likeButton.classList.remove('btn-dark');
+            likeButton.classList.add('btn-outline-dark');
+        }
+    }
+
+    //페이지 들어올 때 현재 liked 상태 초기 세팅
+    function initLikeState() {
+        httpRequestJson(
+            'GET',
+            `/api/articles/${articleId}`,
+            null,
+            (data) => applyLikeUI(data),
+            () => {
+                // 로그인 안 했거나 토큰 문제면 기본값 유지
+            }
+        );
+    }
+
+    initLikeState();
 
     likeButton.addEventListener('click', () => {
         if (likeInFlight) return;
 
-        const articleId = document.getElementById('article-id')?.value;
-        if (!articleId) return;
-
         likeInFlight = true;
         likeButton.disabled = true;
 
-        const mySeq = ++reqSeq;   // 이번 요청 번호
+        const mySeq = ++reqSeq;
 
         httpRequestJson(
             'POST',
             `/api/articles/${articleId}/like`,
             null,
             (data) => {
-                // ✅ 더 늦게 시작한 요청이 이미 있다면, 현재 응답은 무시
                 if (mySeq !== reqSeq) return;
-
-                // 서버 응답: { liked: boolean, likeCount: number }
-                const likeCountEl = document.getElementById('like-count');
-                if (likeCountEl) likeCountEl.innerText = data.likeCount;
-
-                if (data.liked) {
-                    likeButton.innerText = '❤️ 좋아요 취소';
-                    likeButton.classList.remove('btn-outline-dark');
-                    likeButton.classList.add('btn-dark');
-                } else {
-                    likeButton.innerText = '🤍 좋아요';
-                    likeButton.classList.remove('btn-dark');
-                    likeButton.classList.add('btn-outline-dark');
-                }
-
+                applyLikeUI(data);
                 likeInFlight = false;
                 likeButton.disabled = false;
             },
             () => {
-                // ✅ 실패도 마찬가지: 마지막 요청만 처리
                 if (mySeq !== reqSeq) return;
-
                 alert('좋아요 처리 실패 (로그인 필요)');
                 likeInFlight = false;
                 likeButton.disabled = false;
