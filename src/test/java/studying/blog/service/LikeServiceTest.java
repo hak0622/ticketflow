@@ -137,7 +137,6 @@ class LikeServiceTest {
         String uniq = String.valueOf(System.nanoTime());
         String email = "solo-" + uniq + "@test.com";
 
-        // ✅ 저장 + flush/clear 는 tx 안에서
         tx.execute(status -> {
             userRepository.save(User.builder()
                     .email(email)
@@ -153,7 +152,6 @@ class LikeServiceTest {
 
         ExecutorService pool = Executors.newFixedThreadPool(20);
 
-        // ✅ ready 제거 (pool < threads 에서 deadlock 나기 쉬움)
         CountDownLatch start = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(threads);
 

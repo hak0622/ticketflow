@@ -18,8 +18,13 @@ public class ArticleViewResponse {
     private String authorEmail;
     private long viewCount;
     private long likeCount;
+    private boolean liked;
 
-    public ArticleViewResponse(Article article) {
+    public ArticleViewResponse(Article article){
+        this(article,false);
+    }
+
+    public ArticleViewResponse(Article article,boolean liked) {
         this.id = article.getId();
         this.title = article.getTitle();
         this.content = article.getContent();
@@ -29,5 +34,6 @@ public class ArticleViewResponse {
         this.authorEmail = article.getAuthor().getEmail();
         this.viewCount = article.getViewCount();
         this.likeCount = article.getLikeCount();
+        this.liked = liked;
     }
 }
