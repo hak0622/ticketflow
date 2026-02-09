@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${lecture.title}">특강 상세</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <style>
+        body { font-family: 'Pretendard', sans-serif; letter-spacing: -0.02em; }
+    </style>
+</head>
+<body class="bg-[#fafafa] text-[#334155]">
+
+<nav class="bg-white/80 border-b border-gray-100 sticky top-0 z-50">
+    <div class="max-w-2xl mx-auto px-6 h-14 flex items-center text-sm">
+        <a href="/lectures" class="text-gray-400 hover:text-gray-900 flex items-center gap-1">← 돌아가기</a>
+    </div>
+</nav>
+
+<main class="max-w-2xl mx-auto px-6 py-12">
+    <div class="bg-white border border-gray-100 rounded-2xl p-8 md:p-12 shadow-sm">
+        <div class="mb-10">
+            <h1 th:text="${lecture.title}" class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">특강 제목</h1>
+            <p class="text-gray-500 leading-relaxed text-sm md:text-base">
+                본 특강은 선착순 대기열 기반으로 진행됩니다. <br>
+                정해진 시간에 신청 버튼을 눌러주세요.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-10">
+            <div class="p-5 bg-gray-50 rounded-xl text-center">
+                <p class="text-[10px] text-gray-400 mb-1 uppercase tracking-wider">시작 시간</p>
+                <p th:text="${lecture.openAt}" class="font-bold text-gray-700 text-sm md:text-base">오픈시간</p>
+            </div>
+            <div class="p-5 bg-gray-50 rounded-xl text-center">
+                <p class="text-[10px] text-gray-400 mb-1 uppercase tracking-wider">제한 인원</p>
+                <p class="font-bold text-gray-700 text-sm md:text-base"><span th:text="${lecture.capacity}">300</span>명</p>
+            </div>
+        </div>
+
+        <div class="space-y-6 text-center">
+            <!-- 신청(대기열 등록) 버튼 -->
+            <button id="applyBtn"
+                    class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 rounded-xl shadow-md shadow-blue-100 transition-all active:scale-[0.98] disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
+                    type="button">
+                신청하기
+            </button>
+
+            <div id="resultArea" class="hidden animate-in fade-in duration-500">
+                <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-6">
+                    <div id="loadingSpinner" class="flex justify-center mb-3">
+                        <div class="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+
+                    <p id="resultText" class="text-sm font-medium text-gray-600 leading-relaxed">
+                        대기열 등록 중...
+                    </p>
+
+                    <!-- ✅ 이전 신청 이어하기 영역(B 방식) -->
+                    <div id="resumeArea" class="hidden mt-4">
+                        <p class="text-xs text-gray-500 mb-3">
+                            이전에 신청한 기록이 있습니다. 이어서 상태를 확인할까요?
+                        </p>
+                        <div class="flex gap-2">
+                            <button id="resumeBtn"
+                                    type="button"
+                                    class="flex-1 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 font-semibold py-2 rounded-lg">
+                                이어하기
+                            </button>
+                            <button id="restartBtn"
+                                    type="button"
+                                    class="flex-1 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2 rounded-lg">
+                                새로 신청
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</main>
+
+<script th:inline="javascript">
+    const lectureId = [[${lecture.id}]];
+
+    const applyBtn = document.getElementById("applyBtn");
+    const resultArea = document.getElementById("resultArea");
+    const resultText = document.getElementById("resultText");
+    const spinner = document.getElementById("loadingSpinner");
+
+    const resumeArea = document.getElementById("resumeArea");
+    const resumeBtn = document.getElementById("resumeBtn");
+    const restartBtn = document.getElementById("restartBtn");
+
+    const storageKey = `lecture:${lectureId}:userKey`;
+    const timerKey = `lecture:${lectureId}:applyStartAt`; // ✅ 결제페이지 카운트다운 기준
+    let pollTimer = null;
+
+    function setApplyDisabled(disabled) {
+        applyBtn.disabled = disabled;
+        if (disabled) applyBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        else applyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+
+    function showResult(text, showSpinner = true) {
+        resultArea.classList.remove('hidden');
+        spinner.classList.toggle('hidden', !showSpinner);
+        resultText.innerHTML = text;
+    }
+
+    function stopPolling() {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = null;
+    }
+
+    // ✅ (B 방식) 페이지 로드시 userKey가 있으면 "이어하기"만 보여줌 (자동 폴링 X)
+    function showResumeIfExists() {
+        const userKey = localStorage.getItem(storageKey);
+        if (!userKey) return;
+
+        resultArea.classList.remove('hidden');
+        spinner.classList.add('hidden');
+
+        resultText.innerHTML = `
+            <span class="text-gray-900 font-semibold">이전 신청 기록이 있습니다.</span><br>
+            <span class="text-xs text-gray-500">이어하기를 누르면 현재 대기 상태를 확인합니다.</span>
+        `;
+        resumeArea.classList.remove('hidden');
+    }
+
+    // ✅ 폴링 시작
+    function startPolling() {
+        const userKey = localStorage.getItem(storageKey);
+        if (!userKey) return;
+
+        setApplyDisabled(true);
+        resumeArea.classList.add('hidden');
+        showResult("대기 상태를 확인 중...", true);
+
+        if (pollTimer) return;
+
+        pollTimer = setInterval(() => {
+            fetch(`/api/lectures/${lectureId}/queue/me?userKey=${encodeURIComponent(userKey)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === "QUEUED") {
+                        spinner.classList.remove('hidden');
+                        resultText.innerHTML = `
+                            <span class="text-blue-600 font-bold block mb-1">입장 대기 중</span>
+                            <span class="text-xs text-gray-400">현재 내 순번: </span>
+                            <span class="text-gray-900 font-bold text-lg">${data.position}번</span>
+                            <p class="text-[10px] text-gray-400 mt-1">대기열 인원: ${data.total}명</p>
+                        `;
+                    } else if (data.status === "SUCCESS") {
+                        // ✅ SUCCESS면 결제 페이지로 이동
+                        spinner.classList.add('hidden');
+                        resultText.innerHTML = `
+                            <div class="animate-bounce mb-2">✅</div>
+                            <span class="text-green-600 font-bold text-lg">입장이 가능합니다!</span><br>
+                            <span class="text-xs text-gray-500">결제 페이지로 이동합니다...</span>
+                        `;
+
+                        stopPolling();
+
+                        // ✅ 결제 타이머 시작 시각 저장(UX용)
+                        localStorage.setItem(timerKey, String(Date.now()));
+
+                        // ✅ 결제(신청 확정) 페이지로 이동
+                        setTimeout(() => {
+                            location.href = `/lectures/${lectureId}/apply`;
+                        }, 600);
+
+                    } else if (data.status === "NOT_IN_QUEUE") {
+                        spinner.classList.add('hidden');
+                        resultText.innerHTML = `
+                            <span class="text-orange-500 font-bold">세션이 만료되었습니다.</span><br>
+                            <span class="text-xs text-gray-400">다시 신청하기 버튼을 눌러주세요.</span>
+                        `;
+                        stopPolling();
+                        localStorage.removeItem(storageKey);
+                        localStorage.removeItem(timerKey);
+                        setApplyDisabled(false);
+                        resumeArea.classList.add('hidden');
+                    }
+                })
+                .catch(() => {
+                    spinner.classList.add('hidden');
+                    resultText.innerHTML = "<span class='text-red-400 text-xs'>서버 연결 지연 중...</span>";
+                });
+        }, 1500);
+    }
+
+    // ✅ 대기열 등록 (신청하기 버튼)
+    function enqueueNew() {
+        setApplyDisabled(true);
+        resumeArea.classList.add('hidden');
+        showResult("대기열 등록 중...", true);
+
+        fetch(`/api/lectures/${lectureId}/queue`, { method: "POST" })
+            .then(res => res.json())
+            .then(data => {
+                localStorage.setItem(storageKey, data.userKey);
+                startPolling();
+            })
+            .catch(() => {
+                spinner.classList.add('hidden');
+                resultText.innerHTML = "<span class='text-red-400 text-xs'>오류가 발생했습니다.</span>";
+                setApplyDisabled(false);
+            });
+    }
+
+    // 이벤트
+    applyBtn.addEventListener("click", () => {
+        stopPolling();
+        enqueueNew();
+    });
+
+    resumeBtn.addEventListener("click", () => {
+        resumeArea.classList.add('hidden');
+        startPolling();
+    });
+
+    restartBtn.addEventListener("click", () => {
+        stopPolling();
+        localStorage.removeItem(storageKey);
+        localStorage.removeItem(timerKey);
+        resumeArea.classList.add('hidden');
+        enqueueNew();
+    });
+
+    // 초기
+    window.addEventListener("load", showResumeIfExists);
+</script>
+</body>
+</html>
