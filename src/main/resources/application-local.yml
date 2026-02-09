@@ -16,11 +16,12 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        default_batch_fetch_size: 50
+        default_batch_fetch_size: 100
 
-#logging:
-#  level:
-#    org.hibernate.SQL: debug
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
 jwt:
   secret_key: ${JWT_SECRET_KEY}

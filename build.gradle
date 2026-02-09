@@ -39,6 +39,9 @@ dependencies {
 
     implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.10.0'
 
+    //레디스
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
     // Querydsl (Spring Boot 3.x / Jakarta)
     implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
     annotationProcessor 'com.querydsl:querydsl-apt:5.0.0:jakarta'
