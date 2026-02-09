@@ -50,6 +50,8 @@ public class WebOAuthSecurityConfig {
 
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/token").permitAll()
+                //잠시 api 확인으로 열어둠
+                .requestMatchers("/api/lectures/**").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll()
         );
