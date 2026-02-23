@@ -6,6 +6,6 @@ import studying.blog.domain.Enrollment;
 import java.util.Optional;
 
 public interface EnrollmentRepository extends JpaRepository<Enrollment,Long> {
-    boolean existsByLectureIdAndUserKey(Long lectureId,String userKey);
-    Optional<Enrollment> findByLectureIdAndUserKey(Long lectureId,String userKey);
+    boolean existsByLectureIdAndUserId(Long lectureId,Long userId);
+    Optional<Enrollment> findByLectureIdAndUserId(Long lectureId,Long userId);
 }
