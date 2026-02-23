@@ -12,7 +12,7 @@ public class EnrollmentResponse {
     private Long enrollmentId;
     private Long lectureId;
     private String lectureTitle;
-    private String userKey;
+    private Long userId;
     private LocalDateTime createdAt;
 
     public static EnrollmentResponse from(Enrollment enrollment){
@@ -20,9 +20,8 @@ public class EnrollmentResponse {
                 enrollment.getId(),
                 enrollment.getLecture().getId(),
                 enrollment.getLecture().getTitle(),
-                enrollment.getUserKey(),
+                enrollment.getUserId(),
                 enrollment.getCreatedAt()
         );
     }
-
 }

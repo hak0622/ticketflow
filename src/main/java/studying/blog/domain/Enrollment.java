@@ -13,8 +13,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Table(
         name = "enrollment",
-        uniqueConstraints = {@UniqueConstraint(name = "uk_enrollment_lecture_user",columnNames = {"lecture_id","user_key"})},
-        indexes = {@Index(name = "idx_enrollment_lecture",columnList = "lecture_id"),@Index(name = "idx_enrollment_user",columnList = "user_key")}
+        uniqueConstraints = {@UniqueConstraint(name = "uk_enrollment_lecture_user",columnNames = {"lecture_id","user_id"})},
+        indexes = {@Index(name = "idx_enrollment_lecture",columnList = "lecture_id"),@Index(name = "idx_enrollment_user",columnList = "user_id")}
 )
 public class Enrollment {
 
@@ -25,8 +25,8 @@ public class Enrollment {
     @JoinColumn(name = "lecture_id",nullable = false)
     private Lecture lecture;
 
-    @Column(name = "user_key",nullable = false,length = 64)
-    private String userKey;
+    @Column(name = "user_id",nullable = false)
+    private Long userId;
 
     @Column(name = "created_at",nullable = false)
     private LocalDateTime createdAt;
@@ -36,10 +36,10 @@ public class Enrollment {
         this.createdAt = LocalDateTime.now();
     }
 
-    public static Enrollment create(Lecture lecture,String userKey){
+    public static Enrollment create(Lecture lecture, Long userId){
         return Enrollment.builder()
                 .lecture(lecture)
-                .userKey(userKey)
+                .userId(userId)
                 .createdAt(LocalDateTime.now())
                 .build();
     }
