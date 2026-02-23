@@ -50,8 +50,15 @@ public class TokenProvider {
 
     public Authentication getAuthentication(String token){
         Claims claims = getClaims(token);
+
+        Long userId = claims.get("id",Long.class);
+        String email = claims.getSubject();
+
         Set<SimpleGrantedAuthority>authorities = Collections.singleton(new SimpleGrantedAuthority("ROLE_USER"));
-        return new UsernamePasswordAuthenticationToken(new org.springframework.security.core.userdetails.User(claims.getSubject(),"",authorities),token,authorities);
+
+        CustomPrincipal principal = new CustomPrincipal(userId, email);
+
+        return new UsernamePasswordAuthenticationToken(principal,token,authorities);
     }
 
     public Long getUserId(String token){
