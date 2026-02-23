@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>강의 로비 | StarLecture</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <link rel="stylesheet" crossorigin
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"/>
     <style>
         body { font-family: 'Pretendard', sans-serif; letter-spacing: -0.02em; }
         .lecture-card { transition: all 0.2s ease-in-out; }
@@ -35,7 +36,8 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div th:each="lecture : ${lectures}" class="lecture-card bg-white border border-gray-100 rounded-xl p-6 flex flex-col justify-between">
+        <div th:each="lecture : ${lectures}"
+             class="lecture-card bg-white border border-gray-100 rounded-xl p-6 flex flex-col justify-between">
             <div>
                 <div class="flex items-center gap-2 mb-4">
                     <span class="text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200 px-2 py-0.5 rounded">OFFLINE</span>
@@ -52,11 +54,25 @@
                     </p>
                 </div>
             </div>
-            <a th:href="@{/lectures/{id}(id=${lecture.id})}" class="block w-full text-center py-3 bg-[#f8fafc] hover:bg-gray-100 text-gray-600 font-semibold text-sm rounded-lg transition-colors border border-gray-100">
+            <a th:href="@{/lectures/{id}(id=${lecture.id})}"
+               class="block w-full text-center py-3 bg-[#f8fafc] hover:bg-gray-100 text-gray-600 font-semibold text-sm rounded-lg transition-colors border border-gray-100">
                 신청하기
             </a>
         </div>
     </div>
 </main>
+<script src="/js/token.js"></script>
+
+<script>
+    // 2. 페이지가 로드될 때 URL에 있는 토큰(?token=...)을 추출해 로컬 스토리지에 저장합니다.
+    // 저장 후에는 URL에서 토큰을 제거하여 주소창을 깨끗하게 만듭니다.
+    Token.saveTokenFromUrl();
+
+    // 3. (선택사항) 토큰이 없는 상태로 접근했다면 로그인 페이지로 보낼 수도 있습니다.
+    // if (!Token.getToken()) {
+    //     alert("로그인이 필요한 서비스입니다.");
+    //     location.href = "/login";
+    // }
+</script>
 </body>
 </html>

@@ -81,9 +81,13 @@
     </div>
 </main>
 
+<script src="/js/token.js"></script>
+
 <script th:inline="javascript">
+    // 혹시 token이 쿼리로 들어오는 경우 저장/정리
+    Token.saveTokenFromUrl();
+
     const lectureId = [[${lecture.id}]];
-    const enrolledKey = `lecture:${lectureId}:enrolledUserKey`;
 
     const card = document.getElementById("card");
     const error = document.getElementById("error");
@@ -94,37 +98,39 @@
     const enrollmentId = document.getElementById("enrollmentId");
 
     function formatDate(isoString) {
-        if (!isoString) return "-";
-        return isoString.replace("T", " ").slice(0, 19);
+      if (!isoString) return "-";
+      return isoString.replace("T", " ").slice(0, 19);
     }
 
-    const userKey = localStorage.getItem(enrolledKey);
-
-    if (!userKey) {
+    async function loadReceipt() {
+      // 토큰 없으면 로그인 필요
+      if (!Token.getToken()) {
         error.classList.remove("hidden");
-        errorMsg.innerHTML = "신청 내역을 찾을 수 없습니다.<br>목록으로 돌아가 확인해 주세요.";
-    } else {
-        fetch(`/api/lectures/${lectureId}/enroll/detail?userKey=${encodeURIComponent(userKey)}`)
-            .then(res => {
-                if (!res.ok) throw new Error();
-                return res.json();
-            })
-            .then(data => {
-                title.textContent = data.lectureTitle;
-                createdAt.textContent = formatDate(data.createdAt);
-                enrollmentId.textContent = "#" + data.enrollmentId;
+        errorMsg.innerHTML = "로그인이 필요합니다.<br>로그인 후 다시 확인해 주세요.";
+        return;
+      }
 
-                card.classList.remove("hidden");
+      try {
+        // ✅ userKey 없이 조회 + Authorization 자동 첨부
+        const data = await Token.apiFetch(`/api/lectures/${lectureId}/enroll/detail`, { method: "GET" });
 
-                // ✅ (선택) 조회 성공 후 키 정리
-                // receipt 새로고침 시에도 계속 내역 보이고 싶으면 아래 줄 주석처리
-                localStorage.removeItem(enrolledKey);
-            })
-            .catch(() => {
-                error.classList.remove("hidden");
-                errorMsg.textContent = "내역을 불러오는 중 오류가 발생했습니다.";
-            });
+        title.textContent = data.lectureTitle;
+        createdAt.textContent = formatDate(data.createdAt);
+        enrollmentId.textContent = "#" + data.enrollmentId;
+
+        card.classList.remove("hidden");
+      } catch (e) {
+        error.classList.remove("hidden");
+
+        if (String(e.message).includes("UNAUTHORIZED")) {
+          errorMsg.innerHTML = "로그인이 만료되었습니다.<br>다시 로그인해 주세요.";
+        } else {
+          errorMsg.textContent = "내역을 불러오는 중 오류가 발생했습니다.";
+        }
+      }
     }
+
+    loadReceipt();
 </script>
 
 </body>

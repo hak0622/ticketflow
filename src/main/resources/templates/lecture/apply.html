@@ -71,14 +71,13 @@
     </div>
 </main>
 
+<script src="/js/token.js"></script>
+
 <script th:inline="javascript">
+    // ✅ 로드 시 토큰 저장/정리 (apply 페이지가 token을 직접 받을 수도 있으니까)
+    Token.saveTokenFromUrl();
+
     const lectureId = [[${lecture.id}]];
-
-    // ✅ 기존 대기열 userKey
-    const storageKey = `lecture:${lectureId}:userKey`;
-
-    // ✅ 결제(신청완료) 내역 조회용 userKey
-    const enrolledKey = `lecture:${lectureId}:enrolledUserKey`;
 
     // ✅ 결제 타이머 시작 시각
     const timerKey = `lecture:${lectureId}:applyStartAt`;
@@ -90,7 +89,6 @@
     const resultArea = document.getElementById("resultArea");
     const resultText = document.getElementById("resultText");
     const resultBox = document.getElementById("resultBox");
-
     const agreeEl = document.getElementById("agree");
 
     function nowMs(){ return Date.now(); }
@@ -108,9 +106,9 @@
       resultArea.classList.remove("hidden");
       resultText.innerHTML = msg;
       if(type === 'success') {
-          resultBox.className = "bg-green-50 text-green-700 border border-green-100 rounded-2xl p-4 text-center";
+        resultBox.className = "bg-green-50 text-green-700 border border-green-100 rounded-2xl p-4 text-center";
       } else {
-          resultBox.className = "bg-red-50 text-red-700 border border-red-100 rounded-2xl p-4 text-center";
+        resultBox.className = "bg-red-50 text-red-700 border border-red-100 rounded-2xl p-4 text-center";
       }
     }
 
@@ -133,66 +131,97 @@
       }
     }
 
-    // ✅ 초기 로드: userKey 없으면 결제 불가
-    function getUserKeyOrFail() {
-      return localStorage.getItem(storageKey);
-    }
-
-    const initialUserKey = getUserKeyOrFail();
-    if (!initialUserKey) {
+    async function checkAdmissionOrDisable() {
+      // 토큰 없으면 막기
+      if (!Token.getToken()) {
         payBtn.disabled = true;
-        showResult("fail", "입장권이 없습니다. 상세 페이지에서 대기열을 거쳐주세요.");
-    } else {
-        tick();
-        setInterval(tick, 1000);
-    }
+        showResult("fail", "로그인이 필요합니다. 로그인 후 다시 시도해주세요.");
+        return false;
+      }
 
-    payBtn.addEventListener("click", () => {
-        const userKey = getUserKeyOrFail();
-        if (!userKey) {
-            payBtn.disabled = true;
-            showResult("fail", "입장권이 없습니다. 상세 페이지로 돌아가 다시 진행해주세요.");
-            return;
+      try {
+        // ✅ 서버에서 내 상태 확인 (userId 기반)
+        const data = await Token.apiFetch(`/api/lectures/${lectureId}/queue/me`, { method: "GET" });
+
+        // QUEUED면 아직 입장권 없음
+        if (data.status === "QUEUED") {
+          payBtn.disabled = true;
+          showResult("fail", "아직 입장 권한이 없습니다. 대기열에서 순번을 기다려주세요.");
+          return false;
         }
 
-        if (!agreeEl.checked) {
-            showResult("fail", "필수 약관에 동의해주세요.");
-            return;
+        // SUCCESS면 입장권 있음 → 결제 가능
+        if (data.status === "SUCCESS") {
+          tick();
+          setInterval(tick, 1000);
+          return true;
         }
 
+        // NOT_IN_QUEUE 등
         payBtn.disabled = true;
-        payBtn.innerText = "처리 중...";
+        showResult("fail", "입장권이 없습니다. 상세 페이지에서 대기열부터 진행해주세요.");
+        return false;
 
-        fetch(`/api/lectures/${lectureId}/enroll?userKey=${encodeURIComponent(userKey)}`, { method: "POST" })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === "ENROLLED" || data.status === "ALREADY_ENROLLED") {
+      } catch (e) {
+        if (String(e.message).includes("UNAUTHORIZED")) {
+          payBtn.disabled = true;
+          showResult("fail", "로그인이 만료되었습니다. 다시 로그인해주세요.");
+          return false;
+        }
+        payBtn.disabled = true;
+        showResult("fail", "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+        return false;
+      }
+    }
 
-                // ✅ receipt 페이지에서 조회할 수 있도록 userKey를 '완료용'으로 보관
-                localStorage.setItem(enrolledKey, userKey);
+    // ✅ 초기 로드: 입장권 확인 후 타이머 시작
+    checkAdmissionOrDisable();
 
-                // ✅ 대기열/결제 타이머용 키 정리
-                localStorage.removeItem(storageKey);
-                localStorage.removeItem(timerKey);
+    payBtn.addEventListener("click", async () => {
+      if (!agreeEl.checked) {
+        showResult("fail", "필수 약관에 동의해주세요.");
+        return;
+      }
 
-                showResult("success", "✅ 결제가 완료되었습니다. 신청 내역으로 이동합니다...");
-                payBtn.innerText = "완료";
+      // 만료 체크
+      const startAt = ensureStartAt();
+      if ((startAt + TTL_MS) - nowMs() <= 0) {
+        payBtn.disabled = true;
+        showResult("fail", "⏰ 시간이 만료되었습니다. 다시 대기열부터 진행해주세요.");
+        return;
+      }
 
-                // ✅ 신청 내역(영수증) 페이지로 이동
-                setTimeout(() => {
-                    location.href = `/lectures/${lectureId}/receipt`;
-                }, 600);
+      payBtn.disabled = true;
+      payBtn.innerText = "처리 중...";
 
-            } else {
-                showResult("fail", "처리에 실패했습니다. 다시 대기열부터 시도해주세요.");
-                payBtn.disabled = false;
-                payBtn.innerText = "결제하기";
-            }
-        }).catch(() => {
-            showResult("fail", "서버 오류가 발생했습니다.");
-            payBtn.disabled = false;
-            payBtn.innerText = "결제하기";
-        });
+      try {
+        // ✅ userKey 없이 enroll 호출 + Authorization 헤더 자동 첨부
+        const data = await Token.apiFetch(`/api/lectures/${lectureId}/enroll`, { method: "POST" });
+
+        if (data.status === "ENROLLED" || data.status === "ALREADY_ENROLLED") {
+          // ✅ 결제 타이머 키 정리
+          localStorage.removeItem(timerKey);
+
+          showResult("success", "✅ 결제가 완료되었습니다. 신청 내역으로 이동합니다...");
+          payBtn.innerText = "완료";
+
+          setTimeout(() => {
+            location.href = `/lectures/${lectureId}/receipt`;
+          }, 600);
+        } else {
+          showResult("fail", "처리에 실패했습니다. 다시 대기열부터 시도해주세요.");
+          payBtn.disabled = false;
+          payBtn.innerText = "결제하기";
+        }
+      } catch (e) {
+        if (String(e.message).includes("UNAUTHORIZED")) {
+          showResult("fail", "로그인이 만료되었습니다. 다시 로그인해주세요.");
+        } else {
+          showResult("fail", "서버 오류가 발생했습니다.");
+        }
+        payBtn.disabled = false;
+        payBtn.innerText = "결제하기";
+      }
     });
 </script>
 </body>

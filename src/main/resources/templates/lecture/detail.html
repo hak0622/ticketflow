@@ -10,7 +10,9 @@
         body { font-family: 'Pretendard', sans-serif; letter-spacing: -0.02em; }
     </style>
 </head>
-<body class="bg-[#fafafa] text-[#334155]">
+
+<!-- ✅ lectureId를 JS 인라인 대신 data-attribute로 전달 -->
+<body class="bg-[#fafafa] text-[#334155]" th:attr="data-lecture-id=${lecture.id}">
 
 <nav class="bg-white/80 border-b border-gray-100 sticky top-0 z-50">
     <div class="max-w-2xl mx-auto px-6 h-14 flex items-center text-sm">
@@ -35,7 +37,9 @@
             </div>
             <div class="p-5 bg-gray-50 rounded-xl text-center">
                 <p class="text-[10px] text-gray-400 mb-1 uppercase tracking-wider">제한 인원</p>
-                <p class="font-bold text-gray-700 text-sm md:text-base"><span th:text="${lecture.capacity}">300</span>명</p>
+                <p class="font-bold text-gray-700 text-sm md:text-base">
+                    <span th:text="${lecture.capacity}">300</span>명
+                </p>
             </div>
         </div>
 
@@ -57,19 +61,17 @@
                         대기열 등록 중...
                     </p>
 
-                    <!-- ✅ 이전 신청 이어하기 영역(B 방식) -->
+                    <!-- 이어하기 UI -->
                     <div id="resumeArea" class="hidden mt-4">
                         <p class="text-xs text-gray-500 mb-3">
-                            이전에 신청한 기록이 있습니다. 이어서 상태를 확인할까요?
+                            진행 중인 대기열이 있습니다. 이어서 상태를 확인할까요?
                         </p>
                         <div class="flex gap-2">
-                            <button id="resumeBtn"
-                                    type="button"
+                            <button id="resumeBtn" type="button"
                                     class="flex-1 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 font-semibold py-2 rounded-lg">
                                 이어하기
                             </button>
-                            <button id="restartBtn"
-                                    type="button"
+                            <button id="restartBtn" type="button"
                                     class="flex-1 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2 rounded-lg">
                                 새로 신청
                             </button>
@@ -83,8 +85,14 @@
     </div>
 </main>
 
-<script th:inline="javascript">
-    const lectureId = [[${lecture.id}]];
+<!-- ✅ 캐시 무력화: token.js 변경이 즉시 반영되게 -->
+<script th:src="@{/js/token.js(v=${#dates.createNow().time})}"></script>
+
+<script>
+    // token이 쿼리에 붙어오는 경우 저장/정리
+    if (window.Token) Token.saveTokenFromUrl();
+
+    const lectureId = document.body.dataset.lectureId;
 
     const applyBtn = document.getElementById("applyBtn");
     const resultArea = document.getElementById("resultArea");
@@ -95,144 +103,184 @@
     const resumeBtn = document.getElementById("resumeBtn");
     const restartBtn = document.getElementById("restartBtn");
 
-    const storageKey = `lecture:${lectureId}:userKey`;
-    const timerKey = `lecture:${lectureId}:applyStartAt`; // ✅ 결제페이지 카운트다운 기준
+    const timerKey = `lecture:${lectureId}:applyStartAt`;
     let pollTimer = null;
 
     function setApplyDisabled(disabled) {
-        applyBtn.disabled = disabled;
-        if (disabled) applyBtn.classList.add('opacity-50', 'cursor-not-allowed');
-        else applyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      applyBtn.disabled = disabled;
+      applyBtn.classList.toggle("opacity-50", disabled);
+      applyBtn.classList.toggle("cursor-not-allowed", disabled);
     }
 
-    function showResult(text, showSpinner = true) {
-        resultArea.classList.remove('hidden');
-        spinner.classList.toggle('hidden', !showSpinner);
-        resultText.innerHTML = text;
+    function showResult(html, showSpinner = true) {
+      resultArea.classList.remove("hidden");
+      spinner.classList.toggle("hidden", !showSpinner);
+      resultText.innerHTML = html;
     }
 
     function stopPolling() {
-        if (pollTimer) clearInterval(pollTimer);
-        pollTimer = null;
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
     }
 
-    // ✅ (B 방식) 페이지 로드시 userKey가 있으면 "이어하기"만 보여줌 (자동 폴링 X)
-    function showResumeIfExists() {
-        const userKey = localStorage.getItem(storageKey);
-        if (!userKey) return;
+    function ensureLoggedIn() {
+      if (!window.Token || !Token.getToken()) {
+        setApplyDisabled(true);
+        showResult("로그인이 필요합니다. 로그인 후 다시 시도해주세요.", false);
+        return false;
+      }
+      return true;
+    }
 
-        resultArea.classList.remove('hidden');
-        spinner.classList.add('hidden');
+    async function fetchMyQueueStatus() {
+      return Token.apiFetch(`/api/lectures/${lectureId}/queue/me`, { method: "GET" });
+    }
 
-        resultText.innerHTML = `
-            <span class="text-gray-900 font-semibold">이전 신청 기록이 있습니다.</span><br>
+    async function showResumeIfInProgress() {
+      if (!ensureLoggedIn()) return;
+
+      try {
+        const data = await fetchMyQueueStatus();
+
+        if (data.status === "QUEUED") {
+          spinner.classList.add("hidden");
+          resultArea.classList.remove("hidden");
+          resumeArea.classList.remove("hidden");
+          resultText.innerHTML = `
+            <span class="text-gray-900 font-semibold">진행 중인 대기열이 있습니다.</span><br>
             <span class="text-xs text-gray-500">이어하기를 누르면 현재 대기 상태를 확인합니다.</span>
-        `;
-        resumeArea.classList.remove('hidden');
+          `;
+          setApplyDisabled(false);
+          return;
+        }
+
+        if (data.status === "SUCCESS") {
+          showResult("✅ 입장 권한이 있습니다. 결제 페이지로 이동합니다...", true);
+          localStorage.setItem(timerKey, String(Date.now()));
+          setTimeout(() => location.href = `/lectures/${lectureId}/apply`, 400);
+          return;
+        }
+
+        // NOT_IN_QUEUE
+        resumeArea.classList.add("hidden");
+        setApplyDisabled(false);
+
+      } catch (e) {
+        // 오류가 있어도 버튼은 살려둠
+        resumeArea.classList.add("hidden");
+        setApplyDisabled(false);
+      }
     }
 
-    // ✅ 폴링 시작
     function startPolling() {
-        const userKey = localStorage.getItem(storageKey);
-        if (!userKey) return;
+      if (!ensureLoggedIn()) return;
 
-        setApplyDisabled(true);
-        resumeArea.classList.add('hidden');
-        showResult("대기 상태를 확인 중...", true);
+      setApplyDisabled(true);
+      resumeArea.classList.add("hidden");
+      showResult("대기 상태를 확인 중...", true);
 
-        if (pollTimer) return;
+      if (pollTimer) return;
 
-        pollTimer = setInterval(() => {
-            fetch(`/api/lectures/${lectureId}/queue/me?userKey=${encodeURIComponent(userKey)}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.status === "QUEUED") {
-                        spinner.classList.remove('hidden');
-                        resultText.innerHTML = `
-                            <span class="text-blue-600 font-bold block mb-1">입장 대기 중</span>
-                            <span class="text-xs text-gray-400">현재 내 순번: </span>
-                            <span class="text-gray-900 font-bold text-lg">${data.position}번</span>
-                            <p class="text-[10px] text-gray-400 mt-1">대기열 인원: ${data.total}명</p>
-                        `;
-                    } else if (data.status === "SUCCESS") {
-                        // ✅ SUCCESS면 결제 페이지로 이동
-                        spinner.classList.add('hidden');
-                        resultText.innerHTML = `
-                            <div class="animate-bounce mb-2">✅</div>
-                            <span class="text-green-600 font-bold text-lg">입장이 가능합니다!</span><br>
-                            <span class="text-xs text-gray-500">결제 페이지로 이동합니다...</span>
-                        `;
+      pollTimer = setInterval(async () => {
+        try {
+          const data = await fetchMyQueueStatus();
 
-                        stopPolling();
+          if (data.status === "QUEUED") {
+            spinner.classList.remove("hidden");
+            resultText.innerHTML = `
+              <span class="text-blue-600 font-bold block mb-1">입장 대기 중</span>
+              <span class="text-xs text-gray-400">현재 내 순번: </span>
+              <span class="text-gray-900 font-bold text-lg">${data.position}번</span>
+              <p class="text-[10px] text-gray-400 mt-1">대기열 인원: ${data.total}명</p>
+            `;
+            return;
+          }
 
-                        // ✅ 결제 타이머 시작 시각 저장(UX용)
-                        localStorage.setItem(timerKey, String(Date.now()));
+          if (data.status === "SUCCESS") {
+            spinner.classList.add("hidden");
+            resultText.innerHTML = `
+              <div class="animate-bounce mb-2">✅</div>
+              <span class="text-green-600 font-bold text-lg">입장이 가능합니다!</span><br>
+              <span class="text-xs text-gray-500">결제 페이지로 이동합니다...</span>
+            `;
+            stopPolling();
 
-                        // ✅ 결제(신청 확정) 페이지로 이동
-                        setTimeout(() => {
-                            location.href = `/lectures/${lectureId}/apply`;
-                        }, 600);
+            localStorage.setItem(timerKey, String(Date.now()));
 
-                    } else if (data.status === "NOT_IN_QUEUE") {
-                        spinner.classList.add('hidden');
-                        resultText.innerHTML = `
-                            <span class="text-orange-500 font-bold">세션이 만료되었습니다.</span><br>
-                            <span class="text-xs text-gray-400">다시 신청하기 버튼을 눌러주세요.</span>
-                        `;
-                        stopPolling();
-                        localStorage.removeItem(storageKey);
-                        localStorage.removeItem(timerKey);
-                        setApplyDisabled(false);
-                        resumeArea.classList.add('hidden');
-                    }
-                })
-                .catch(() => {
-                    spinner.classList.add('hidden');
-                    resultText.innerHTML = "<span class='text-red-400 text-xs'>서버 연결 지연 중...</span>";
-                });
-        }, 1500);
+            setTimeout(() => {
+              location.href = `/lectures/${lectureId}/apply`;
+            }, 600);
+
+            return;
+          }
+
+          // NOT_IN_QUEUE
+          spinner.classList.add("hidden");
+          resultText.innerHTML = `
+            <span class="text-orange-500 font-bold">대기열 정보가 없습니다.</span><br>
+            <span class="text-xs text-gray-400">다시 신청하기 버튼을 눌러주세요.</span>
+          `;
+          stopPolling();
+          localStorage.removeItem(timerKey);
+          setApplyDisabled(false);
+          resumeArea.classList.add("hidden");
+
+        } catch (e) {
+          spinner.classList.add("hidden");
+          // 로그인 만료 등
+          resultText.innerHTML = "<span class='text-red-500 text-xs'>오류가 발생했습니다. 새로고침 후 다시 시도해주세요.</span>";
+          stopPolling();
+          setApplyDisabled(false);
+        }
+      }, 1500);
     }
 
-    // ✅ 대기열 등록 (신청하기 버튼)
-    function enqueueNew() {
-        setApplyDisabled(true);
-        resumeArea.classList.add('hidden');
-        showResult("대기열 등록 중...", true);
+    async function enqueueNew() {
+      if (!ensureLoggedIn()) return;
 
-        fetch(`/api/lectures/${lectureId}/queue`, { method: "POST" })
-            .then(res => res.json())
-            .then(data => {
-                localStorage.setItem(storageKey, data.userKey);
-                startPolling();
-            })
-            .catch(() => {
-                spinner.classList.add('hidden');
-                resultText.innerHTML = "<span class='text-red-400 text-xs'>오류가 발생했습니다.</span>";
-                setApplyDisabled(false);
-            });
+      setApplyDisabled(true);
+      resumeArea.classList.add("hidden");
+      showResult("대기열 등록 중...", true);
+
+      try {
+        await Token.apiFetch(`/api/lectures/${lectureId}/queue`, { method: "POST" });
+        startPolling();
+      } catch (e) {
+        spinner.classList.add("hidden");
+        if (String(e.message).includes("UNAUTHORIZED")) {
+          resultText.innerHTML = "<span class='text-red-500 text-xs'>로그인이 만료되었습니다. 다시 로그인해주세요.</span>";
+          setApplyDisabled(true);
+        } else {
+          resultText.innerHTML = "<span class='text-red-400 text-xs'>오류가 발생했습니다.</span>";
+          setApplyDisabled(false);
+        }
+      }
     }
 
-    // 이벤트
+    // 이벤트 바인딩
     applyBtn.addEventListener("click", () => {
-        stopPolling();
-        enqueueNew();
+      stopPolling();
+      enqueueNew();
     });
 
     resumeBtn.addEventListener("click", () => {
-        resumeArea.classList.add('hidden');
-        startPolling();
+      resumeArea.classList.add("hidden");
+      startPolling();
     });
 
     restartBtn.addEventListener("click", () => {
-        stopPolling();
-        localStorage.removeItem(storageKey);
-        localStorage.removeItem(timerKey);
-        resumeArea.classList.add('hidden');
-        enqueueNew();
+      stopPolling();
+      localStorage.removeItem(timerKey);
+      resumeArea.classList.add("hidden");
+      enqueueNew();
     });
 
-    // 초기
-    window.addEventListener("load", showResumeIfExists);
+    // 초기 로드
+    window.addEventListener("load", () => {
+      setApplyDisabled(false);
+      showResumeIfInProgress();
+    });
 </script>
+
 </body>
 </html>
