@@ -1,78 +1,440 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<html lang="ko"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>강의 로비 | StarLecture</title>
+    <title>StarLecture | 무한 루프 프리미엄 특강</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" crossorigin
-          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"/>
+    <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
     <style>
-        body { font-family: 'Pretendard', sans-serif; letter-spacing: -0.02em; }
-        .lecture-card { transition: all 0.2s ease-in-out; }
-        .lecture-card:hover { border-color: #cbd5e1; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05); }
+        body { font-family: 'Pretendard', sans-serif; letter-spacing: -0.02em; overflow-x: hidden; color: #1a1a1a; }
+
+        /* 캐러셀 영역 */
+        .c-section { position: relative; padding: 28px 0; background: #fff; }
+
+        /* overflow:hidden 으로 좌우 peek 잘라냄 */
+        .c-viewport {
+            overflow: hidden;
+            width: 100%;
+            position: relative;
+        }
+
+        /* 슬라이드들이 가로로 나열되는 트랙
+           JS가 transform으로만 이동 — padding/margin 최소화 */
+        .c-track {
+            display: flex;
+            /* transition은 JS에서 동적으로 on/off */
+        }
+
+        /* 슬라이드: width와 margin은 JS가 계산 후 직접 style로 세팅 */
+        .c-slide {
+            flex-shrink: 0;
+            height: 380px;
+            border-radius: 26px;
+            overflow: hidden;
+            position: relative;
+            /* 비활성: 어둡게 + 축소 */
+            filter: brightness(0.65);
+            transform: scale(0.94);
+            transition: filter 0.5s, transform 0.5s, box-shadow 0.5s;
+        }
+        .c-slide.active {
+            filter: brightness(1);
+            transform: scale(1);
+            box-shadow: 0 24px 52px -10px rgba(0,0,0,0.22);
+        }
+
+        /* 배경 */
+        .s1 { background: #111; }
+        .s1::before { content:''; position:absolute; inset:0; background: radial-gradient(ellipse 55% 80% at 78% 50%, rgba(232,52,78,.38) 0%, transparent 65%), radial-gradient(ellipse 30% 45% at 90% 20%, rgba(255,80,40,.15) 0%, transparent 55%); }
+        .s2 { background: linear-gradient(135deg, #1e0840, #2d0f5e 40%, #3b1278); }
+        .s2::before { content:''; position:absolute; inset:0; background: radial-gradient(ellipse 60% 85% at 72% 48%, rgba(168,85,247,.42) 0%, transparent 65%); }
+        .s3 { background: #060d1f; }
+        .s3::before { content:''; position:absolute; inset:0; background: radial-gradient(ellipse 58% 80% at 75% 50%, rgba(59,107,255,.32) 0%, transparent 65%); }
+        .s4 { background: linear-gradient(135deg, #012918, #023d24 50%, #014d2c); }
+        .s4::before { content:''; position:absolute; inset:0; background: radial-gradient(ellipse 58% 80% at 74% 50%, rgba(0,200,100,.28) 0%, transparent 65%); }
+        .s5 { background: linear-gradient(135deg, #eef5ff, #ddeaff 60%, #ccdeff); }
+
+        /* 슬라이드 내부 */
+        .si-body { position:absolute; inset:0; z-index:2; padding:0 60px; display:flex; flex-direction:column; justify-content:center; }
+        .si-tag { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800; letter-spacing:1px; text-transform:uppercase; padding:5px 14px; border-radius:100px; margin-bottom:16px; width:fit-content; }
+        .si-title { font-size:32px; font-weight:900; letter-spacing:-1.2px; line-height:1.22; margin-bottom:12px; }
+        .si-desc { font-size:14px; line-height:1.72; margin-bottom:24px; max-width:420px; }
+        .si-btn { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:800; padding:11px 24px; border-radius:10px; border:none; cursor:pointer; font-family:inherit; width:fit-content; text-decoration:none; transition:opacity .15s; }
+        .si-btn:hover { opacity:.84; }
+        .si-date { position:absolute; bottom:26px; right:56px; z-index:3; font-size:12px; font-weight:700; padding:6px 15px; border-radius:100px; }
+        .si-art { position:absolute; right:0; top:0; bottom:0; width:46%; z-index:1; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+
+        /* 파티클 */
+        .spk { position:absolute; z-index:3; pointer-events:none; animation:spkF 2.2s infinite ease-in-out; }
+        @keyframes spkF { 0%,100%{opacity:.4;transform:scale(.8)} 50%{opacity:1;transform:scale(1.2)} }
+
+        /* 진행바 */
+        .si-pbar { position:absolute; bottom:0; left:0; right:0; height:4px; background:rgba(0,0,0,.1); z-index:4; }
+        .si-pbar-fill { height:100%; width:0%; border-radius:0 0 26px 26px; }
+        .active .si-pbar-fill { animation:pbarGrow 3s linear forwards; }
+        @keyframes pbarGrow { from{width:0%} to{width:100%} }
+
+        /* 번호 */
+        .c-num { position:absolute; bottom:18px; left:50%; transform:translateX(-50%); z-index:50; background:rgba(0,0,0,.42); color:#fff; backdrop-filter:blur(6px); padding:4px 16px; border-radius:100px; font-size:13px; font-weight:800; pointer-events:none; }
+
+        /* 화살표 버튼 */
+        .c-arrow { position:absolute; top:50%; transform:translateY(-50%); z-index:60; width:44px; height:44px; border-radius:50%; background:#fff; border:none; cursor:pointer; box-shadow:0 4px 20px rgba(0,0,0,.15); display:flex; align-items:center; justify-content:center; transition:all .2s; color:#555; }
+        .c-arrow:hover { transform:translateY(-50%) scale(1.1); color:#3b82f6; }
+
+        /* 아이콘 애니 */
+        @keyframes heartFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)} }
+        @keyframes aiGlow { 0%,100%{filter:drop-shadow(0 0 18px rgba(59,107,255,.5))} 50%{filter:drop-shadow(0 0 40px rgba(59,107,255,1))} }
+        @keyframes trophyBob { 0%,100%{transform:rotate(-4deg)} 50%{transform:rotate(4deg) translateY(-9px)} }
     </style>
 </head>
-<body class="bg-[#fafafa] text-[#334155]">
+<body class="bg-white">
 
-<nav class="bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50">
-    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-        <h1 class="text-lg font-bold text-gray-900">StarLecture</h1>
-        <div class="flex gap-8 text-sm text-gray-500">
-            <a href="#" class="hover:text-gray-900">강의 목록</a>
-            <a href="#" class="hover:text-gray-900">내 정보</a>
+<nav class="border-b border-gray-100 sticky top-0 bg-white/90 backdrop-blur-md z-[100] h-16 flex items-center">
+    <div class="max-w-[1200px] mx-auto w-full px-4 flex justify-between items-center">
+        <h1 class="text-2xl font-black tracking-tighter text-slate-900">STAR<span class="text-blue-600">LECTURE</span></h1>
+
+        <div class="hidden md:flex gap-8 font-bold text-[15px] text-slate-500">
+            <a href="#" class="hover:text-blue-600">강의 목록</a>
+            <a href="#" class="text-rose-500 underline underline-offset-4">무한 루프 혜택</a>
+            <a href="#" class="hover:text-blue-600">이벤트</a>
+        </div>
+
+        <!-- ✅ 여기만 "로그인/로그아웃" 상태에 따라 바뀌도록 수정 -->
+        <div class="flex gap-4 font-bold text-[14px] items-center">
+            <!-- 로그인 전 -->
+            <a sec:authorize="isAnonymous()"
+               href="/login"
+               class="px-4 py-2 text-slate-500">로그인</a>
+
+            <!-- 로그인 후 -->
+            <button sec:authorize="isAuthenticated()"
+                    type="button"
+                    onclick="Token.logout('/lectures')"
+                    class="px-4 py-2 text-slate-500">
+                로그아웃
+            </button>
+
+            <!-- 로그인 후에만 "내 강의장" 보이게 -->
+            <a sec:authorize="isAuthenticated()"
+               href="#"
+               class="bg-slate-900 text-white px-5 py-2.5 rounded-xl">내 강의장</a>
+
+            <!-- (선택) 로그인 전에도 버튼을 유지하고 싶으면 아래처럼 바꿔도 됨
+            <a sec:authorize="isAnonymous()"
+               href="/login"
+               class="bg-slate-900 text-white px-5 py-2.5 rounded-xl">내 강의장</a>
+            -->
         </div>
     </div>
 </nav>
 
-<main class="max-w-5xl mx-auto px-6 py-16">
-    <div class="mb-12">
-        <h2 class="text-2xl font-bold text-gray-900 mb-3">진행 중인 특강</h2>
-        <p class="text-gray-400">선착순으로 진행되는 인기 강연을 확인하세요.</p>
-    </div>
+<div class="c-section">
+    <div class="c-viewport" id="cViewport">
+        <div class="c-track" id="cTrack">
 
-    <div th:if="${#lists.isEmpty(lectures)}" class="py-20 text-center border rounded-2xl bg-white border-gray-100">
-        <p class="text-gray-400">등록된 특강이 없습니다.</p>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div th:each="lecture : ${lectures}"
-             class="lecture-card bg-white border border-gray-100 rounded-xl p-6 flex flex-col justify-between">
-            <div>
-                <div class="flex items-center gap-2 mb-4">
-                    <span class="text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200 px-2 py-0.5 rounded">OFFLINE</span>
+            <!-- SLIDE 1 — 얼리버드 -->
+            <div class="c-slide s1">
+                <div class="si-body">
+                    <div class="si-tag" style="background:rgba(232,52,78,.18);color:#ff8fa3;border:1px solid rgba(232,52,78,.3)">🐣 Early Bird Special</div>
+                    <h2 class="si-title" style="color:#fff">매주 열리는 신규강의<br><span style="color:#ff4e6a">얼리버드 특가로 만나자</span></h2>
+                    <p class="si-desc" style="color:rgba(255,255,255,.62)">트렌디한 주제의 갓 나온 신규강의를<br>슈퍼얼리버드 특가로 만나보세요</p>
+                    <a href="#" class="si-btn" style="background:#e8344e;color:#fff;box-shadow:0 8px 24px rgba(232,52,78,.38)">지금 확인하기 →</a>
                 </div>
-                <h3 th:text="${lecture.title}" class="text-lg font-bold text-gray-900 mb-2 leading-tight">특강 제목</h3>
-                <div class="space-y-1.5 mb-8">
-                    <p class="text-sm text-gray-500 flex items-center gap-2">
-                        <span class="w-1 h-1 bg-gray-300 rounded-full"></span>
-                        오픈: <span th:text="${lecture.openAt}">2026-02-08</span>
-                    </p>
-                    <p class="text-sm text-gray-500 flex items-center gap-2">
-                        <span class="w-1 h-1 bg-gray-300 rounded-full"></span>
-                        정원: <span th:text="${lecture.capacity}">300</span>명
-                    </p>
+                <div class="si-art">
+                    <div style="position:relative;width:190px;height:190px">
+                        <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:68px;filter:drop-shadow(0 10px 24px rgba(232,52,78,.6));animation:heartFloat 2.4s infinite ease-in-out">💗</div>
+                        <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:154px;height:154px;background:linear-gradient(155deg,#e8344e,#9b1030);clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);display:flex;align-items:center;justify-content:center">
+                            <span style="font-size:14px;font-weight:900;color:#fff;text-align:center;line-height:1.3">EARLY<br>BIRD</span>
+                        </div>
+                    </div>
+                </div>
+                <span class="spk" style="top:26%;right:44%;color:rgba(255,143,163,.7);font-size:14px">✦</span>
+                <span class="spk" style="top:15%;right:26%;color:rgba(255,143,163,.4);font-size:9px;animation-delay:.5s">✦</span>
+                <span class="spk" style="bottom:32%;right:22%;color:rgba(255,143,163,.5);font-size:11px;animation-delay:1s">✦</span>
+                <div class="si-date" style="background:rgba(255,255,255,.12);backdrop-filter:blur(8px);color:rgba(255,255,255,.82)">2/20(금) ~ 2/28(토)</div>
+                <div class="si-pbar"><div class="si-pbar-fill" style="background:rgba(255,255,255,.65)"></div></div>
+            </div>
+
+            <!-- SLIDE 2 — 크리에이티브 쿠폰 -->
+            <div class="c-slide s2">
+                <div class="si-body">
+                    <div class="si-tag" style="background:rgba(168,85,247,.2);color:#d8b4fe;border:1px solid rgba(168,85,247,.3)">✨ Creative Coupon Pack</div>
+                    <h2 class="si-title" style="color:#fff">내 부족한 기운을 채워줄<br><span style="color:#c084fc">맞춤형 크리에이티브 할인</span></h2>
+                    <p class="si-desc" style="color:rgba(255,255,255,.6)">(~2/28) 대운이 들어서기 전에<br>최대 126만원 할인 부적 받고 가세요!</p>
+                    <a href="#" class="si-btn" style="background:#7c3aed;color:#fff;box-shadow:0 8px 24px rgba(124,58,237,.4)">할인 받기 →</a>
+                </div>
+                <div class="si-art">
+                    <div style="display:flex;gap:8px;transform:rotate(-8deg) translateY(4px)">
+                        <div style="width:62px;height:88px;border-radius:10px;background:linear-gradient(160deg,#4ade80,#166534);display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 8px 20px rgba(0,0,0,.35);transform:rotate(5deg) translateY(-4px)">🌿</div>
+                        <div style="width:62px;height:88px;border-radius:10px;background:linear-gradient(160deg,#fb923c,#9a3412);display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 8px 20px rgba(0,0,0,.35)">🔥</div>
+                        <div style="width:62px;height:88px;border-radius:10px;background:linear-gradient(160deg,#f59e0b,#78350f);display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 8px 20px rgba(0,0,0,.35);transform:rotate(-4deg)">⚡</div>
+                        <div style="width:62px;height:88px;border-radius:10px;background:linear-gradient(160deg,#60a5fa,#1e3a8a);display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 8px 20px rgba(0,0,0,.35);transform:rotate(6deg) translateY(-4px)">💎</div>
+                        <div style="width:62px;height:88px;border-radius:10px;background:linear-gradient(160deg,#e2e8f0,#64748b);display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 8px 20px rgba(0,0,0,.35);transform:rotate(-3deg)">🌫️</div>
+                    </div>
+                </div>
+                <div class="si-date" style="background:rgba(255,255,255,.12);backdrop-filter:blur(8px);color:rgba(255,255,255,.82)">2/20(금) ~ 2/28(토)</div>
+                <div class="si-pbar"><div class="si-pbar-fill" style="background:rgba(255,255,255,.65)"></div></div>
+            </div>
+
+            <!-- SLIDE 3 — Google AI -->
+            <div class="c-slide s3">
+                <div class="si-body">
+                    <div class="si-tag" style="background:rgba(59,107,255,.2);color:#93bbff;border:1px solid rgba(59,107,255,.35)">🤖 Google AI 특가</div>
+                    <h2 class="si-title" style="color:#fff">Google AI 강의로<br><span style="color:#60a5fa">커리어 레벨업 -60%</span></h2>
+                    <p class="si-desc" style="color:rgba(255,255,255,.6)">AI 시대를 선도할 실무 역량을<br>지금 가장 합리적인 가격으로 키워보세요.</p>
+                    <a href="#" class="si-btn" style="background:#3b6bff;color:#fff;box-shadow:0 8px 24px rgba(59,107,255,.4)">특가 강의 보기 →</a>
+                </div>
+                <div class="si-art" style="flex-direction:column;gap:12px">
+                    <div style="font-size:86px;animation:aiGlow 3s infinite ease-in-out">🤖</div>
+                    <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:center">
+                        <span style="background:rgba(59,107,255,.25);border:1px solid rgba(59,107,255,.4);color:#93bbff;font-size:10px;font-weight:800;padding:4px 11px;border-radius:100px">Gemini</span>
+                        <span style="background:rgba(59,107,255,.25);border:1px solid rgba(59,107,255,.4);color:#93bbff;font-size:10px;font-weight:800;padding:4px 11px;border-radius:100px">ChatGPT</span>
+                        <span style="background:rgba(59,107,255,.25);border:1px solid rgba(59,107,255,.4);color:#93bbff;font-size:10px;font-weight:800;padding:4px 11px;border-radius:100px">Claude</span>
+                    </div>
+                </div>
+                <div class="si-date" style="background:rgba(255,255,255,.12);backdrop-filter:blur(8px);color:rgba(255,255,255,.82)">~3/31(월)</div>
+                <div class="si-pbar"><div class="si-pbar-fill" style="background:rgba(255,255,255,.65)"></div></div>
+            </div>
+
+            <!-- SLIDE 4 — 챌린지 -->
+            <div class="c-slide s4">
+                <div class="si-body">
+                    <div class="si-tag" style="background:rgba(0,200,100,.18);color:#4ade80;border:1px solid rgba(0,200,100,.3)">🏆 완주 100% 환급 챌린지</div>
+                    <h2 class="si-title" style="color:#fff">함께 완주하면<br><span style="color:#4ade80">수강료 전액 돌려드립니다</span></h2>
+                    <p class="si-desc" style="color:rgba(255,255,255,.62)">혼자가 아닌 함께라서 더 강한 공부.<br>작심삼일 탈출하고 커리어를 바꿔보세요.</p>
+                    <a href="#" class="si-btn" style="background:#16a34a;color:#fff;box-shadow:0 8px 24px rgba(22,163,74,.4)">챌린지 참여하기 →</a>
+                </div>
+                <div class="si-art" style="flex-direction:column;gap:12px">
+                    <div style="font-size:72px;animation:trophyBob 2.5s infinite ease-in-out">🏆</div>
+                    <div style="display:flex;flex-direction:column;gap:6px;min-width:145px">
+                        <div style="background:rgba(255,255,255,.1);border-radius:8px;padding:8px 15px;display:flex;justify-content:space-between;align-items:center;gap:28px">
+                            <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.55)">완주율</span>
+                            <span style="font-size:14px;font-weight:900;color:#4ade80">87%</span>
+                        </div>
+                        <div style="background:rgba(255,255,255,.1);border-radius:8px;padding:8px 15px;display:flex;justify-content:space-between;align-items:center;gap:28px">
+                            <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.55)">환급 인원</span>
+                            <span style="font-size:14px;font-weight:900;color:#4ade80">12,400+</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="si-date" style="background:rgba(255,255,255,.12);backdrop-filter:blur(8px);color:rgba(255,255,255,.82)">상시 진행</div>
+                <div class="si-pbar"><div class="si-pbar-fill" style="background:rgba(255,255,255,.65)"></div></div>
+            </div>
+
+            <!-- SLIDE 5 — KT AI CAMP -->
+            <div class="c-slide s5">
+                <div class="si-body">
+                    <div class="si-tag" style="background:#dce8ff;color:#3b6bff">🎓 교육 후 AI 취업 보장</div>
+                    <h2 class="si-title" style="color:#0f172a">교육 후 AI 취업까지<br><span style="color:#3b6bff">KT AI CAMP</span></h2>
+                    <p class="si-desc" style="color:#475569">우선지원대상기업 재직 가능!<br>수강료 90% 환급 → 지금 확인하세요.</p>
+                    <a href="#" class="si-btn" style="background:#0f172a;color:#fff">자세히 보기 →</a>
+                </div>
+                <div class="si-art" style="flex-direction:column;gap:12px">
+                    <div style="font-size:62px">🎓</div>
+                    <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px 22px;box-shadow:0 8px 24px rgba(59,107,255,.1)">
+                        <div style="font-size:10px;font-weight:700;color:#94a3b8;margin-bottom:4px">수강료 환급</div>
+                        <div style="font-size:26px;font-weight:900;color:#0f172a;letter-spacing:-1px">최대 <span style="color:#3b6bff">90%</span></div>
+                    </div>
+                </div>
+                <div class="si-date" style="background:rgba(15,23,42,.08);color:rgba(15,23,42,.55)">상시 모집 중</div>
+                <div class="si-pbar"><div class="si-pbar-fill" style="background:rgba(59,107,255,.45)"></div></div>
+            </div>
+
+        </div><!-- /c-track -->
+    </div><!-- /c-viewport -->
+
+    <div class="c-num" id="cNum">1 / 5</div>
+    <button class="c-arrow" id="btnPrev" style="left:16px">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <button class="c-arrow" id="btnNext" style="right:16px">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+    </button>
+</div>
+
+<!-- 강의 리스트 -->
+<main class="max-w-[1200px] mx-auto px-4 py-16">
+    <div class="flex items-end justify-between mb-12">
+        <div>
+            <span class="text-blue-600 font-black text-xs uppercase tracking-[0.2em] mb-2 block">Real-time Ranking</span>
+            <h3 class="text-3xl font-black text-slate-900">실시간 BEST 인기 강의</h3>
+        </div>
+        <a href="#" class="text-sm font-bold text-slate-400 hover:text-blue-600 transition-colors">전체보기 ↗</a>
+    </div>
+    <div th:if="${#lists.isEmpty(lectures)}" class="py-32 text-center rounded-[40px] bg-slate-50 border border-dashed border-slate-200">
+        <p class="text-slate-400 font-bold">현재 진행 중인 특강이 없습니다.</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div th:each="lecture : ${lectures}" class="group cursor-pointer">
+            <div class="aspect-[1.4/1] bg-slate-100 rounded-[32px] mb-6 overflow-hidden relative shadow-sm transition-all group-hover:-translate-y-2 group-hover:shadow-2xl group-hover:shadow-blue-100">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all"></div>
+                <div class="absolute top-5 left-5 bg-white px-3 py-1 rounded-full text-[10px] font-black text-blue-600 shadow-sm">NEW</div>
+            </div>
+            <div class="px-2">
+                <div class="flex items-center gap-2 mb-3 text-[11px] font-bold text-slate-400">
+                    <span class="text-blue-600 font-black">수강신청</span>
+                    <span th:text="${lecture.openAt}">2026.02.08</span>
+                </div>
+                <h4 th:text="${lecture.title}" class="text-lg font-black text-slate-900 mb-6 leading-snug line-clamp-2 h-14 group-hover:text-blue-600 transition-colors">특강 제목</h4>
+                <div class="flex items-center justify-between pt-5 border-t border-slate-100">
+                    <p class="text-sm font-bold text-slate-500">정원 <span th:text="${lecture.capacity}" class="text-slate-900 font-black">300</span>명</p>
+                    <a th:href="@{/lectures/{id}(id=${lecture.id})}" class="text-[13px] font-black text-blue-600 hover:underline">상세보기</a>
                 </div>
             </div>
-            <a th:href="@{/lectures/{id}(id=${lecture.id})}"
-               class="block w-full text-center py-3 bg-[#f8fafc] hover:bg-gray-100 text-gray-600 font-semibold text-sm rounded-lg transition-colors border border-gray-100">
-                신청하기
-            </a>
         </div>
     </div>
 </main>
+
 <script src="/js/token.js"></script>
-
 <script>
-    // 2. 페이지가 로드될 때 URL에 있는 토큰(?token=...)을 추출해 로컬 스토리지에 저장합니다.
-    // 저장 후에는 URL에서 토큰을 제거하여 주소창을 깨끗하게 만듭니다.
-    Token.saveTokenFromUrl();
+    (function () {
+        'use strict';
 
-    // 3. (선택사항) 토큰이 없는 상태로 접근했다면 로그인 페이지로 보낼 수도 있습니다.
-    // if (!Token.getToken()) {
-    //     alert("로그인이 필요한 서비스입니다.");
-    //     location.href = "/login";
-    // }
+        var vp      = document.getElementById('cViewport');
+        var track   = document.getElementById('cTrack');
+        var numEl   = document.getElementById('cNum');
+        var btnPrev = document.getElementById('btnPrev');
+        var btnNext = document.getElementById('btnNext');
+
+        /* 원본 슬라이드 목록 수집 */
+        var slides = Array.prototype.slice.call(track.querySelectorAll('.c-slide'));
+        var N = slides.length; // 5
+
+        /* 무한 루프용 클론:
+           앞에 마지막 슬라이드 클론, 뒤에 첫 슬라이드 클론
+           최종 배치: [clone5] [1] [2] [3] [4] [5] [clone1]
+        */
+        var cloneLast  = slides[N - 1].cloneNode(true);
+        var cloneFirst = slides[0].cloneNode(true);
+        track.insertBefore(cloneLast, slides[0]);
+        track.appendChild(cloneFirst);
+
+        /* 전체 슬라이드 (클론 포함, N+2개) */
+        var all = Array.prototype.slice.call(track.querySelectorAll('.c-slide'));
+
+        var MAX_W  = 1200; /* 강의 리스트 컨테이너 너비 — 이 너비에 맞춤 */
+        var GAP    = 12;   /* 슬라이드 사이 gap px */
+
+        /* PEEK = 화면이 MAX_W보다 넓으면 남은 공간의 절반, 좁으면 16px */
+        function calcPeek() {
+            return Math.max(16, (vp.offsetWidth - MAX_W) / 2);
+        }
+        var PEEK = calcPeek();
+
+        var cur       = 0;    /* 현재 슬라이드 인덱스 (0 ~ N-1, 원본 기준) */
+        var isJumping = false;
+        var autoTimer = null;
+
+        /* ── 슬라이드 너비 계산 및 적용 ── */
+        function applyWidths() {
+            PEEK = calcPeek();
+            var w = vp.offsetWidth - PEEK * 2;
+            all.forEach(function(s) {
+                s.style.width       = w + 'px';
+                s.style.marginLeft  = GAP + 'px';
+                s.style.marginRight = GAP + 'px';
+            });
+            return w;
+        }
+
+        /* ── translateX 계산 ──
+           all[cur+1] 을 화면 중앙(peek 위치)에 오게 함
+        */
+        function calcX(idx) {
+            PEEK = calcPeek();
+            var w    = vp.offsetWidth - PEEK * 2;
+            var unit = w + GAP * 2;
+            return PEEK - (idx + 1) * unit;
+        }
+
+        /* ── 트랙 이동 ── */
+        function moveTo(idx, animate) {
+            var x = calcX(idx);
+            track.style.transition = animate
+                ? 'transform 0.6s cubic-bezier(0.25,1,0.5,1)'
+                : 'none';
+            track.style.transform = 'translateX(' + x + 'px)';
+        }
+
+        /* ── active & 번호 업데이트 ── */
+        function updateUI(idx) {
+            all.forEach(function(s, i) {
+                s.classList.toggle('active', i === idx + 1);
+            });
+            numEl.textContent = (idx + 1) + ' / ' + N;
+        }
+
+        /* ── 이동 핵심 함수 ── */
+        function go(delta) {
+            if (isJumping) return;
+            cur += delta;
+
+            moveTo(cur, true);
+            updateUI(cur);
+
+            /* 무한 루프: 경계 벗어나면 애니 후 순간이동 */
+            if (cur >= N) {
+                isJumping = true;
+                setTimeout(function() {
+                    cur = 0;
+                    moveTo(cur, false);
+                    updateUI(cur);
+                    isJumping = false;
+                }, 650);
+            } else if (cur < 0) {
+                isJumping = true;
+                setTimeout(function() {
+                    cur = N - 1;
+                    moveTo(cur, false);
+                    updateUI(cur);
+                    isJumping = false;
+                }, 650);
+            }
+        }
+
+        /* ── 자동 재생 ── */
+        function startAuto() {
+            clearInterval(autoTimer);
+            autoTimer = setInterval(function() { go(1); }, 3000);
+        }
+
+        /* ── 버튼 이벤트 ── */
+        btnPrev.addEventListener('click', function() { go(-1); startAuto(); });
+        btnNext.addEventListener('click', function() { go(1);  startAuto(); });
+
+        /* ── 터치 스와이프 ── */
+        var touchStartX = 0;
+        vp.addEventListener('touchstart', function(e) {
+            touchStartX = e.touches[0].clientX;
+        }, { passive: true });
+        vp.addEventListener('touchend', function(e) {
+            var dx = e.changedTouches[0].clientX - touchStartX;
+            if (Math.abs(dx) > 50) { go(dx < 0 ? 1 : -1); startAuto(); }
+        }, { passive: true });
+
+        /* ── 리사이즈 ── */
+        window.addEventListener('resize', function() {
+            applyWidths();
+            moveTo(cur, false);
+        });
+
+        /* ── 초기화:
+           반드시 DOM 렌더 완료 후 실행해야 vp.offsetWidth가 정확함
+           requestAnimationFrame을 두 번 중첩해서 보장
+        ── */
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                applyWidths();
+                moveTo(cur, false);
+                updateUI(cur);
+                startAuto();
+            });
+        });
+
+    })();
 </script>
 </body>
 </html>

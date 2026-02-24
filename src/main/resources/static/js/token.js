@@ -20,6 +20,18 @@
     return localStorage.getItem(TOKEN_KEY);
   }
 
+  function clearToken() {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+
+  async function logout(redirectTo) {
+    clearToken();
+    try {
+      await fetch("/logout", { method: "POST" });
+    } catch (e) {}
+    location.href = redirectTo || "/lectures";
+  }
+
   function authHeaders(extraHeaders) {
     const token = getToken();
     return {
@@ -34,12 +46,18 @@
 
     const res = await fetch(url, opts);
 
-    if (res.status === 401) throw new Error("UNAUTHORIZED");
+    if (res.status === 401) {
+      clearToken();
+      throw new Error("UNAUTHORIZED");
+    }
 
     const contentType = res.headers.get("content-type") || "";
     if (contentType.includes("application/json")) return res.json();
     return res.text();
   }
 
-  window.Token = { saveTokenFromUrl, getToken, apiFetch };
+  window.Token = { saveTokenFromUrl, getToken, clearToken, logout, apiFetch };
+
+  // ✅ 핵심: 스크립트 로드되면 즉시 URL의 token을 저장
+  saveTokenFromUrl();
 })();
