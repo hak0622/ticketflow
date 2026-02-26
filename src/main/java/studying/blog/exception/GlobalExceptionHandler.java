@@ -12,10 +12,27 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<?> handleIllegalState(IllegalStateException e) {
-        // 정원 마감 같은 비즈니스 충돌 409
+        String msg = e.getMessage() == null ? "" : e.getMessage();
+
+        //오픈 전/마감 -> 403
+        if(msg.contains("오픈 전") || msg.contains("마감된 강의")){
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "status",403,
+                    "error",msg
+            ));
+        }
+
+        //정원 마감/ 좌석 부족 등 충돌 -> 409
+        if(msg.contains("정원") || msg.contains("SOLD_OUT")){
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "status",409,
+                    "error",msg
+            ));
+        }
+
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                "status", 409,
-                "error", e.getMessage()
+                "status",409,
+                "error",msg
         ));
     }
 
