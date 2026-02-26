@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import studying.blog.domain.Enrollment;
 import studying.blog.domain.Lecture;
+import studying.blog.domain.LectureStatus;
 import studying.blog.dto.EnrollResult;
 import studying.blog.dto.EnrollmentResponse;
 import studying.blog.repository.EnrollmentRepository;
@@ -19,13 +20,22 @@ public class EnrollService {
 
     @Transactional
     public EnrollResult enroll(Long lectureId, Long userId){
-        // 1) 입장권(admitted) 검증
-        if(!queueService.isAdmitted(lectureId,userId)){
-            throw new IllegalStateException("입장 권한이 없습니다. (대기열 성공 후 진행하세요");
+        boolean consumed = queueService.consumeAdmitted(lectureId, userId);
+
+        // 입장권 소비 먼저 시도 (동시 클릭/중복 요청 방지)
+        if(!consumed){
+            throw new IllegalStateException("입장 권한이 없습니다.(입장권이 없거나 만료/이미 사용됨)");
         }
 
         // 2) 강의 row 락(동시성 방지)
         Lecture lecture = lectureRepository.findByIdForUpdate(lectureId).orElseThrow(() -> new IllegalArgumentException("Lecture not found :" + lectureId));
+
+        if(lecture.getStatus() == LectureStatus.CLOSED){
+            throw new IllegalStateException("마감된 강의입니다.");
+        }
+        if(lecture.getStatus() == LectureStatus.SOLD_OUT){
+            throw new IllegalStateException("정원이 마감되었습니다.");
+        }
 
         // 3) 중복 신청 방지
         if(enrollmentRepository.existsByLectureIdAndUserId(lectureId,userId)){
@@ -34,9 +44,14 @@ public class EnrollService {
 
         // 4) 정원 체크 + 차감
         if (!lecture.hasSeat()) {
+            lecture.markSoldOut();
             throw new IllegalStateException("정원이 마감되었습니다.");
         }
         lecture.increaseEnrolled();
+
+        if(!lecture.hasSeat()){
+            lecture.markSoldOut();
+        }
 
         // 5) 신청 기록 저장
         Enrollment enrollment = Enrollment.builder()
@@ -45,9 +60,6 @@ public class EnrollService {
                 .build();
 
         enrollmentRepository.save(enrollment);
-
-        // 6) 입장권 소모
-        queueService.consumeAdmitted(lectureId, userId);
 
         return new EnrollResult("ENROLLED", lecture.getId(), lecture.getTitle());
     }

@@ -6,6 +6,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import studying.blog.config.CustomPrincipal;
+import studying.blog.dto.EnrollResult;
+import studying.blog.service.EnrollService;
 import studying.blog.service.QueueService;
 
 import java.util.Map;
@@ -16,6 +18,7 @@ import java.util.UUID;
 @RequestMapping("/api/lectures")
 public class LectureQueueApiController {
     private final QueueService queueService;
+    private final EnrollService enrollService;
 
     private Long currentUserId(){
         CustomPrincipal principal = (CustomPrincipal) SecurityContextHolder
@@ -29,6 +32,15 @@ public class LectureQueueApiController {
     @PostMapping("/{lectureId}/queue")
     public ResponseEntity<?> enqueue(@PathVariable Long lectureId) {
         Long userId = currentUserId();
+
+        EnrollResult my = enrollService.myEnroll(lectureId, userId);
+        if("ENROLLED".equals(my.getStatus())){
+            return ResponseEntity.ok(Map.of(
+                    "lectureId", lectureId,
+                    "status", "ENROLLED",
+                    "message","이미 신청한 강의입니다."
+            ));
+        }
 
         Long position = queueService.enqueue(lectureId, userId);
         Long total = queueService.getTotal(lectureId);
@@ -45,6 +57,15 @@ public class LectureQueueApiController {
     @GetMapping("/{lectureId}/queue/me")
     public ResponseEntity<?>myQueue(@PathVariable Long lectureId){
         Long userId = currentUserId();
+
+        EnrollResult my = enrollService.myEnroll(lectureId, userId);
+        if ("ENROLLED".equals(my.getStatus())) {
+            return ResponseEntity.ok(Map.of(
+                    "lectureId", lectureId,
+                    "status", "ENROLLED",
+                    "message", "이미 신청한 강의입니다."
+            ));
+        }
 
         Long position = queueService.getPosition(lectureId, userId);
         Long total = queueService.getTotal(lectureId);
@@ -63,7 +84,7 @@ public class LectureQueueApiController {
         if (queueService.isAdmitted(lectureId, userId)) {
             return ResponseEntity.ok(Map.of(
                     "lectureId", lectureId,
-                    "status", "SUCCESS"
+                    "status", "ADMITTED"
             ));
         }
 
