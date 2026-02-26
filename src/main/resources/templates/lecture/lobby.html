@@ -21,21 +21,16 @@
             position: relative;
         }
 
-        /* 슬라이드들이 가로로 나열되는 트랙
-           JS가 transform으로만 이동 — padding/margin 최소화 */
-        .c-track {
-            display: flex;
-            /* transition은 JS에서 동적으로 on/off */
-        }
+        /* 슬라이드들이 가로로 나열되는 트랙 */
+        .c-track { display: flex; }
 
-        /* 슬라이드: width와 margin은 JS가 계산 후 직접 style로 세팅 */
+        /* 슬라이드 */
         .c-slide {
             flex-shrink: 0;
             height: 380px;
             border-radius: 26px;
             overflow: hidden;
             position: relative;
-            /* 비활성: 어둡게 + 축소 */
             filter: brightness(0.65);
             transform: scale(0.94);
             transition: filter 0.5s, transform 0.5s, box-shadow 0.5s;
@@ -102,14 +97,11 @@
             <a href="#" class="hover:text-blue-600">이벤트</a>
         </div>
 
-        <!-- ✅ 여기만 "로그인/로그아웃" 상태에 따라 바뀌도록 수정 -->
         <div class="flex gap-4 font-bold text-[14px] items-center">
-            <!-- 로그인 전 -->
             <a sec:authorize="isAnonymous()"
                href="/login"
                class="px-4 py-2 text-slate-500">로그인</a>
 
-            <!-- 로그인 후 -->
             <button sec:authorize="isAuthenticated()"
                     type="button"
                     onclick="Token.logout('/lectures')"
@@ -117,16 +109,9 @@
                 로그아웃
             </button>
 
-            <!-- 로그인 후에만 "내 강의장" 보이게 -->
             <a sec:authorize="isAuthenticated()"
                href="#"
                class="bg-slate-900 text-white px-5 py-2.5 rounded-xl">내 강의장</a>
-
-            <!-- (선택) 로그인 전에도 버튼을 유지하고 싶으면 아래처럼 바꿔도 됨
-            <a sec:authorize="isAnonymous()"
-               href="/login"
-               class="bg-slate-900 text-white px-5 py-2.5 rounded-xl">내 강의장</a>
-            -->
         </div>
     </div>
 </nav>
@@ -264,31 +249,61 @@
         </div>
         <a href="#" class="text-sm font-bold text-slate-400 hover:text-blue-600 transition-colors">전체보기 ↗</a>
     </div>
+
     <div th:if="${#lists.isEmpty(lectures)}" class="py-32 text-center rounded-[40px] bg-slate-50 border border-dashed border-slate-200">
         <p class="text-slate-400 font-bold">현재 진행 중인 특강이 없습니다.</p>
     </div>
+
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         <div th:each="lecture : ${lectures}" class="group cursor-pointer">
             <div class="aspect-[1.4/1] bg-slate-100 rounded-[32px] mb-6 overflow-hidden relative shadow-sm transition-all group-hover:-translate-y-2 group-hover:shadow-2xl group-hover:shadow-blue-100">
+
                 <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all"></div>
+
+                <!-- NEW -->
                 <div class="absolute top-5 left-5 bg-white px-3 py-1 rounded-full text-[10px] font-black text-blue-600 shadow-sm">NEW</div>
+
+                <!-- ✅ 상태 배지(마감/정원마감/오픈까지/신청가능) -->
+                <div class="absolute top-5 right-5"
+                     th:attr="
+                        data-open-at=${#temporals.format(lecture.openAt, 'yyyy-MM-dd''T''HH:mm:ss')},
+                        data-status=${lecture.status},
+                        data-remaining=${lecture.capacity - lecture.enrolledCount}
+                     ">
+                    <span class="statusBadge inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black shadow-sm"></span>
+                </div>
+
             </div>
+
             <div class="px-2">
                 <div class="flex items-center gap-2 mb-3 text-[11px] font-bold text-slate-400">
                     <span class="text-blue-600 font-black">수강신청</span>
-                    <span th:text="${lecture.openAt}">2026.02.08</span>
+                    <span th:text="${#temporals.format(lecture.openAt, 'yyyy.MM.dd (E) HH:mm', T(java.util.Locale).KOREAN)}"></span>
                 </div>
+
                 <h4 th:text="${lecture.title}" class="text-lg font-black text-slate-900 mb-6 leading-snug line-clamp-2 h-14 group-hover:text-blue-600 transition-colors">특강 제목</h4>
+
                 <div class="flex items-center justify-between pt-5 border-t border-slate-100">
-                    <p class="text-sm font-bold text-slate-500">정원 <span th:text="${lecture.capacity}" class="text-slate-900 font-black">300</span>명</p>
-                    <a th:href="@{/lectures/{id}(id=${lecture.id})}" class="text-[13px] font-black text-blue-600 hover:underline">상세보기</a>
+                    <p class="text-sm font-bold text-slate-500">
+                        정원 <span th:text="${lecture.capacity}" class="text-slate-900 font-black">300</span>명
+                        <span class="text-slate-300 mx-1">|</span>
+                        남은자리
+                        <span th:text="${lecture.capacity - lecture.enrolledCount}" class="text-blue-600 font-black">0</span>석
+                    </p>
+
+                    <a th:href="@{/lectures/{id}(id=${lecture.id})}"
+                       class="text-[13px] font-black text-blue-600 hover:underline">
+                        상세보기
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 </main>
 
-<script src="/js/token.js"></script>
+<!-- ✅ 캐시 무력화: token.js 변경 즉시 반영 -->
+<script th:src="@{/js/token.js(v=${#dates.createNow().time})}"></script>
+
 <script>
     (function () {
         'use strict';
@@ -299,36 +314,28 @@
         var btnPrev = document.getElementById('btnPrev');
         var btnNext = document.getElementById('btnNext');
 
-        /* 원본 슬라이드 목록 수집 */
         var slides = Array.prototype.slice.call(track.querySelectorAll('.c-slide'));
-        var N = slides.length; // 5
+        var N = slides.length;
 
-        /* 무한 루프용 클론:
-           앞에 마지막 슬라이드 클론, 뒤에 첫 슬라이드 클론
-           최종 배치: [clone5] [1] [2] [3] [4] [5] [clone1]
-        */
         var cloneLast  = slides[N - 1].cloneNode(true);
         var cloneFirst = slides[0].cloneNode(true);
         track.insertBefore(cloneLast, slides[0]);
         track.appendChild(cloneFirst);
 
-        /* 전체 슬라이드 (클론 포함, N+2개) */
         var all = Array.prototype.slice.call(track.querySelectorAll('.c-slide'));
 
-        var MAX_W  = 1200; /* 강의 리스트 컨테이너 너비 — 이 너비에 맞춤 */
-        var GAP    = 12;   /* 슬라이드 사이 gap px */
+        var MAX_W  = 1200;
+        var GAP    = 12;
 
-        /* PEEK = 화면이 MAX_W보다 넓으면 남은 공간의 절반, 좁으면 16px */
         function calcPeek() {
             return Math.max(16, (vp.offsetWidth - MAX_W) / 2);
         }
         var PEEK = calcPeek();
 
-        var cur       = 0;    /* 현재 슬라이드 인덱스 (0 ~ N-1, 원본 기준) */
+        var cur       = 0;
         var isJumping = false;
         var autoTimer = null;
 
-        /* ── 슬라이드 너비 계산 및 적용 ── */
         function applyWidths() {
             PEEK = calcPeek();
             var w = vp.offsetWidth - PEEK * 2;
@@ -340,9 +347,6 @@
             return w;
         }
 
-        /* ── translateX 계산 ──
-           all[cur+1] 을 화면 중앙(peek 위치)에 오게 함
-        */
         function calcX(idx) {
             PEEK = calcPeek();
             var w    = vp.offsetWidth - PEEK * 2;
@@ -350,7 +354,6 @@
             return PEEK - (idx + 1) * unit;
         }
 
-        /* ── 트랙 이동 ── */
         function moveTo(idx, animate) {
             var x = calcX(idx);
             track.style.transition = animate
@@ -359,7 +362,6 @@
             track.style.transform = 'translateX(' + x + 'px)';
         }
 
-        /* ── active & 번호 업데이트 ── */
         function updateUI(idx) {
             all.forEach(function(s, i) {
                 s.classList.toggle('active', i === idx + 1);
@@ -367,7 +369,6 @@
             numEl.textContent = (idx + 1) + ' / ' + N;
         }
 
-        /* ── 이동 핵심 함수 ── */
         function go(delta) {
             if (isJumping) return;
             cur += delta;
@@ -375,7 +376,6 @@
             moveTo(cur, true);
             updateUI(cur);
 
-            /* 무한 루프: 경계 벗어나면 애니 후 순간이동 */
             if (cur >= N) {
                 isJumping = true;
                 setTimeout(function() {
@@ -395,17 +395,14 @@
             }
         }
 
-        /* ── 자동 재생 ── */
         function startAuto() {
             clearInterval(autoTimer);
             autoTimer = setInterval(function() { go(1); }, 3000);
         }
 
-        /* ── 버튼 이벤트 ── */
         btnPrev.addEventListener('click', function() { go(-1); startAuto(); });
         btnNext.addEventListener('click', function() { go(1);  startAuto(); });
 
-        /* ── 터치 스와이프 ── */
         var touchStartX = 0;
         vp.addEventListener('touchstart', function(e) {
             touchStartX = e.touches[0].clientX;
@@ -415,16 +412,11 @@
             if (Math.abs(dx) > 50) { go(dx < 0 ? 1 : -1); startAuto(); }
         }, { passive: true });
 
-        /* ── 리사이즈 ── */
         window.addEventListener('resize', function() {
             applyWidths();
             moveTo(cur, false);
         });
 
-        /* ── 초기화:
-           반드시 DOM 렌더 완료 후 실행해야 vp.offsetWidth가 정확함
-           requestAnimationFrame을 두 번 중첩해서 보장
-        ── */
         requestAnimationFrame(function() {
             requestAnimationFrame(function() {
                 applyWidths();
@@ -436,5 +428,70 @@
 
     })();
 </script>
+
+<!-- ✅ 로비 상태 배지 렌더링: OPEN/오픈예정/마감/정원마감/마감임박 -->
+<script>
+    (function(){
+      const wraps = document.querySelectorAll('[data-open-at][data-status][data-remaining]');
+
+      function fmt(diffMs){
+        const s = Math.max(0, Math.floor(diffMs / 1000));
+        const hh = String(Math.floor(s / 3600)).padStart(2, "0");
+        const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+        const ss = String(s % 60).padStart(2, "0");
+        return `${hh}:${mm}:${ss}`;
+      }
+
+      function setBadge(badge, classes, text){
+        badge.className = "statusBadge inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black shadow-sm";
+        classes.forEach(c => badge.classList.add(c));
+        badge.textContent = text;
+      }
+
+      function render(){
+        const now = Date.now();
+
+        wraps.forEach(wrap => {
+          const badge = wrap.querySelector('.statusBadge');
+          if (!badge) return;
+
+          const status = (wrap.dataset.status || "").toUpperCase();
+          const openAtIso = wrap.dataset.openAt;
+          const remaining = Number(wrap.dataset.remaining || "0");
+          const openAtMs = openAtIso ? new Date(openAtIso).getTime() : NaN;
+
+          if (status === "CLOSED") {
+            setBadge(badge, ["bg-slate-900","text-white"], "마감");
+            return;
+          }
+
+          if (status === "SOLD_OUT") {
+            setBadge(badge, ["bg-rose-50","text-rose-600","border","border-rose-100"], "정원 마감");
+            return;
+          }
+
+          // 오픈 전 카운트다운
+          if (!Number.isNaN(openAtMs) && now < openAtMs) {
+            setBadge(badge, ["bg-amber-50","text-amber-700","border","border-amber-100"], `오픈까지 ${fmt(openAtMs - now)}`);
+            return;
+          }
+
+          // 오픈 후
+          // 잔여석 적으면 "마감 임박" 표시
+          if (remaining > 0 && remaining <= 10) {
+            setBadge(badge, ["bg-rose-50","text-rose-600","border","border-rose-100"], `마감 임박 ${remaining}석`);
+            return;
+          }
+
+          setBadge(badge, ["bg-blue-50","text-blue-600","border","border-blue-100"], "신청 가능");
+        });
+      }
+
+      render();
+      // 로비는 너무 촘촘하면 부담될 수 있어 1.5초
+      setInterval(render, 1500);
+    })();
+</script>
+
 </body>
 </html>

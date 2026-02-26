@@ -11,7 +11,9 @@
         .timer-glow { box-shadow: 0 0 15px rgba(59, 130, 246, 0.1); }
     </style>
 </head>
-<body class="bg-[#f8fafc] text-[#334155]">
+
+<!-- ✅ status 전달 -->
+<body class="bg-[#f8fafc] text-[#334155]" th:attr="data-lecture-status=${lecture.status}">
 
 <nav class="bg-white/80 border-b border-slate-100 sticky top-0 z-50 backdrop-blur-md">
     <div class="max-w-xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -71,15 +73,14 @@
     </div>
 </main>
 
-<script src="/js/token.js"></script>
+<script th:src="@{/js/token.js(v=${#dates.createNow().time})}"></script>
 
 <script th:inline="javascript">
-    // ✅ 로드 시 토큰 저장/정리 (apply 페이지가 token을 직접 받을 수도 있으니까)
     Token.saveTokenFromUrl();
 
     const lectureId = [[${lecture.id}]];
+    const lectureStatus = (document.body.dataset.lectureStatus || "").toUpperCase();
 
-    // ✅ 결제 타이머 시작 시각
     const timerKey = `lecture:${lectureId}:applyStartAt`;
     const TTL_MS = 10 * 60 * 1000;
 
@@ -131,8 +132,24 @@
       }
     }
 
+    // ✅ 페이지 진입 시 강의 상태 방어
+    function guardLectureStatus() {
+      if (lectureStatus === "CLOSED") {
+        payBtn.disabled = true;
+        showResult("fail", "마감된 강의입니다. 상세 페이지로 돌아가주세요.");
+        return false;
+      }
+      if (lectureStatus === "SOLD_OUT") {
+        payBtn.disabled = true;
+        showResult("fail", "정원이 마감되었습니다. 상세 페이지로 돌아가주세요.");
+        return false;
+      }
+      return true;
+    }
+
     async function checkAdmissionOrDisable() {
-      // 토큰 없으면 막기
+      if (!guardLectureStatus()) return false;
+
       if (!Token.getToken()) {
         payBtn.disabled = true;
         showResult("fail", "로그인이 필요합니다. 로그인 후 다시 시도해주세요.");
@@ -140,24 +157,20 @@
       }
 
       try {
-        // ✅ 서버에서 내 상태 확인 (userId 기반)
         const data = await Token.apiFetch(`/api/lectures/${lectureId}/queue/me`, { method: "GET" });
 
-        // QUEUED면 아직 입장권 없음
         if (data.status === "QUEUED") {
           payBtn.disabled = true;
           showResult("fail", "아직 입장 권한이 없습니다. 대기열에서 순번을 기다려주세요.");
           return false;
         }
 
-        // SUCCESS면 입장권 있음 → 결제 가능
-        if (data.status === "SUCCESS") {
+        if (data.status === "ADMITTED") {
           tick();
           setInterval(tick, 1000);
           return true;
         }
 
-        // NOT_IN_QUEUE 등
         payBtn.disabled = true;
         showResult("fail", "입장권이 없습니다. 상세 페이지에서 대기열부터 진행해주세요.");
         return false;
@@ -174,16 +187,17 @@
       }
     }
 
-    // ✅ 초기 로드: 입장권 확인 후 타이머 시작
+    // 초기 로드
     checkAdmissionOrDisable();
 
     payBtn.addEventListener("click", async () => {
+      if (!guardLectureStatus()) return;
+
       if (!agreeEl.checked) {
         showResult("fail", "필수 약관에 동의해주세요.");
         return;
       }
 
-      // 만료 체크
       const startAt = ensureStartAt();
       if ((startAt + TTL_MS) - nowMs() <= 0) {
         payBtn.disabled = true;
@@ -195,11 +209,9 @@
       payBtn.innerText = "처리 중...";
 
       try {
-        // ✅ userKey 없이 enroll 호출 + Authorization 헤더 자동 첨부
         const data = await Token.apiFetch(`/api/lectures/${lectureId}/enroll`, { method: "POST" });
 
         if (data.status === "ENROLLED" || data.status === "ALREADY_ENROLLED") {
-          // ✅ 결제 타이머 키 정리
           localStorage.removeItem(timerKey);
 
           showResult("success", "✅ 결제가 완료되었습니다. 신청 내역으로 이동합니다...");
@@ -214,7 +226,17 @@
           payBtn.innerText = "결제하기";
         }
       } catch (e) {
-        if (String(e.message).includes("UNAUTHORIZED")) {
+        const msg = String(e.message || "");
+
+        // ✅ 정원 마감/마감/입장권 없음 등 서버 메시지 반영
+        if (msg.includes("정원") || msg.includes("마감")) {
+          showResult("fail", msg);
+          payBtn.disabled = true;
+          payBtn.innerText = "결제 불가";
+          return;
+        }
+
+        if (msg.includes("UNAUTHORIZED")) {
           showResult("fail", "로그인이 만료되었습니다. 다시 로그인해주세요.");
         } else {
           showResult("fail", "서버 오류가 발생했습니다.");
