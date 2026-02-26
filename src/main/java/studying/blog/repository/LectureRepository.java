@@ -6,7 +6,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import studying.blog.domain.Lecture;
+import studying.blog.domain.LectureStatus;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface LectureRepository extends JpaRepository<Lecture,Long> {
@@ -14,4 +16,6 @@ public interface LectureRepository extends JpaRepository<Lecture,Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select l from Lecture l where l.id = :id")
     Optional<Lecture> findByIdForUpdate(@Param("id")Long id);
+
+    List<Lecture> findByStatus(LectureStatus status);
 }
