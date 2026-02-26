@@ -27,6 +27,11 @@ public class Lecture {
     @Column(nullable = false)
     private int enrolledCount;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private LectureStatus status = LectureStatus.OPEN;
+
     public boolean hasSeat(){
         return enrolledCount < capacity;
     }
@@ -36,5 +41,13 @@ public class Lecture {
             throw new IllegalArgumentException("정원이 초과되었습니다.");
         }
         this.enrolledCount++;
+    }
+
+    public void markSoldOut(){
+        this.status = LectureStatus.SOLD_OUT;
+    }
+
+    public void close(){
+        this.status = LectureStatus.CLOSED;
     }
 }
