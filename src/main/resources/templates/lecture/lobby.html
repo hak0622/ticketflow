@@ -109,9 +109,21 @@
                 로그아웃
             </button>
 
-            <a sec:authorize="isAuthenticated()"
+            <!-- ✅ 기본은 '내 강의장' (로그인 사용자용) -->
+            <a id="myLectureBtn"
+               sec:authorize="isAuthenticated()"
                href="#"
-               class="bg-slate-900 text-white px-5 py-2.5 rounded-xl">내 강의장</a>
+               class="bg-slate-900 text-white px-5 py-2.5 rounded-xl">
+                내 강의장
+            </a>
+
+            <!-- ✅ ADMIN이면 위 버튼 대신 이 버튼을 보여줌 -->
+            <a id="adminBtn"
+               sec:authorize="isAuthenticated()"
+               href="/admin/lectures"
+               class="hidden bg-blue-600 text-white px-5 py-2.5 rounded-xl">
+                관리자 페이지
+            </a>
         </div>
     </div>
 </nav>
@@ -303,6 +315,37 @@
 
 <!-- ✅ 캐시 무력화: token.js 변경 즉시 반영 -->
 <script th:src="@{/js/token.js(v=${#dates.createNow().time})}"></script>
+
+<script>
+    // ✅ ADMIN이면 '내 강의장' 대신 '관리자 페이지'로 교체
+    (function swapMyLectureToAdminIfNeeded() {
+      const myBtn = document.getElementById('myLectureBtn');
+      const adminBtn = document.getElementById('adminBtn');
+
+      if (!myBtn || !adminBtn) return;
+      if (!window.Token || !Token.getToken()) return;
+
+      try {
+        const token = Token.getToken();
+        const payload = token.split('.')[1];
+
+        // base64url 디코딩
+        const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const json = JSON.parse(decodeURIComponent(escape(atob(base64))));
+
+        if (json.role === 'ADMIN') {
+          myBtn.classList.add('hidden');        // 내 강의장 숨김
+          adminBtn.classList.remove('hidden');  // 관리자 버튼 노출
+        } else {
+          // 혹시 모를 상황 대비: USER면 원복
+          adminBtn.classList.add('hidden');
+          myBtn.classList.remove('hidden');
+        }
+      } catch (e) {
+        // 실패하면 기본(내 강의장) 유지
+      }
+    })();
+</script>
 
 <script>
     (function () {

@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>관리자 | 강의 관리</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"/>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #f8fafc;
+            --white: #ffffff;
+            --border: #e8ecf2;
+            --border-soft: #f1f4f8;
+            --text: #0f172a;
+            --text-2: #475569;
+            --text-3: #94a3b8;
+            --blue: #3b6bff;
+            --blue-soft: #eff4ff;
+            --blue-border: #dce8ff;
+            --blue-text: #1d4ed8;
+            --rose: #e8344e;
+            --rose-soft: #fff0f2;
+            --green: #16a34a;
+            --green-soft: #f0fdf4;
+            --amber: #d97706;
+            --amber-soft: #fffbeb;
+            --slate: #64748b;
+            --radius: 16px;
+            --radius-sm: 10px;
+        }
+
+        body {
+            font-family: 'Pretendard', 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            letter-spacing: -0.02em;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        /* ── NAV ── */
+        nav {
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,.92);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 64px;
+            display: flex;
+            align-items: center;
+        }
+
+        .nav-inner {
+            max-width: 1120px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .nav-left { display: flex; align-items: center; gap: 16px; }
+
+        .nav-logo {
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: -0.05em;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .nav-logo span { color: var(--blue); }
+
+        .nav-divider { width: 1px; height: 18px; background: var(--border); }
+
+        .nav-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 800;
+            color: var(--blue-text);
+            background: var(--blue-soft);
+            border: 1px solid var(--blue-border);
+            padding: 4px 12px;
+            border-radius: 100px;
+            letter-spacing: 0.02em;
+        }
+
+        .nav-back {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-3);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: color .15s;
+        }
+        .nav-back:hover { color: var(--text); }
+
+        .btn-logout {
+            font-size: 13px;
+            font-weight: 700;
+            padding: 8px 18px;
+            border-radius: var(--radius-sm);
+            background: var(--text);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            letter-spacing: -0.02em;
+            transition: background .15s, transform .1s;
+        }
+        .btn-logout:hover { background: #1e293b; }
+        .btn-logout:active { transform: scale(.97); }
+
+        /* ── MAIN ── */
+        main {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 40px 24px 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+
+        /* ── NOTICE ── */
+        #notice {
+            display: none;
+            padding: 14px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 600;
+            animation: slideDown .2s ease;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .notice-success { background: var(--green-soft); color: var(--green); border: 1px solid #bbf7d0; }
+        .notice-error   { background: var(--rose-soft);  color: var(--rose);  border: 1px solid #fecdd3; }
+
+        /* ── CARD ── */
+        .card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px;
+            box-shadow: 0 2px 12px rgba(15,23,42,.04);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 28px;
+        }
+
+        .card-title-block {}
+        .card-eyebrow {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--blue);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .card-title {
+            font-size: 18px;
+            font-weight: 900;
+            color: var(--text);
+            letter-spacing: -0.04em;
+        }
+
+        /* ── FORM ── */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+        @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+
+        .form-group { display: flex; flex-direction: column; gap: 8px; }
+
+        .form-label {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--text-3);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .form-input,
+        .form-select {
+            padding: 11px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+            font-weight: 500;
+            outline: none;
+            -webkit-appearance: none;
+            transition: border-color .15s, box-shadow .15s;
+            letter-spacing: -0.02em;
+        }
+        .form-input::placeholder { color: var(--text-3); font-weight: 400; }
+        .form-input:focus,
+        .form-select:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(59,107,255,.1);
+            background: #fff;
+        }
+
+        .form-hint { font-size: 11px; color: var(--text-3); line-height: 1.5; }
+
+        /* ── BUTTONS ── */
+        .btn-row { display: flex; gap: 10px; margin-top: 22px; }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 800;
+            font-family: inherit;
+            border: none;
+            cursor: pointer;
+            letter-spacing: -0.02em;
+            transition: all .15s;
+        }
+        .btn:active { transform: scale(.97); }
+        .btn:disabled { opacity: .45; cursor: not-allowed; transform: none !important; }
+
+        .btn-primary { background: var(--text); color: #fff; }
+        .btn-primary:hover:not(:disabled) { background: #1e293b; }
+
+        .btn-secondary {
+            background: var(--bg);
+            color: var(--text-2);
+            border: 1.5px solid var(--border);
+        }
+        .btn-secondary:hover { background: var(--border-soft); }
+
+        .btn-close {
+            background: var(--text);
+            color: #fff;
+            padding: 7px 14px;
+            font-size: 12px;
+        }
+        .btn-close:hover { background: #1e293b; }
+
+        .btn-close-disabled {
+            background: var(--bg);
+            color: var(--text-3);
+            border: 1.5px solid var(--border);
+            cursor: not-allowed;
+            padding: 7px 14px;
+            font-size: 12px;
+        }
+
+        .btn-view {
+            background: var(--blue-soft);
+            color: var(--blue);
+            border: 1.5px solid var(--blue-border);
+            padding: 7px 14px;
+            font-size: 12px;
+        }
+        .btn-view:hover { background: #dce8ff; }
+
+        /* ── TABLE ── */
+        .table-wrap { overflow-x: auto; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+        thead tr { border-bottom: 1.5px solid var(--border); }
+        thead th {
+            padding: 0 16px 12px 0;
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--text-3);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            text-align: left;
+            white-space: nowrap;
+        }
+        thead th:last-child { padding-right: 0; }
+
+        tbody tr {
+            border-bottom: 1px solid var(--border-soft);
+            transition: background .1s;
+        }
+        tbody tr:last-child { border-bottom: none; }
+        tbody tr:hover { background: var(--bg); }
+
+        tbody td {
+            padding: 16px 16px 16px 0;
+            vertical-align: middle;
+        }
+
+        .td-id {
+            font-family: 'DM Mono', monospace;
+            font-size: 12px;
+            color: var(--text-3);
+            font-weight: 500;
+        }
+        .td-title { font-weight: 700; color: var(--text); }
+        .td-mono {
+            font-family: 'DM Mono', monospace;
+            font-size: 12px;
+            color: var(--text-2);
+        }
+        .td-actions { display: flex; gap: 8px; }
+
+        /* ── BADGES ── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 5px 11px;
+            border-radius: 100px;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+        .badge::before {
+            content: '';
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .badge-open     { background: var(--blue-soft);  color: var(--blue);   border: 1px solid var(--blue-border); }
+        .badge-open::before   { background: var(--blue); }
+        .badge-sold     { background: var(--rose-soft);  color: var(--rose);   border: 1px solid #fecdd3; }
+        .badge-sold::before   { background: var(--rose); }
+        .badge-closed   { background: var(--bg);         color: var(--text-3); border: 1px solid var(--border); }
+        .badge-closed::before { background: var(--text-3); }
+
+        /* ── COUNT BADGE ── */
+        .count-chip {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-3);
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 4px 12px;
+            border-radius: 100px;
+            font-family: 'DM Mono', monospace;
+        }
+
+        /* ── EMPTY / LOADING ── */
+        .state-row td { padding: 48px 0 !important; text-align: center; }
+        .state-text { font-size: 13px; font-weight: 600; color: var(--text-3); }
+        .state-error { color: var(--rose); }
+
+        /* ── MODAL ── */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,.5);
+            z-index: 200;
+            backdrop-filter: blur(4px);
+            animation: fadeIn .2s ease;
+        }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+        .modal-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            max-width: 640px;
+            max-height: 82vh;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: 0 32px 80px rgba(15,23,42,.18);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            animation: modalUp .22s ease;
+        }
+        @keyframes modalUp {
+            from { opacity:0; transform: translate(-50%, calc(-50% + 14px)); }
+            to   { opacity:1; transform: translate(-50%, -50%); }
+        }
+
+        .modal-header {
+            padding: 22px 28px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .modal-eyebrow { font-size: 11px; font-weight: 800; color: var(--blue); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+        .modal-title { font-size: 15px; font-weight: 900; color: var(--text); letter-spacing: -0.03em; }
+        .modal-sub { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+
+        .modal-body { padding: 24px 28px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-inner">
+        <div class="nav-left">
+            <a href="/lectures" class="nav-logo">STAR<span>LECTURE</span></a>
+            <div class="nav-divider"></div>
+            <span class="nav-tag">⚙️ Admin</span>
+            <a href="/lectures" class="nav-back" style="margin-left:4px">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 16 16"><path d="M10 12L6 8l4-4"/></svg>
+                로비로 돌아가기
+            </a>
+        </div>
+        <button type="button" onclick="Token.logout('/lectures')" class="btn-logout">로그아웃</button>
+    </div>
+</nav>
+
+<main>
+
+    <div id="notice"></div>
+
+    <!-- 강의 생성 -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title-block">
+                <div class="card-eyebrow">New Lecture</div>
+                <div class="card-title">새 강의 만들기</div>
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label class="form-label">강의 제목</label>
+                <input id="titleInput" type="text" class="form-input" placeholder="예) 스프링 선착순 특강"/>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">오픈 시간</label>
+                <input id="openAtInput" type="datetime-local" class="form-input"/>
+                <p class="form-hint">서버 LocalDateTime 형식으로 저장됩니다. (예: 2026-03-01T14:00:00)</p>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">정원</label>
+                <input id="capacityInput" type="number" min="1" value="30" class="form-input"/>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">초기 상태</label>
+                <select id="statusSelect" class="form-select">
+                    <option value="OPEN">OPEN</option>
+                    <option value="SOLD_OUT">SOLD_OUT</option>
+                    <option value="CLOSED">CLOSED</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="btn-row">
+            <button id="createBtn" type="button" class="btn btn-primary">강의 생성하기</button>
+            <button id="refreshBtn" type="button" class="btn btn-secondary">목록 새로고침</button>
+        </div>
+    </div>
+
+    <!-- 강의 목록 -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title-block">
+                <div class="card-eyebrow">Lecture List</div>
+                <div class="card-title">강의 목록</div>
+            </div>
+            <span id="countText" class="count-chip">—</span>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>제목</th>
+                    <th>오픈 시간</th>
+                    <th>정원 / 신청</th>
+                    <th>상태</th>
+                    <th>작업</th>
+                </tr>
+                </thead>
+                <tbody id="lectureTbody">
+                <tr class="state-row">
+                    <td colspan="6"><span class="state-text">불러오는 중…</span></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</main>
+
+<!-- 신청자 모달 -->
+<div id="enrollModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-header">
+            <div>
+                <div class="modal-eyebrow">Enrollments</div>
+                <div class="modal-title">신청자 목록</div>
+                <div id="modalTitle" class="modal-sub"></div>
+            </div>
+            <button id="closeModalBtn" class="btn btn-close">닫기</button>
+        </div>
+        <div class="modal-body">
+            <div id="modalBody"><span class="state-text">불러오는 중…</span></div>
+        </div>
+    </div>
+</div>
+
+<script th:src="@{/js/token.js(v=${#dates.createNow().time})}"></script>
+
+<script>
+    if (window.Token) Token.saveTokenFromUrl();
+
+    const notice        = document.getElementById('notice');
+    const tbody         = document.getElementById('lectureTbody');
+    const countText     = document.getElementById('countText');
+    const titleInput    = document.getElementById('titleInput');
+    const openAtInput   = document.getElementById('openAtInput');
+    const capacityInput = document.getElementById('capacityInput');
+    const statusSelect  = document.getElementById('statusSelect');
+    const createBtn     = document.getElementById('createBtn');
+    const refreshBtn    = document.getElementById('refreshBtn');
+    const enrollModal   = document.getElementById('enrollModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const modalBody     = document.getElementById('modalBody');
+    const modalTitle    = document.getElementById('modalTitle');
+
+    let noticeTimer = null;
+
+    function showNotice(type, msg) {
+        if (noticeTimer) clearTimeout(noticeTimer);
+        notice.style.display = 'block';
+        notice.textContent = msg;
+        notice.className = type === 'success' ? 'notice-success' : 'notice-error';
+        noticeTimer = setTimeout(() => notice.style.display = 'none', 4000);
+    }
+
+    function ensureToken() {
+        if (!window.Token || !Token.getToken()) {
+            showNotice('error', '로그인이 필요합니다.');
+            return false;
+        }
+        return true;
+    }
+
+    function fmtDate(s) {
+        if (!s) return '—';
+        return s.replace('T', '  ');
+    }
+
+    function badge(status) {
+        if (status === 'OPEN')     return `<span class="badge badge-open">OPEN</span>`;
+        if (status === 'SOLD_OUT') return `<span class="badge badge-sold">SOLD OUT</span>`;
+        if (status === 'CLOSED')   return `<span class="badge badge-closed">CLOSED</span>`;
+        return `<span class="badge badge-closed">${status}</span>`;
+    }
+
+    async function loadLectures() {
+        if (!ensureToken()) return;
+        tbody.innerHTML = `<tr class="state-row"><td colspan="6"><span class="state-text">불러오는 중…</span></td></tr>`;
+        countText.textContent = '—';
+
+        try {
+            const list = await Token.apiFetch('/api/admin/lectures', { method: 'GET' });
+            countText.textContent = list.length + '개';
+
+            if (!list.length) {
+                tbody.innerHTML = `<tr class="state-row"><td colspan="6"><span class="state-text">등록된 강의가 없습니다.</span></td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = list.map(l => {
+                const isClosed = l.status === 'CLOSED';
+                const closeBtn = isClosed
+                    ? `<button class="btn btn-close-disabled" disabled>마감됨</button>`
+                    : `<button class="btn btn-close" onclick="closeLecture(${l.id})">마감</button>`;
+
+                return `<tr>
+                    <td class="td-id">#${l.id}</td>
+                    <td class="td-title">${l.title}</td>
+                    <td class="td-mono">${fmtDate(l.openAt)}</td>
+                    <td class="td-mono">${l.capacity} / ${l.enrolledCount ?? 0}</td>
+                    <td>${badge(l.status)}</td>
+                    <td>
+                        <div class="td-actions">
+                            ${closeBtn}
+                            <button class="btn btn-view"
+                                    onclick="openEnrollments(${l.id}, '${String(l.title).replaceAll("'","\\'")}')">
+                                신청자 보기
+                            </button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+
+        } catch (e) {
+            const m = String(e.message);
+            if (m.includes('FORBIDDEN'))    showNotice('error', '관리자 권한이 없습니다. (ADMIN 계정으로 로그인하세요)');
+            else if (m.includes('UNAUTHORIZED')) showNotice('error', '로그인이 만료되었습니다. 다시 로그인해주세요.');
+            else showNotice('error', '목록 조회 중 오류가 발생했습니다.');
+            tbody.innerHTML = `<tr class="state-row"><td colspan="6"><span class="state-text state-error">불러오기 실패</span></td></tr>`;
+        }
+    }
+
+    async function createLecture() {
+        if (!ensureToken()) return;
+
+        const title      = titleInput.value.trim();
+        const openAtRaw  = openAtInput.value;
+        const capacity   = Number(capacityInput.value);
+        const status     = statusSelect.value;
+
+        if (!title)            return showNotice('error', '제목을 입력해주세요.');
+        if (!openAtRaw)        return showNotice('error', '오픈 시간을 입력해주세요.');
+        if (!capacity || capacity < 1) return showNotice('error', '정원은 1 이상이어야 합니다.');
+
+        const openAt = openAtRaw.length === 16 ? openAtRaw + ':00' : openAtRaw;
+
+        createBtn.disabled = true;
+        createBtn.textContent = '생성 중…';
+
+        try {
+            await Token.apiFetch('/api/admin/lectures', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, openAt, capacity, status })
+            });
+            showNotice('success', `"${title}" 강의가 생성되었습니다.`);
+            titleInput.value = '';
+            await loadLectures();
+        } catch (e) {
+            const m = String(e.message);
+            if (m.includes('FORBIDDEN')) showNotice('error', '관리자 권한이 없습니다.');
+            else showNotice('error', '강의 생성에 실패했습니다.');
+        } finally {
+            createBtn.disabled = false;
+            createBtn.textContent = '강의 생성하기';
+        }
+    }
+
+    window.closeLecture = async function (id) {
+        if (!ensureToken()) return;
+        if (!confirm(`강의 #${id}를 마감 처리할까요?`)) return;
+        try {
+            await Token.apiFetch(`/api/admin/lectures/${id}/close`, { method: 'PATCH' });
+            showNotice('success', `강의 #${id}가 마감되었습니다.`);
+            await loadLectures();
+        } catch (e) {
+            showNotice('error', '마감 처리 중 오류가 발생했습니다.');
+        }
+    };
+
+    window.openEnrollments = async function (id, title) {
+        if (!ensureToken()) return;
+
+        enrollModal.style.display = 'block';
+        modalTitle.textContent = `강의 #${id} — ${title}`;
+        modalBody.innerHTML = `<span class="state-text">불러오는 중…</span>`;
+
+        try {
+            const list = await Token.apiFetch(`/api/admin/lectures/${id}/enrollments`, { method: 'GET' });
+
+            if (!list.length) {
+                modalBody.innerHTML = `<div style="text-align:center;padding:40px 0"><span class="state-text">신청자가 없습니다.</span></div>`;
+                return;
+            }
+
+            modalBody.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Enrollment ID</th>
+                            <th>User ID</th>
+                            <th>신청 시각</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${list.map(e => `<tr>
+                            <td class="td-id">#${e.enrollmentId}</td>
+                            <td class="td-mono">${e.userId}</td>
+                            <td class="td-mono">${(e.createdAt || '').replace('T', '  ')}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>`;
+        } catch (e) {
+            modalBody.innerHTML = `<div style="text-align:center;padding:40px 0"><span class="state-text state-error">신청자 조회 실패</span></div>`;
+        }
+    };
+
+    closeModalBtn.addEventListener('click', () => enrollModal.style.display = 'none');
+    enrollModal.addEventListener('click', e => { if (e.target === enrollModal) enrollModal.style.display = 'none'; });
+    createBtn.addEventListener('click', createLecture);
+    refreshBtn.addEventListener('click', loadLectures);
+    window.addEventListener('load', loadLectures);
+</script>
+
+</body>
+</html>
