@@ -3,9 +3,14 @@ package studying.blog.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import studying.blog.domain.Enrollment;
 import studying.blog.domain.Lecture;
+import studying.blog.domain.LectureStatus;
+import studying.blog.dto.EnrollmentAdminResponse;
+import studying.blog.dto.LectureAdminUpsertRequest;
 import studying.blog.dto.LectureCreateRequest;
 import studying.blog.dto.LectureResponse;
+import studying.blog.repository.EnrollmentRepository;
 import studying.blog.repository.LectureRepository;
 
 import java.util.ArrayList;
@@ -16,6 +21,7 @@ import java.util.stream.Collectors;
 @Service
 public class LectureService {
     private final LectureRepository lectureRepository;
+    private final EnrollmentRepository enrollmentRepository;
 
     @Transactional
     public LectureResponse create(LectureCreateRequest req){
@@ -23,6 +29,8 @@ public class LectureService {
                 .title(req.getTitle())
                 .openAt(req.getOpenAt())
                 .capacity(req.getCapacity())
+                .enrolledCount(0)
+                .status(LectureStatus.OPEN)
                 .build();
 
         return LectureResponse.from(lectureRepository.save(lecture));
@@ -46,4 +54,66 @@ public class LectureService {
         }
         return result;
     }
+
+    @Transactional
+    public LectureResponse adminCreate(LectureAdminUpsertRequest req){
+        validateAdminUpsert(req);
+
+        Lecture lecture = Lecture.builder()
+                .title(req.getTitle())
+                .openAt(req.getOpenAt())
+                .capacity(req.getCapacity())
+                .enrolledCount(0)
+                .status(req.getStatus() == null ? LectureStatus.OPEN : req.getStatus())
+                .build();
+        return LectureResponse.from(lectureRepository.save(lecture));
+    }
+
+    @Transactional
+    public LectureResponse adminUpdate(Long id, LectureAdminUpsertRequest req){
+        validateAdminUpsert(req);
+
+        Lecture lecture = lectureRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Lecture not found : " + id));
+
+        if(req.getCapacity() < lecture.getEnrolledCount()){
+            throw new IllegalArgumentException("capacity는 현재 신청 인원(enrolledCount)보다 작을 수 없습니다. 현재 신청 인원: " + lecture.getEnrolledCount());
+        }
+
+        lecture.updateByAdmin(req.getTitle(),req.getOpenAt(),req.getCapacity(),req.getStatus());
+        return LectureResponse.from(lecture);
+    }
+
+    @Transactional
+    public LectureResponse adminClose(Long id){
+        Lecture lecture = lectureRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Lecture not found : " + id));
+        lecture.close();
+        return LectureResponse.from(lecture);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EnrollmentAdminResponse>adminEnrollments(Long lectureId){
+        Lecture lecture = lectureRepository.findById(lectureId).orElseThrow(() -> new IllegalArgumentException("Lecture not found : " + lectureId));
+        List<Enrollment> list = enrollmentRepository.findAllByLectureId(lectureId);
+
+        return list.stream().map(e -> new EnrollmentAdminResponse(
+                e.getId(),
+                e.getUserId(),
+                lecture.getId(),
+                lecture.getTitle(),
+                e.getCreatedAt()
+        )).toList();
+    }
+
+    private void validateAdminUpsert(LectureAdminUpsertRequest req){
+        if(req.getTitle() == null || req.getTitle().isBlank()){
+            throw new IllegalArgumentException("title은 필수입니다.");
+        }
+        if(req.getOpenAt() == null){
+            throw new IllegalArgumentException("openAt은 필수입니다.");
+        }
+        if(req.getCapacity() <= 0){
+            throw new IllegalArgumentException("capacity는 1 이상이어야 합니다.");
+        }
+    }
+
 }
