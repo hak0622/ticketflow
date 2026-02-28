@@ -6,6 +6,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Service;
+import studying.blog.domain.Role;
 import studying.blog.domain.User;
 
 import java.time.Duration;
@@ -26,6 +27,8 @@ public class TokenProvider {
     private String makeToken(Date expiry,User user){
         Date now = new Date();
 
+        String role = (user.getRole() == null) ? Role.USER.name() : user.getRole().name();
+
         return Jwts.builder()
                 .setHeaderParam(Header.TYPE,Header.JWT_TYPE)
                 .setIssuer(jwtProperties.getIssuer())
@@ -33,6 +36,7 @@ public class TokenProvider {
                 .setExpiration(expiry)
                 .setSubject(user.getEmail())
                 .claim("id",user.getId())
+                .claim("role",role)
                 .signWith(SignatureAlgorithm.HS256, jwtProperties.getSecretKey())
                 .compact();
     }
@@ -54,7 +58,10 @@ public class TokenProvider {
         Long userId = claims.get("id",Long.class);
         String email = claims.getSubject();
 
-        Set<SimpleGrantedAuthority>authorities = Collections.singleton(new SimpleGrantedAuthority("ROLE_USER"));
+        String role = claims.get("role",String.class);
+        if(role == null || role.isBlank()) role = Role.USER.name();
+
+        Set<SimpleGrantedAuthority>authorities = Collections.singleton(new SimpleGrantedAuthority("ROLE_" + role));
 
         CustomPrincipal principal = new CustomPrincipal(userId, email);
 

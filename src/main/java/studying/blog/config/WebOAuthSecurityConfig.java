@@ -48,6 +48,7 @@ public class WebOAuthSecurityConfig {
 
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/token").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
         );
 
@@ -73,6 +74,7 @@ public class WebOAuthSecurityConfig {
 
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/lectures", "/login", "/oauth2/**").permitAll()
+                .requestMatchers("/admin/**").authenticated()
                 // 페이지 중 로그인 필요하면 여기서 authenticated()로 걸면 됨
                 .anyRequest().permitAll()
         );
