@@ -50,4 +50,13 @@ public class Lecture {
     public void close(){
         this.status = LectureStatus.CLOSED;
     }
+
+    public void updateByAdmin(String title, LocalDateTime openAt, int capacity, LectureStatus status){
+        this.title = title;
+        this.openAt = openAt;
+        this.capacity = capacity;
+        if(status != null){
+            this.status = status;
+        }
+    }
 }
