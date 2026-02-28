@@ -20,14 +20,19 @@ public class EnrollService {
 
     @Transactional
     public EnrollResult enroll(Long lectureId, Long userId){
-        boolean consumed = queueService.consumeAdmitted(lectureId, userId);
 
-        // 입장권 소비 먼저 시도 (동시 클릭/중복 요청 방지)
-        if(!consumed){
-            throw new IllegalStateException("입장 권한이 없습니다.(입장권이 없거나 만료/이미 사용됨)");
+        //입장권을 소비하지말고 있는지만 확인 -> DB처리 중 실패해도 재시도 가능하게 하기 위함(멱등성)
+        if(!queueService.isAdmitted(lectureId,userId)){
+            //이미 신청 완료면 멱등하게 성공 응답(버튼 연타/재시도 방지) -> (입장권이 만료/삭제되어도, DB에 있으면 신청된 상태가 진실)
+            if(enrollmentRepository.existsByLectureIdAndUserId(lectureId,userId)){
+                Lecture lecture = lectureRepository.findById(lectureId).orElseThrow(() -> new IllegalArgumentException("Lecture not found : " + lectureId));
+                return new EnrollResult("ALREADY_ENROLLED",lecture.getId(),lecture.getTitle());
+            }
+
+            throw new IllegalStateException("입장 권한이 없습니다.(입장권이 없거나 만료됨");
         }
 
-        // 2) 강의 row 락(동시성 방지)
+        // 강의 row 락(동시성 방지)
         Lecture lecture = lectureRepository.findByIdForUpdate(lectureId).orElseThrow(() -> new IllegalArgumentException("Lecture not found :" + lectureId));
 
         if(lecture.getStatus() == LectureStatus.CLOSED){
@@ -37,12 +42,15 @@ public class EnrollService {
             throw new IllegalStateException("정원이 마감되었습니다.");
         }
 
-        // 3) 중복 신청 방지
+        // 중복 신청 방지(멱등 처리)
         if(enrollmentRepository.existsByLectureIdAndUserId(lectureId,userId)){
+            //이미 신청했으면 여기서 입장권을 소비해도 되고(선택),그냥 두어도 TTL로 사라짐.
+            queueService.consumeAdmitted(lectureId,userId);
+
             return new EnrollResult("ALREADY_ENROLLED", lecture.getId(), lecture.getTitle());
         }
 
-        // 4) 정원 체크 + 차감
+        // 정원 체크 + 차감
         if (!lecture.hasSeat()) {
             lecture.markSoldOut();
             throw new IllegalStateException("정원이 마감되었습니다.");
@@ -53,13 +61,16 @@ public class EnrollService {
             lecture.markSoldOut();
         }
 
-        // 5) 신청 기록 저장
+        // 신청 기록 저장
         Enrollment enrollment = Enrollment.builder()
                 .lecture(lecture)
                 .userId(userId)
                 .build();
 
         enrollmentRepository.save(enrollment);
+
+        //DB저장이 성공한 뒤에 입장권 소비(삭제)->DB 실패 시 admitted는 남아서 재시도 가능(멱등성)
+        queueService.consumeAdmitted(lectureId,userId);
 
         return new EnrollResult("ENROLLED", lecture.getId(), lecture.getTitle());
     }
