@@ -31,15 +31,21 @@ public class User implements UserDetails {
     @Column(name = "nickname",unique = true)
     private String nickname;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role",nullable = false)
+    private Role role;
+
     @Builder
-    public User(String email, String password, String nickname){
+    public User(String email, String password, String nickname,Role role){
         this.email = email;
         this.password = password;
         this.nickname = nickname;
+        this.role = (role == null) ? Role.USER : role;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities(){
+        String roleName = (role == null) ? "ROLE_USER" : "ROLE_" + role.name();
         return List.of(new SimpleGrantedAuthority("user"));
     }
 
@@ -76,5 +82,9 @@ public class User implements UserDetails {
     public User update(String nickname){
         this.nickname = nickname;
         return this;
+    }
+
+    public void setRole(Role role){
+        this.role = role;
     }
 }
