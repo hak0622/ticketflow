@@ -91,17 +91,8 @@ public class LectureService {
     }
 
     @Transactional(readOnly = true)
-    public List<EnrollmentAdminResponse>adminEnrollments(Long lectureId){
-        Lecture lecture = lectureRepository.findById(lectureId).orElseThrow(() -> new IllegalArgumentException("Lecture not found : " + lectureId));
-        List<Enrollment> list = enrollmentRepository.findAllByLectureId(lectureId);
-
-        return list.stream().map(e -> new EnrollmentAdminResponse(
-                e.getId(),
-                e.getUserId(),
-                lecture.getId(),
-                lecture.getTitle(),
-                e.getCreatedAt()
-        )).toList();
+    public List<EnrollmentAdminResponse> adminEnrollments(Long lectureId) {
+        return enrollmentRepository.findAdminEnrollments(lectureId);
     }
 
     private void validateAdminUpsert(LectureAdminUpsertRequest req){

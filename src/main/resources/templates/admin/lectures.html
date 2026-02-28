@@ -451,7 +451,6 @@
             <div class="form-group">
                 <label class="form-label">오픈 시간</label>
                 <input id="openAtInput" type="datetime-local" class="form-input"/>
-                <p class="form-hint">서버 LocalDateTime 형식으로 저장됩니다. (예: 2026-03-01T14:00:00)</p>
             </div>
 
             <div class="form-group">
@@ -492,7 +491,7 @@
                     <th>ID</th>
                     <th>제목</th>
                     <th>오픈 시간</th>
-                    <th>정원 / 신청</th>
+                    <th>신청 / 정원</th>
                     <th>상태</th>
                     <th>작업</th>
                 </tr>
@@ -564,7 +563,16 @@
 
     function fmtDate(s) {
         if (!s) return '—';
-        return s.replace('T', '  ');
+        const d = new Date(s);
+        if (isNaN(d)) return s;
+        const days = ['일', '월', '화', '수', '목', '금', '토'];
+        const yyyy = d.getFullYear();
+        const mm   = String(d.getMonth() + 1).padStart(2, '0');
+        const dd   = String(d.getDate()).padStart(2, '0');
+        const day  = days[d.getDay()];
+        const hh   = String(d.getHours()).padStart(2, '0');
+        const min  = String(d.getMinutes()).padStart(2, '0');
+        return `${yyyy}.${mm}.${dd} (${day}) ${hh}:${min}`;
     }
 
     function badge(status) {
@@ -598,7 +606,7 @@
                     <td class="td-id">#${l.id}</td>
                     <td class="td-title">${l.title}</td>
                     <td class="td-mono">${fmtDate(l.openAt)}</td>
-                    <td class="td-mono">${l.capacity} / ${l.enrolledCount ?? 0}</td>
+                    <td class="td-mono">${l.enrolledCount ?? 0} / ${l.capacity}</td>
                     <td>${badge(l.status)}</td>
                     <td>
                         <div class="td-actions">
@@ -690,6 +698,8 @@
                         <tr>
                             <th>Enrollment ID</th>
                             <th>User ID</th>
+                            <th>Email</th>
+                            <th>Nickname</th>
                             <th>신청 시각</th>
                         </tr>
                     </thead>
@@ -697,7 +707,9 @@
                         ${list.map(e => `<tr>
                             <td class="td-id">#${e.enrollmentId}</td>
                             <td class="td-mono">${e.userId}</td>
-                            <td class="td-mono">${(e.createdAt || '').replace('T', '  ')}</td>
+                            <td class="td-mono">${e.email ?? '—'}</td>
+                            <td class="td-mono">${e.nickname ?? '—'}</td>
+                            <td class="td-mono">${fmtDate(e.createdAt)}</td>
                         </tr>`).join('')}
                     </tbody>
                 </table>`;

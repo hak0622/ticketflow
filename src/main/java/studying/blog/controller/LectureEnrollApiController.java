@@ -56,5 +56,4 @@ public class LectureEnrollApiController {
 
         return ResponseEntity.ok(enrollService.getMyEnrollmentDetail(lectureId, userId));
     }
-
 }
