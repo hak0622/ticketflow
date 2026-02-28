@@ -12,11 +12,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import static java.time.Duration.*;
-import static java.util.stream.Collectors.*;
 
 @RequiredArgsConstructor
 @Service
