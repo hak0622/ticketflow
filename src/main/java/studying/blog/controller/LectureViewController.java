@@ -29,9 +29,15 @@ public class LectureViewController {
         model.addAttribute("lecture",lectureService.findById(id));
         return "lecture/apply";
     }
+
     @GetMapping("/lectures/{id}/receipt")
     public String receipt(@PathVariable Long id, Model model){
         model.addAttribute("lecture", lectureService.findById(id));
         return "lecture/receipt";
+    }
+
+    @GetMapping("/me")
+    public String me(){
+        return "lecture/me";
     }
 }
