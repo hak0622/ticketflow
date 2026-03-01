@@ -3,7 +3,6 @@ package studying.blog.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import studying.blog.config.CustomPrincipal;
 import studying.blog.dto.EnrollResult;
@@ -11,7 +10,6 @@ import studying.blog.service.EnrollService;
 import studying.blog.service.QueueService;
 
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
