@@ -23,7 +23,7 @@ public class LectureQueueScheduler {
     @Scheduled(fixedDelay = 5000)
     public void processQueue(){
         int batchSize = 50; //한번에 n명 처리
-        int ttlSeconds = 300; //입장권 TTL (5분)
+        int ttlSeconds = 600; //입장권 TTL (5분)
 
         List<Lecture> openLectures = lectureRepository.findByStatus(LectureStatus.OPEN);
 
