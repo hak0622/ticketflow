@@ -11,5 +11,5 @@ public class LectureCreateRequest{
     private String title;
     private LocalDateTime openAt;
     private int capacity;
+    private String thumbnailUrl;
 }
-

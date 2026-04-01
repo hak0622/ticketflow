@@ -4,6 +4,7 @@ import io.lettuce.core.dynamic.annotation.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import studying.blog.domain.Enrollment;
+import studying.blog.domain.Lecture;
 import studying.blog.dto.EnrollmentAdminResponse;
 
 import java.util.List;
@@ -34,4 +35,6 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment,Long> {
     order by e.createdAt desc
 """)
     List<EnrollmentAdminResponse>findAdminEnrollments(@Param("lectureId") Long lectureId);
+
+    void deleteByLecture(Lecture lecture);
 }

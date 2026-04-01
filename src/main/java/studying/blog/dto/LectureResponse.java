@@ -16,6 +16,7 @@ public class LectureResponse{
     private int capacity;
     private LectureStatus status;
     private int enrolledCount;
+    private String thumbnailUrl;
 
     public static LectureResponse from(Lecture lecture){
         return new LectureResponse(
@@ -24,7 +25,8 @@ public class LectureResponse{
                 lecture.getOpenAt(),
                 lecture.getCapacity(),
                 lecture.getStatus(),
-                lecture.getEnrolledCount()
+                lecture.getEnrolledCount(),
+                lecture.getThumbnailUrl()
         );
     }
 }

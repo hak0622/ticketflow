@@ -31,6 +31,7 @@ public class LectureService {
                 .capacity(req.getCapacity())
                 .enrolledCount(0)
                 .status(LectureStatus.OPEN)
+                .thumbnailUrl(req.getThumbnailUrl())
                 .build();
 
         return LectureResponse.from(lectureRepository.save(lecture));
@@ -65,6 +66,7 @@ public class LectureService {
                 .capacity(req.getCapacity())
                 .enrolledCount(0)
                 .status(req.getStatus() == null ? LectureStatus.OPEN : req.getStatus())
+                .thumbnailUrl(req.getThumbnailUrl())
                 .build();
         return LectureResponse.from(lectureRepository.save(lecture));
     }
@@ -88,6 +90,13 @@ public class LectureService {
         Lecture lecture = lectureRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Lecture not found : " + id));
         lecture.close();
         return LectureResponse.from(lecture);
+    }
+
+    @Transactional
+    public void adminDelete(Long id){
+        Lecture lecture = lectureRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Lecture not found : " + id));
+        enrollmentRepository.deleteByLecture(lecture);
+        lectureRepository.delete(lecture);
     }
 
     @Transactional(readOnly = true)

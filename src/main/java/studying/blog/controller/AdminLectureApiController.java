@@ -40,4 +40,10 @@ public class AdminLectureApiController {
     public ResponseEntity<List<LectureResponse>>list(){
         return ResponseEntity.ok(lectureService.findAll());
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void>delete(@PathVariable Long id){
+        lectureService.adminDelete(id);
+        return ResponseEntity.noContent().build();
+    }
 }

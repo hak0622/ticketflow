@@ -27,6 +27,9 @@ public class Lecture {
     @Column(nullable = false)
     private int enrolledCount;
 
+    @Column
+    private String thumbnailUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
