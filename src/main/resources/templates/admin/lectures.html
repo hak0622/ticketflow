@@ -277,6 +277,15 @@
         }
         .btn-view:hover { background: #dce8ff; }
 
+        .btn-delete {
+            background: var(--rose-soft);
+            color: var(--rose);
+            border: 1.5px solid #fecdd3;
+            padding: 7px 14px;
+            font-size: 12px;
+        }
+        .btn-delete:hover { background: #ffe4e8; }
+
         /* ── TABLE ── */
         .table-wrap { overflow-x: auto; }
 
@@ -451,6 +460,7 @@
             <div class="form-group">
                 <label class="form-label">오픈 시간</label>
                 <input id="openAtInput" type="datetime-local" class="form-input"/>
+                <p class="form-hint">서버 LocalDateTime 형식으로 저장됩니다. (예: 2026-03-01T14:00:00)</p>
             </div>
 
             <div class="form-group">
@@ -465,6 +475,13 @@
                     <option value="SOLD_OUT">SOLD_OUT</option>
                     <option value="CLOSED">CLOSED</option>
                 </select>
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1">
+                <label class="form-label">썸네일 URL</label>
+                <input id="thumbnailInput" type="url" class="form-input"
+                       placeholder="/images/thumbnails/keynote.svg  (선택 사항)"/>
+                <p class="form-hint">비워두면 기본 배경으로 표시됩니다. 외부 이미지 URL 또는 서버 업로드 경로를 입력하세요.</p>
             </div>
         </div>
 
@@ -494,11 +511,12 @@
                     <th>신청 / 정원</th>
                     <th>상태</th>
                     <th>작업</th>
+                    <th>삭제</th>
                 </tr>
                 </thead>
                 <tbody id="lectureTbody">
                 <tr class="state-row">
-                    <td colspan="6"><span class="state-text">불러오는 중…</span></td>
+                    <td colspan="7"><span class="state-text">불러오는 중…</span></td>
                 </tr>
                 </tbody>
             </table>
@@ -536,6 +554,7 @@
     const openAtInput   = document.getElementById('openAtInput');
     const capacityInput = document.getElementById('capacityInput');
     const statusSelect  = document.getElementById('statusSelect');
+    const thumbnailInput = document.getElementById('thumbnailInput');
     const createBtn     = document.getElementById('createBtn');
     const refreshBtn    = document.getElementById('refreshBtn');
     const enrollModal   = document.getElementById('enrollModal');
@@ -584,7 +603,7 @@
 
     async function loadLectures() {
         if (!ensureToken()) return;
-        tbody.innerHTML = `<tr class="state-row"><td colspan="6"><span class="state-text">불러오는 중…</span></td></tr>`;
+        tbody.innerHTML = `<tr class="state-row"><td colspan="7"><span class="state-text">불러오는 중…</span></td></tr>`;
         countText.textContent = '—';
 
         try {
@@ -592,7 +611,7 @@
             countText.textContent = list.length + '개';
 
             if (!list.length) {
-                tbody.innerHTML = `<tr class="state-row"><td colspan="6"><span class="state-text">등록된 강의가 없습니다.</span></td></tr>`;
+                tbody.innerHTML = `<tr class="state-row"><td colspan="7"><span class="state-text">등록된 강의가 없습니다.</span></td></tr>`;
                 return;
             }
 
@@ -617,6 +636,12 @@
                             </button>
                         </div>
                     </td>
+                    <td>
+                        <button class="btn btn-delete"
+                                onclick="deleteLecture(${l.id}, '${String(l.title).replaceAll("'","\\'")}')">
+                            삭제
+                        </button>
+                    </td>
                 </tr>`;
             }).join('');
 
@@ -625,7 +650,7 @@
             if (m.includes('FORBIDDEN'))    showNotice('error', '관리자 권한이 없습니다. (ADMIN 계정으로 로그인하세요)');
             else if (m.includes('UNAUTHORIZED')) showNotice('error', '로그인이 만료되었습니다. 다시 로그인해주세요.');
             else showNotice('error', '목록 조회 중 오류가 발생했습니다.');
-            tbody.innerHTML = `<tr class="state-row"><td colspan="6"><span class="state-text state-error">불러오기 실패</span></td></tr>`;
+            tbody.innerHTML = `<tr class="state-row"><td colspan="7"><span class="state-text state-error">불러오기 실패</span></td></tr>`;
         }
     }
 
@@ -636,6 +661,7 @@
         const openAtRaw  = openAtInput.value;
         const capacity   = Number(capacityInput.value);
         const status     = statusSelect.value;
+        const thumbnailUrl = thumbnailInput.value.trim() || null;
 
         if (!title)            return showNotice('error', '제목을 입력해주세요.');
         if (!openAtRaw)        return showNotice('error', '오픈 시간을 입력해주세요.');
@@ -650,7 +676,7 @@
             await Token.apiFetch('/api/admin/lectures', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, openAt, capacity, status })
+                body: JSON.stringify({ title, openAt, capacity, status, thumbnailUrl })
             });
             showNotice('success', `"${title}" 강의가 생성되었습니다.`);
             titleInput.value = '';
@@ -664,6 +690,18 @@
             createBtn.textContent = '강의 생성하기';
         }
     }
+
+    window.deleteLecture = async function (id, title) {
+        if (!ensureToken()) return;
+        if (!confirm(`"${title}" 강의를 삭제할까요?\n수강신청 내역도 함께 삭제됩니다.`)) return;
+        try {
+            await Token.apiFetch(`/api/admin/lectures/${id}`, { method: 'DELETE' });
+            showNotice('success', `"${title}" 강의가 삭제되었습니다.`);
+            await loadLectures();
+        } catch (e) {
+            showNotice('error', '삭제 중 오류가 발생했습니다.');
+        }
+    };
 
     window.closeLecture = async function (id) {
         if (!ensureToken()) return;
@@ -698,8 +736,6 @@
                         <tr>
                             <th>Enrollment ID</th>
                             <th>User ID</th>
-                            <th>Email</th>
-                            <th>Nickname</th>
                             <th>신청 시각</th>
                         </tr>
                     </thead>
@@ -707,8 +743,6 @@
                         ${list.map(e => `<tr>
                             <td class="td-id">#${e.enrollmentId}</td>
                             <td class="td-mono">${e.userId}</td>
-                            <td class="td-mono">${e.email ?? '—'}</td>
-                            <td class="td-mono">${e.nickname ?? '—'}</td>
                             <td class="td-mono">${fmtDate(e.createdAt)}</td>
                         </tr>`).join('')}
                     </tbody>

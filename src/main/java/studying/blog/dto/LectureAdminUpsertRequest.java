@@ -13,4 +13,5 @@ public class LectureAdminUpsertRequest {
     private LocalDateTime openAt;
     private int capacity;
     private LectureStatus status;
+    private String thumbnailUrl;
 }
