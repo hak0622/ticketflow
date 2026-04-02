@@ -1,0 +1,4 @@
+- [x] TestContainers 의존성 추가
+- [x] Redis TestContainer 설정
+- [ ] MySQL TestContainer 설정
+- [x] QueueServiceIntegrationTest 생성
