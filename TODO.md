@@ -1,4 +1,9 @@
-- [x] TestContainers 의존성 추가
-- [x] Redis TestContainer 설정
-- [ ] MySQL TestContainer 설정
-- [x] QueueServiceIntegrationTest 생성
+- [x] E1 동시성 실험
+- [x] E3 멱등성 실험
+- [x] E4 보상 트랜잭션 실험
+- [x] 실험 코드 분리
+
+- [ ] 실험 결과 기반 아키텍처 구현
+- [ ] 쿠폰 → 결제 → 크레딧 → 수강등록 구현
+- [ ] Redis + Outbox 적용
+- [ ] 통합 테스트
