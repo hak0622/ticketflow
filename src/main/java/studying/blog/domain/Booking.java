@@ -30,6 +30,11 @@ public class Booking {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private BookingStatus status = BookingStatus.PENDING_PAYMENT;
+
     @PrePersist
     void prePersist(){
         this.createdAt = LocalDateTime.now();
@@ -41,5 +46,13 @@ public class Booking {
                 .userId(userId)
                 .createdAt(LocalDateTime.now())
                 .build();
+    }
+
+    public void confirm() {
+        this.status = BookingStatus.CONFIRMED;
+    }
+
+    public void cancel() {
+        this.status = BookingStatus.CANCELLED;
     }
 }
