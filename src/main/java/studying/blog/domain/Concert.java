@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class Lecture {
+public class Concert {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -19,45 +19,57 @@ public class Lecture {
     private String title;
 
     @Column(nullable = false)
-    private LocalDateTime openAt;
+    private LocalDateTime eventAt;
 
     @Column(nullable = false)
-    private int capacity;
+    private int totalSeats;
 
     @Column(nullable = false)
-    private int enrolledCount;
+    private int bookedCount;
 
     @Column
-    private String thumbnailUrl;
+    private String posterUrl;
+
+    @Column
+    private String venue;
+
+    @Column
+    private String artist;
+
+    @Column
+    private Integer price;
+
+    @Column
+    private String zone;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private LectureStatus status = LectureStatus.OPEN;
+    private ConcertStatus status = ConcertStatus.OPEN;
 
     public boolean hasSeat(){
-        return enrolledCount < capacity;
+        return bookedCount < totalSeats;
     }
 
-    public void increaseEnrolled(){
+    public void increaseBooked(){
         if(!hasSeat()){
             throw new IllegalArgumentException("정원이 초과되었습니다.");
         }
-        this.enrolledCount++;
+        this.bookedCount++;
     }
 
     public void markSoldOut(){
-        this.status = LectureStatus.SOLD_OUT;
+        this.status = ConcertStatus.SOLD_OUT;
     }
 
     public void close(){
-        this.status = LectureStatus.CLOSED;
+        this.status = ConcertStatus.CLOSED;
     }
 
-    public void updateByAdmin(String title, LocalDateTime openAt, int capacity, LectureStatus status){
+    public void updateByAdmin(String title, LocalDateTime eventAt, int totalSeats, ConcertStatus status){
         this.title = title;
-        this.openAt = openAt;
-        this.capacity = capacity;
+        this.eventAt = eventAt;
+        this.totalSeats = totalSeats;
         if(status != null){
             this.status = status;
         }

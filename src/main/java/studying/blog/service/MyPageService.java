@@ -3,22 +3,21 @@ package studying.blog.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import studying.blog.dto.EnrollmentResponse;
-import studying.blog.dto.MyEnrollmentResponse;
-import studying.blog.repository.EnrollmentRepository;
+import studying.blog.dto.MyBookingResponse;
+import studying.blog.repository.BookingRepository;
 
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class MyPageService {
-    private final EnrollmentRepository enrollmentRepository;
+    private final BookingRepository bookingRepository;
 
     @Transactional(readOnly = true)
-    public List<MyEnrollmentResponse>getMyEnrollments(Long userId){
-        return enrollmentRepository.findByUserIdWithLecture(userId)
+    public List<MyBookingResponse> getMyBookings(Long userId){
+        return bookingRepository.findByUserIdWithConcert(userId)
                 .stream()
-                .map(MyEnrollmentResponse::from)
+                .map(MyBookingResponse::from)
                 .toList();
     }
 }
