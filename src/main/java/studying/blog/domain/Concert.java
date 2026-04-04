@@ -58,6 +58,17 @@ public class Concert {
         this.bookedCount++;
     }
 
+    public void decreaseBooked() {
+        if (this.bookedCount <= 0) {
+            throw new IllegalStateException("예약된 인원이 없습니다.");
+        }
+        this.bookedCount--;
+        if (this.status == ConcertStatus.SOLD_OUT) {
+            this.status = ConcertStatus.OPEN;
+        }
+        // CLOSED 상태는 관리자 의도적 마감이므로 건드리지 않는다
+    }
+
     public void markSoldOut(){
         this.status = ConcertStatus.SOLD_OUT;
     }

@@ -1,7 +1,10 @@
 package studying.blog.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,10 +13,13 @@ import studying.blog.dto.PaymentRequest;
 import studying.blog.dto.PaymentResponse;
 import studying.blog.repository.BookingRepository;
 import studying.blog.repository.ConcertRepository;
+import studying.blog.repository.PaymentCompensationOutboxRepository;
 import studying.blog.repository.PaymentRepository;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @Service
@@ -23,7 +29,12 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
     private final ConcertRepository concertRepository;
+    private final PaymentCompensationOutboxRepository outboxRepository;
     private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+
+    @Value("${payment.mock.fail-rate:0}")
+    private int failRate;
 
     private static final int IDEMPOTENCY_TTL_SEC = 30;
     private static final String IDEMPOTENCY_PREFIX = "payment:idempotency:";
@@ -34,7 +45,7 @@ public class PaymentService {
      * 멱등성 보장 흐름:
      *   1. DB 선조회 — 이미 처리된 idempotencyKey면 캐시된 결과 즉시 반환
      *   2. Redis SETNX — 처리 중 중복 요청 차단 (TTL 30s 안전망)
-     *   3. 결제 처리 (Mock PG)
+     *   3. 결제 처리 (Mock PG, fail-rate 적용)
      *   4. finally — Redis key 해제
      *
      * DB UNIQUE constraint(uk_payment_idempotency_key)는 Redis 장애 시 최후 방어선.
@@ -70,7 +81,6 @@ public class PaymentService {
     }
 
     private PaymentResponse doProcess(Long concertId, Long userId, PaymentRequest request, String iKey) {
-        // 예매 조회
         Booking booking = bookingRepository.findByConcertIdAndUserId(concertId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("예매 내역이 없습니다."));
 
@@ -85,20 +95,47 @@ public class PaymentService {
             throw new IllegalStateException("결제 금액이 설정되지 않은 콘서트입니다.");
         }
 
-        // Step 3: Mock PG 처리 — Step 2에서는 항상 성공
+        // Step 3: Payment 엔티티 생성 (PENDING 상태로 먼저 저장 → paymentId 확보)
         Payment payment = Payment.create(
                 booking, userId, concertId,
                 concert.getPrice(), request.getPaymentMethod(), iKey
         );
+        paymentRepository.save(payment);
+
+        // Step 4: Mock PG 처리 (fail-rate에 따라 성공/실패 결정)
+        boolean shouldFail = failRate > 0 && ThreadLocalRandom.current().nextInt(100) < failRate;
+
+        if (shouldFail) {
+            payment.fail("Mock PG 실패 (fail-rate=" + failRate + "%)");
+
+            // 결제 실패 보상 이벤트를 같은 트랜잭션에 원자적으로 저장
+            String payload = buildPayload(booking.getId(), concertId, userId, payment.getId());
+            outboxRepository.save(PaymentCompensationOutbox.create(payload));
+
+            log.warn("[PAYMENT][FAILED] userId={} concertId={} bookingId={} paymentId={} idempotencyKey={}",
+                    userId, concertId, booking.getId(), payment.getId(), iKey);
+
+            return PaymentResponse.from(payment);
+        }
+
         payment.complete();
         booking.confirm();
-
-        paymentRepository.save(payment);
 
         log.info("[PAYMENT][COMPLETED] userId={} concertId={} bookingId={} amount={} idempotencyKey={}",
                 userId, concertId, booking.getId(), concert.getPrice(), iKey);
 
         return PaymentResponse.from(payment);
+    }
+
+    private String buildPayload(Long bookingId, Long concertId, Long userId, Long paymentId) {
+        try {
+            return objectMapper.writeValueAsString(
+                    Map.of("bookingId", bookingId, "concertId", concertId,
+                           "userId", userId, "paymentId", paymentId)
+            );
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Outbox payload 직렬화 실패", e);
+        }
     }
 
     @Transactional(readOnly = true)
