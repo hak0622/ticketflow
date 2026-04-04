@@ -6,10 +6,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
-import studying.blog.domain.Lecture;
-import studying.blog.domain.LectureStatus;
-import studying.blog.repository.EnrollmentRepository;
-import studying.blog.repository.LectureRepository;
+import studying.blog.domain.Concert;
+import studying.blog.domain.ConcertStatus;
+import studying.blog.repository.BookingRepository;
+import studying.blog.repository.ConcertRepository;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.CountDownLatch;
@@ -19,40 +19,39 @@ import java.util.concurrent.Executors;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.*;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
 public class EnrollConcurrencyTest {
 
     @Autowired
-    private EnrollService enrollService;
+    private BookingService bookingService;
 
     @Autowired
-    private LectureRepository lectureRepository;
+    private ConcertRepository concertRepository;
 
     @Autowired
-    private EnrollmentRepository enrollmentRepository;
+    private BookingRepository bookingRepository;
 
     @MockBean
     private QueueService queueService;
 
-    private Lecture lecture;
+    private Concert concert;
 
     @BeforeEach
     void setUp() {
-        enrollmentRepository.deleteAll();
-        lectureRepository.deleteAll();
+        bookingRepository.deleteAll();
+        concertRepository.deleteAll();
 
-        lecture = Lecture.builder()
-                .title("동시성 테스트 강의")
-                .capacity(1)
-                .enrolledCount(0)
-                .status(LectureStatus.OPEN)
-                .openAt(LocalDateTime.now().minusMinutes(1))
+        concert = Concert.builder()
+                .title("동시성 테스트 콘서트")
+                .totalSeats(1)
+                .bookedCount(0)
+                .status(ConcertStatus.OPEN)
+                .eventAt(LocalDateTime.now().minusMinutes(1))
                 .build();
 
-        lectureRepository.save(lecture);
+        concertRepository.save(concert);
     }
 
     @Test
@@ -70,7 +69,7 @@ public class EnrollConcurrencyTest {
 
             executorService.submit(()->{
                 try{
-                    enrollService.enroll(lecture.getId(),userId);
+                    bookingService.book(concert.getId(), userId);
                 }catch (Exception e){
 
                 }finally {
@@ -81,12 +80,12 @@ public class EnrollConcurrencyTest {
 
         latch.await();
 
-        Lecture reloaded = lectureRepository.findById(lecture.getId()).orElseThrow();
+        Concert reloaded = concertRepository.findById(concert.getId()).orElseThrow();
 
-        //정원 1명이므로 enrolledCount는 1이어야 한다.
-        assertThat(reloaded.getEnrolledCount()).isEqualTo(1);
+        //정원 1명이므로 bookedCount는 1이어야 한다.
+        assertThat(reloaded.getBookedCount()).isEqualTo(1);
 
-        // Enrollment도 1개만 저장되어야 한다.
-        assertThat(enrollmentRepository.count()).isEqualTo(1);
+        // Booking도 1개만 저장되어야 한다.
+        assertThat(bookingRepository.count()).isEqualTo(1);
     }
 }

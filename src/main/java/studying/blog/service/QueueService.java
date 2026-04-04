@@ -4,9 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
-import studying.blog.domain.Lecture;
-import studying.blog.domain.LectureStatus;
-import studying.blog.repository.LectureRepository;
+import studying.blog.domain.Concert;
+import studying.blog.domain.ConcertStatus;
+import studying.blog.repository.ConcertRepository;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -19,93 +19,91 @@ import java.util.concurrent.TimeUnit;
 public class QueueService {
 
     private final StringRedisTemplate redisTemplate;
-    private final LectureRepository lectureRepository;
+    private final ConcertRepository concertRepository;
 
     // 느린 Redis 호출 감지 기준(운영에서 병목 찾기용)
     private static final long SLOW_REDIS_MS = 30;
 
     //대기열 키
-    private String queueKey(Long lectureId) {
-        return "queue:lecture:" + lectureId;
+    private String queueKey(Long concertId) {
+        return "queue:concert:" + concertId;
     }
 
     private String member(Long userId) {
         return String.valueOf(userId);
     }
 
-    private String admittedKey(Long lectureId, Long userId) {
-        return "admitted:lecture:" + lectureId + ":user:" + userId;
+    private String admittedKey(Long concertId, Long userId) {
+        return "admitted:concert:" + concertId + ":user:" + userId;
     }
 
-    private String admittedKeyPrefix(Long lectureId) {
-        return "admitted:lecture:" + lectureId + ":user:";
+    private String admittedKeyPrefix(Long concertId) {
+        return "admitted:concert:" + concertId + ":user:";
     }
 
     //오픈 전/마감/정원 마감 상태에서 큐 등록 자체 차단
-    private void validateQueueAvailable(Lecture lecture) {
-        if (lecture.getStatus() == LectureStatus.CLOSED) {
-            throw new IllegalStateException("마감된 강의입니다.");
+    private void validateQueueAvailable(Concert concert) {
+        if (concert.getStatus() == ConcertStatus.CLOSED) {
+            throw new IllegalStateException("마감된 콘서트입니다.");
         }
-        if (lecture.getStatus() == LectureStatus.SOLD_OUT) {
-            throw new IllegalStateException("정원이 마감된 강의입니다.");
+        if (concert.getStatus() == ConcertStatus.SOLD_OUT) {
+            throw new IllegalStateException("정원이 마감된 콘서트입니다.");
         }
-        LocalDateTime openAt = lecture.getOpenAt();
-        if (openAt != null && LocalDateTime.now().isBefore(openAt)) {
+        LocalDateTime eventAt = concert.getEventAt();
+        if (eventAt != null && LocalDateTime.now().isBefore(eventAt)) {
             throw new IllegalStateException("아직 오픈 전입니다.");
         }
     }
 
     //줄서기 등록
-    public Long enqueue(Long lectureId, Long userId) {
-        Lecture lecture = lectureRepository.findById(lectureId)
-                .orElseThrow(() -> new IllegalArgumentException("Lecture not found : " + lectureId));
-        validateQueueAvailable(lecture);
+    public Long enqueue(Long concertId, Long userId) {
+        Concert concert = concertRepository.findById(concertId)
+                .orElseThrow(() -> new IllegalArgumentException("Concert not found : " + concertId));
+        validateQueueAvailable(concert);
 
         long score = Instant.now().toEpochMilli();
         String m = member(userId);
 
         // Redis ZADD + RANK 시간 측정
         long t0 = System.nanoTime();
-        redisTemplate.opsForZSet().add(queueKey(lectureId), m, score);
-        Long rank = redisTemplate.opsForZSet().rank(queueKey(lectureId), m);
+        redisTemplate.opsForZSet().add(queueKey(concertId), m, score);
+        Long rank = redisTemplate.opsForZSet().rank(queueKey(concertId), m);
         long ms = (System.nanoTime() - t0) / 1_000_000;
 
         //너무 자주 찍히는 API라서 "느릴 때만" 경고 로그
         if (ms >= SLOW_REDIS_MS) {
-            // log는 EnrollService만 쓰고 싶으면 여기 로그는 빼도 됨.
-            // 하지만 병목 찾기에는 이게 진짜 유용함.
             org.slf4j.LoggerFactory.getLogger(QueueService.class)
-                    .warn("[QUEUE][SLOW] op=enqueue lectureId={} userId={} tookMs={}", lectureId, userId, ms);
+                    .warn("[QUEUE][SLOW] op=enqueue concertId={} userId={} tookMs={}", concertId, userId, ms);
         }
 
         return rank != null ? rank + 1 : null;
     }
 
     //현재 내 순번 조회만
-    public Long getPosition(Long lectureId, Long userId) {
+    public Long getPosition(Long concertId, Long userId) {
         String m = member(userId);
 
         long t0 = System.nanoTime();
-        Long rank = redisTemplate.opsForZSet().rank(queueKey(lectureId), m);
+        Long rank = redisTemplate.opsForZSet().rank(queueKey(concertId), m);
         long ms = (System.nanoTime() - t0) / 1_000_000;
 
         if (ms >= SLOW_REDIS_MS) {
             org.slf4j.LoggerFactory.getLogger(QueueService.class)
-                    .warn("[QUEUE][SLOW] op=getPosition lectureId={} userId={} tookMs={}", lectureId, userId, ms);
+                    .warn("[QUEUE][SLOW] op=getPosition concertId={} userId={} tookMs={}", concertId, userId, ms);
         }
 
         return rank != null ? rank + 1 : null;
     }
 
     // 총 몇명(총 원소의 개수)
-    public Long getTotal(Long lectureId) {
+    public Long getTotal(Long concertId) {
         long t0 = System.nanoTime();
-        Long total = redisTemplate.opsForZSet().zCard(queueKey(lectureId));
+        Long total = redisTemplate.opsForZSet().zCard(queueKey(concertId));
         long ms = (System.nanoTime() - t0) / 1_000_000;
 
         if (ms >= SLOW_REDIS_MS) {
             org.slf4j.LoggerFactory.getLogger(QueueService.class)
-                    .warn("[QUEUE][SLOW] op=getTotal lectureId={} tookMs={}", lectureId, ms);
+                    .warn("[QUEUE][SLOW] op=getTotal concertId={} tookMs={}", concertId, ms);
         }
 
         return total;
@@ -154,8 +152,8 @@ public class QueueService {
             new DefaultRedisScript<>(CLAIM_ADMITTED_LUA, Long.class);
 
     // admitted를 원자적으로 선점한다. 키가 있으면 TTL(초) 반환 + 키 삭제(소비), 없으면 -1
-    public long claimAdmitted(Long lectureId, Long userId) {
-        String key = admittedKey(lectureId, userId);
+    public long claimAdmitted(Long concertId, Long userId) {
+        String key = admittedKey(concertId, userId);
 
         long t0 = System.nanoTime();
         Long ttl = redisTemplate.execute(
@@ -167,20 +165,20 @@ public class QueueService {
         // claim은 결제/신청 직전에만 호출되니, 느릴 때만 경고
         if (ms >= SLOW_REDIS_MS) {
             org.slf4j.LoggerFactory.getLogger(QueueService.class)
-                    .warn("[ADMITTED][SLOW] op=claim key={} lectureId={} userId={} tookMs={} ttl={}",
-                            key, lectureId, userId, ms, ttl);
+                    .warn("[ADMITTED][SLOW] op=claim key={} concertId={} userId={} tookMs={} ttl={}",
+                            key, concertId, userId, ms, ttl);
         }
 
         return ttl == null ? -1 : ttl;
     }
 
     // 선점 후 DB실패 등으로 롤백이 필요할 때 admitted 복구
-    public void restoreAdmitted(Long lectureId, Long userId, long ttlSeconds) {
+    public void restoreAdmitted(Long concertId, Long userId, long ttlSeconds) {
         if (ttlSeconds <= 0) {
             ttlSeconds = 600; // 기본 10분
         }
 
-        String key = admittedKey(lectureId, userId);
+        String key = admittedKey(concertId, userId);
 
         long t0 = System.nanoTime();
         redisTemplate.opsForValue().set(key, "1", ttlSeconds, TimeUnit.SECONDS);
@@ -188,22 +186,22 @@ public class QueueService {
 
         if (ms >= SLOW_REDIS_MS) {
             org.slf4j.LoggerFactory.getLogger(QueueService.class)
-                    .warn("[ADMITTED][SLOW] op=restore lectureId={} userId={} ttlSec={} tookMs={}",
-                            lectureId, userId, ttlSeconds, ms);
+                    .warn("[ADMITTED][SLOW] op=restore concertId={} userId={} ttlSec={} tookMs={}",
+                            concertId, userId, ttlSeconds, ms);
         }
     }
 
     // 스케줄러 호출: queue 앞 n명 꺼내서 admitted 키 발급(원자적)
-    public List<String> popAndGrantAdmitted(Long lectureId, int n, int ttlSeconds) {
+    public List<String> popAndGrantAdmitted(Long concertId, int n, int ttlSeconds) {
         long t0 = System.nanoTime();
 
         @SuppressWarnings("unchecked")
         List<String> granted = (List<String>) redisTemplate.execute(
                 popAndGrantScript,
-                Collections.singletonList(queueKey(lectureId)),
+                Collections.singletonList(queueKey(concertId)),
                 String.valueOf(n),
                 String.valueOf(ttlSeconds),
-                admittedKeyPrefix(lectureId)
+                admittedKeyPrefix(concertId)
         );
 
         long ms = (System.nanoTime() - t0) / 1_000_000;
@@ -212,16 +210,16 @@ public class QueueService {
         int size = granted == null ? 0 : granted.size();
         if (ms >= SLOW_REDIS_MS) {
             org.slf4j.LoggerFactory.getLogger(QueueService.class)
-                    .warn("[QUEUE][SLOW] op=popAndGrant lectureId={} batch={} granted={} ttlSec={} tookMs={}",
-                            lectureId, n, size, ttlSeconds, ms);
+                    .warn("[QUEUE][SLOW] op=popAndGrant concertId={} batch={} granted={} ttlSec={} tookMs={}",
+                            concertId, n, size, ttlSeconds, ms);
         }
 
         return granted == null ? List.of() : granted;
     }
 
     // 입장권 있는지 확인
-    public boolean isAdmitted(Long lectureId, Long userId) {
-        String key = admittedKey(lectureId, userId);
+    public boolean isAdmitted(Long concertId, Long userId) {
+        String key = admittedKey(concertId, userId);
 
         long t0 = System.nanoTime();
         Boolean exists = redisTemplate.hasKey(key);
@@ -229,15 +227,15 @@ public class QueueService {
 
         if (ms >= SLOW_REDIS_MS) {
             org.slf4j.LoggerFactory.getLogger(QueueService.class)
-                    .warn("[ADMITTED][SLOW] op=isAdmitted lectureId={} userId={} tookMs={}", lectureId, userId, ms);
+                    .warn("[ADMITTED][SLOW] op=isAdmitted concertId={} userId={} tookMs={}", concertId, userId, ms);
         }
 
         return Boolean.TRUE.equals(exists);
     }
 
     // 입장권 소모(현재는 claim에서 DEL하므로 보조용)
-    public boolean consumeAdmitted(Long lectureId, Long userId) {
-        String key = admittedKey(lectureId, userId);
+    public boolean consumeAdmitted(Long concertId, Long userId) {
+        String key = admittedKey(concertId, userId);
 
         long t0 = System.nanoTime();
         Boolean deleted = redisTemplate.delete(key);
@@ -245,7 +243,7 @@ public class QueueService {
 
         if (ms >= SLOW_REDIS_MS) {
             org.slf4j.LoggerFactory.getLogger(QueueService.class)
-                    .warn("[ADMITTED][SLOW] op=consume lectureId={} userId={} tookMs={} deleted={}", lectureId, userId, ms, deleted);
+                    .warn("[ADMITTED][SLOW] op=consume concertId={} userId={} tookMs={} deleted={}", concertId, userId, ms, deleted);
         }
 
         return Boolean.TRUE.equals(deleted);

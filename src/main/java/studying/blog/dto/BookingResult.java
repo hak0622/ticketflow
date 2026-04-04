@@ -5,8 +5,8 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public class EnrollResult {
+public class BookingResult {
     private final String status;
-    private final Long lectureId;
-    private final String lectureTitle;
+    private final Long concertId;
+    private final String concertTitle;
 }

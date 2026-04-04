@@ -8,7 +8,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import studying.blog.config.CustomPrincipal;
-import studying.blog.dto.MyEnrollmentResponse;
+import studying.blog.dto.MyBookingResponse;
 import studying.blog.service.MyPageService;
 
 import java.util.List;
@@ -27,9 +27,9 @@ public class MyPageApiController {
         return principal.getUserId();
     }
 
-    @GetMapping("/enrollments")
-    public ResponseEntity<List<MyEnrollmentResponse>>myEnrollments(){
+    @GetMapping("/bookings")
+    public ResponseEntity<List<MyBookingResponse>> myBookings(){
         Long userId = currentUserId();
-        return ResponseEntity.ok(myPageService.getMyEnrollments(userId));
+        return ResponseEntity.ok(myPageService.getMyBookings(userId));
     }
 }

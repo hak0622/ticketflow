@@ -7,9 +7,9 @@ import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor
-public class LectureCreateRequest{
+public class ConcertCreateRequest {
     private String title;
-    private LocalDateTime openAt;
-    private int capacity;
-    private String thumbnailUrl;
+    private LocalDateTime eventAt;
+    private int totalSeats;
+    private String posterUrl;
 }
