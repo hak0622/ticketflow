@@ -23,3 +23,6 @@ jwt:
 payment:
   mock:
     fail-rate: 0   # 0=항상 성공, 30=30% 실패, 100=항상 실패
+
+toss:
+  secret-key: ${TOSS_SECRET_KEY}

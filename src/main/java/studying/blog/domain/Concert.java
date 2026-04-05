@@ -42,6 +42,9 @@ public class Concert {
     @Column
     private String zone;
 
+    @Column
+    private String genre;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

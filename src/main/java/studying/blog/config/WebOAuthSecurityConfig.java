@@ -1,6 +1,7 @@
 package studying.blog.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -26,6 +27,9 @@ public class WebOAuthSecurityConfig {
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserService userService;
 
+    @Value("${oauth2.redirect-url}")
+    private String oauth2RedirectUrl;
+
     @Bean
     public WebSecurityCustomizer configure() {
         return web -> web.ignoring()
@@ -49,6 +53,7 @@ public class WebOAuthSecurityConfig {
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/token").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/concerts/**").permitAll()
                 .anyRequest().authenticated()
         );
 
@@ -97,7 +102,8 @@ public class WebOAuthSecurityConfig {
                 tokenProvider,
                 refreshTokenRepository,
                 oAuth2AuthorizationRequestBasedOnCookieRepository(),
-                userService
+                userService,
+                oauth2RedirectUrl
         );
     }
 

@@ -75,6 +75,20 @@ tasks.named('test') {
 	}
 }
 
+bootRun {
+	def envFile = file('.env')
+	if (envFile.exists()) {
+		envFile.readLines().each { line ->
+			if (line && !line.startsWith('#')) {
+				def parts = line.split('=', 2)
+				if (parts.length == 2) {
+					environment(parts[0].trim(), parts[1].trim())
+				}
+			}
+		}
+	}
+}
+
 jar {
     enabled = false
 }
