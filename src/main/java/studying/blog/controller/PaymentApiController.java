@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import studying.blog.config.CustomPrincipal;
 import studying.blog.dto.PaymentRequest;
 import studying.blog.dto.PaymentResponse;
+import studying.blog.dto.TossConfirmRequest;
 import studying.blog.service.PaymentService;
 
 @RestController
@@ -36,5 +37,14 @@ public class PaymentApiController {
     public ResponseEntity<PaymentResponse> myPayment(@PathVariable Long concertId) {
         Long userId = currentUserId();
         return ResponseEntity.ok(paymentService.getMyPayment(concertId, userId));
+    }
+
+    /** Toss Payments 결제 승인 — 프론트에서 successUrl 콜백 후 호출 */
+    @PostMapping("/{concertId}/payment/toss-confirm")
+    public ResponseEntity<PaymentResponse> tossConfirm(
+            @PathVariable Long concertId,
+            @RequestBody TossConfirmRequest request) {
+        Long userId = currentUserId();
+        return ResponseEntity.ok(paymentService.tossConfirm(concertId, userId, request));
     }
 }

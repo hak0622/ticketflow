@@ -17,6 +17,9 @@ public class ConcertResponse {
     private ConcertStatus status;
     private int bookedCount;
     private String posterUrl;
+    private String artist;
+    private Integer price;
+    private String genre;
 
     public static ConcertResponse from(Concert concert){
         return new ConcertResponse(
@@ -26,7 +29,10 @@ public class ConcertResponse {
                 concert.getTotalSeats(),
                 concert.getStatus(),
                 concert.getBookedCount(),
-                concert.getPosterUrl()
+                concert.getPosterUrl(),
+                concert.getArtist(),
+                concert.getPrice(),
+                concert.getGenre()
         );
     }
 }

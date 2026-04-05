@@ -18,7 +18,8 @@ public class MyBookingResponse {
     private LocalDateTime eventAt;
     private int totalSeats;
     private int bookedCount;
-    private String status;
+    private String status;        // concert status (OPEN / SOLD_OUT / CLOSED)
+    private String bookingStatus; // booking status (PENDING_PAYMENT / CONFIRMED / CANCELLED)
     private LocalDateTime bookedAt;
 
     public static MyBookingResponse from(Booking b){
@@ -31,6 +32,7 @@ public class MyBookingResponse {
                 .totalSeats(c.getTotalSeats())
                 .bookedCount(c.getBookedCount())
                 .status(c.getStatus().name())
+                .bookingStatus(b.getStatus().name())
                 .bookedAt(b.getCreatedAt())
                 .build();
     }

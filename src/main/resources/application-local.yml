@@ -21,3 +21,6 @@ spring:
 
 jwt:
   secret_key: ${JWT_SECRET_KEY}
+
+oauth2:
+  redirect-url: http://localhost:5173

@@ -5,19 +5,27 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
 import studying.blog.domain.*;
 import studying.blog.dto.PaymentRequest;
 import studying.blog.dto.PaymentResponse;
+import studying.blog.dto.TossConfirmRequest;
 import studying.blog.repository.BookingRepository;
 import studying.blog.repository.ConcertRepository;
 import studying.blog.repository.PaymentCompensationOutboxRepository;
 import studying.blog.repository.PaymentRepository;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -146,5 +154,83 @@ public class PaymentService {
         return paymentRepository.findByBookingId(booking.getId())
                 .map(PaymentResponse::from)
                 .orElseThrow(() -> new IllegalArgumentException("결제 내역이 없습니다."));
+    }
+
+    // ─── Toss Payments 승인 ─────────────────────────────────────────
+
+    private static final String TOSS_CONFIRM_URL = "https://api.tosspayments.com/v1/payments/confirm";
+    private final RestClient tossRestClient = RestClient.create();
+
+    @Value("${toss.secret-key}")
+    private String tossSecretKey;
+
+    /**
+     * Toss Payments 결제 승인.
+     * orderId 를 idempotencyKey 로 사용해 중복 승인을 방지한다.
+     */
+    @Transactional
+    public PaymentResponse tossConfirm(Long concertId, Long userId, TossConfirmRequest request) {
+        String orderId = request.getOrderId();
+
+        // 1. 멱등성 — 이미 처리된 orderId 면 캐시된 결과 반환
+        Optional<Payment> existing = paymentRepository.findByIdempotencyKey(orderId);
+        if (existing.isPresent()) {
+            log.info("[TOSS][CACHED] userId={} concertId={} orderId={} status={}",
+                    userId, concertId, orderId, existing.get().getStatus());
+            return PaymentResponse.from(existing.get());
+        }
+
+        // 2. 예매 검증
+        Booking booking = bookingRepository.findByConcertIdAndUserId(concertId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("예매 내역이 없습니다."));
+
+        if (booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
+            throw new IllegalStateException("결제할 수 없는 상태입니다. 현재 예매 상태: " + booking.getStatus());
+        }
+
+        Concert concert = concertRepository.findById(concertId)
+                .orElseThrow(() -> new IllegalArgumentException("Concert not found: " + concertId));
+
+        // 3. 금액 위변조 검증
+        if (!request.getAmount().equals(concert.getPrice())) {
+            throw new IllegalArgumentException("결제 금액이 일치하지 않습니다.");
+        }
+
+        // 4. Toss 결제 승인 API 호출
+        String paymentMethod = callTossConfirmApi(request.getPaymentKey(), orderId, request.getAmount());
+
+        // 5. Payment 엔티티 생성 후 즉시 완료 처리
+        Payment payment = Payment.create(booking, userId, concertId,
+                request.getAmount(), paymentMethod, orderId);
+        paymentRepository.save(payment);
+        payment.complete();
+        booking.confirm();
+
+        log.info("[TOSS][CONFIRMED] userId={} concertId={} bookingId={} amount={} orderId={}",
+                userId, concertId, booking.getId(), request.getAmount(), orderId);
+
+        return PaymentResponse.from(payment);
+    }
+
+    /**
+     * Toss Payments 서버에 결제 승인 요청을 보낸다.
+     * 응답의 method 필드를 반환한다 (결제 수단 기록용).
+     */
+    private String callTossConfirmApi(String paymentKey, String orderId, Integer amount) {
+        String credentials = Base64.getEncoder()
+                .encodeToString((tossSecretKey + ":").getBytes(StandardCharsets.UTF_8));
+
+        Map<String, Object> responseBody = tossRestClient.post()
+                .uri(TOSS_CONFIRM_URL)
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + credentials)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("paymentKey", paymentKey, "orderId", orderId, "amount", amount))
+                .retrieve()
+                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+
+        if (responseBody == null) {
+            throw new IllegalStateException("Toss 결제 승인 응답이 비어 있습니다.");
+        }
+        return String.valueOf(responseBody.getOrDefault("method", "TOSS"));
     }
 }
