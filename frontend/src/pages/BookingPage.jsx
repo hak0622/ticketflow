@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getConcert } from '../api/concert'
 import { createBooking } from '../api/booking'
@@ -43,6 +43,7 @@ export default function BookingPage() {
   const [loading, setLoading]     = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]         = useState(null)
+  const submittingRef             = useRef(false)   // 이중 클릭 방지
 
   /* 비로그인 */
   useEffect(() => {
@@ -61,6 +62,8 @@ export default function BookingPage() {
   }, [concertId, token])
 
   const handleBook = async () => {
+    if (submittingRef.current) return
+    submittingRef.current = true
     setSubmitting(true)
     setError(null)
     try {
@@ -70,18 +73,31 @@ export default function BookingPage() {
         replace: true,
       })
     } catch (err) {
-      const status = err.response?.status
+      const status    = err.response?.status
+      const serverMsg = err.response?.data?.message ?? ''
+
       if (status === 409) {
-        // 이미 예매됨 → 결제 페이지로 직행
-        navigate(`/concerts/${concertId}/payment`, {
-          state: { concert },
-          replace: true,
-        })
+        if (serverMsg.includes('정원') || serverMsg.includes('SOLD_OUT')) {
+          // 매진
+          setError('매진된 공연입니다. 예매가 불가합니다.')
+        } else if (serverMsg.includes('입장 권한')) {
+          // 입장권 없음 / 만료
+          setError('입장권이 만료되었습니다. 대기열에 다시 등록해주세요.')
+        } else {
+          // 이미 PENDING_PAYMENT 상태 → 결제 페이지로
+          navigate(`/concerts/${concertId}/payment`, { state: { concert }, replace: true })
+          return
+        }
+      } else if (status === 403) {
+        setError(serverMsg || '예매가 불가능한 공연입니다.')
+      } else if (status === 401) {
+        navigate('/login', { state: { from: `/concerts/${concertId}/booking` } })
+        return
       } else {
-        const msg = err.response?.data?.message || '예매 처리 중 오류가 발생했습니다.'
-        setError(msg)
-        setSubmitting(false)
+        setError(serverMsg || '예매 처리 중 오류가 발생했습니다.')
       }
+      submittingRef.current = false
+      setSubmitting(false)
     }
   }
 

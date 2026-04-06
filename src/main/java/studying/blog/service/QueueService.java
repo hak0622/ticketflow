@@ -41,7 +41,7 @@ public class QueueService {
         return "admitted:concert:" + concertId + ":user:";
     }
 
-    //오픈 전/마감/정원 마감 상태에서 큐 등록 자체 차단
+    //마감/정원 마감 상태에서 큐 등록 차단 (예매는 공연 전에 진행되므로 eventAt 비교 제거)
     private void validateQueueAvailable(Concert concert) {
         if (concert.getStatus() == ConcertStatus.CLOSED) {
             throw new IllegalStateException("마감된 콘서트입니다.");
@@ -50,8 +50,8 @@ public class QueueService {
             throw new IllegalStateException("정원이 마감된 콘서트입니다.");
         }
         LocalDateTime eventAt = concert.getEventAt();
-        if (eventAt != null && LocalDateTime.now().isBefore(eventAt)) {
-            throw new IllegalStateException("아직 오픈 전입니다.");
+        if (eventAt != null && LocalDateTime.now().isAfter(eventAt)) {
+            throw new IllegalStateException("이미 종료된 공연입니다.");
         }
     }
 

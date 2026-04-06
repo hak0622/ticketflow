@@ -38,7 +38,19 @@ export default function PaymentSuccessPage() {
       .then(() => setStatus('success'))
       .catch((err) => {
         setStatus('error')
-        setErrorMsg(err.response?.data?.message || '결제 승인에 실패했습니다.')
+        const httpStatus = err.response?.status
+        const msg        = err.response?.data?.message
+        if (!err.response) {
+          setErrorMsg('네트워크 연결을 확인해주세요.')
+        } else if (httpStatus === 409) {
+          setErrorMsg('이미 처리된 결제입니다. 내 예매 목록을 확인해주세요.')
+        } else if (httpStatus === 400) {
+          setErrorMsg(msg || '결제 정보가 올바르지 않습니다.')
+        } else if (httpStatus === 403) {
+          setErrorMsg(msg || '결제 권한이 없습니다.')
+        } else {
+          setErrorMsg(msg || '결제 승인에 실패했습니다. 잠시 후 다시 시도해주세요.')
+        }
       })
   }, []) // eslint-disable-line
 

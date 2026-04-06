@@ -14,25 +14,25 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleIllegalState(IllegalStateException e) {
         String msg = e.getMessage() == null ? "" : e.getMessage();
 
-        //오픈 전/마감 -> 403
-        if(msg.contains("오픈 전") || msg.contains("마감된 강의")){
+        //종료된 공연 / 마감 -> 403
+        if(msg.contains("종료된") || msg.contains("마감된 콘서트")){
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
                     "status",403,
-                    "error",msg
+                    "message",msg
             ));
         }
 
-        //정원 마감/ 좌석 부족 등 충돌 -> 409
+        //정원 마감 / 좌석 부족 등 충돌 -> 409
         if(msg.contains("정원") || msg.contains("SOLD_OUT")){
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
                     "status",409,
-                    "error",msg
+                    "message",msg
             ));
         }
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
                 "status",409,
-                "error",msg
+                "message",msg
         ));
     }
 

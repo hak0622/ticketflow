@@ -1,18 +1,18 @@
-import { useEffect } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { loginWithGoogle } from '../api/auth'
-import useAuthStore from '../store/authStore'
+import { useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { loginWithGoogle } from "../api/auth";
+import useAuthStore from "../store/authStore";
 
 export default function LoginPage() {
-  const { token } = useAuthStore()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const from = location.state?.from || '/'
+  const { token } = useAuthStore();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from || "/";
 
   // 이미 로그인된 경우 원래 페이지 또는 홈으로
   useEffect(() => {
-    if (token) navigate(from, { replace: true })
-  }, [token, navigate, from])
+    if (token) navigate(from, { replace: true });
+  }, [token, navigate, from]);
 
   return (
     <div className="min-h-[calc(100svh-56px)] flex items-center justify-center px-4 pb-20 md:pb-0 bg-gray-50">
@@ -25,17 +25,19 @@ export default function LoginPage() {
 
         {/* 카드 */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <h1 className="text-xl font-bold text-gray-900 mb-1">로그인</h1>
-          <p className="text-sm text-gray-400 mb-8">
-            Google 계정으로 빠르게 로그인하세요
-          </p>
+          <div className="text-center mb-8">
+            <h1 className="text-xl font-bold text-gray-900 mb-1">로그인</h1>
+            <p className="text-sm text-gray-400">
+              Google 계정으로 빠르게 로그인하세요
+            </p>
+          </div>
 
           {/* Google 로그인 버튼 */}
           <button
             onClick={() => {
               // OAuth2 완료 후 돌아올 경로 저장
-              if (from !== '/') sessionStorage.setItem('loginRedirect', from)
-              loginWithGoogle()
+              if (from !== "/") sessionStorage.setItem("loginRedirect", from);
+              loginWithGoogle();
             }}
             className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 border-2 border-gray-200 hover:border-primary-300 text-gray-700 font-semibold py-3.5 rounded-xl transition-colors duration-150 shadow-sm"
           >
@@ -50,7 +52,7 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-6 text-sm text-center text-gray-500">
-            아직 계정이 없으신가요?{' '}
+            아직 계정이 없으신가요?{" "}
             <Link
               to="/register"
               className="text-primary-600 font-semibold hover:underline"
@@ -65,7 +67,7 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
-  )
+  );
 }
 
 function GoogleIcon() {
@@ -88,5 +90,5 @@ function GoogleIcon() {
         fill="#1976D2"
       />
     </svg>
-  )
+  );
 }
