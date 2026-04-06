@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -10,11 +10,31 @@
 
 body {
   margin: 0;
-  background-color: #f9fafb;
+  background-color: #F9F9F9;
+  color: #1B1B1B;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   min-height: 100svh;
+}
+
+/* 이미지 위 스크림 그라데이션 (하단 → 상단으로 어두워지는 효과) */
+.scrim-gradient {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0) 60%);
+}
+
+/* 에디토리얼 그림자 */
+.editorial-shadow {
+  box-shadow: 0 40px 60px rgba(27, 27, 27, 0.06);
+}
+
+/* 스크롤바 숨기기 */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }

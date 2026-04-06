@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { loadTossPayments, ANONYMOUS } from '@tosspayments/tosspayments-sdk'
 import { getConcert } from '../api/concert'
@@ -7,6 +7,7 @@ import useAuthStore from '../store/authStore'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 
 const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY
+const IS_DEV = import.meta.env.DEV
 
 /* ── orderId 생성 ───────────────────────────────── */
 function generateOrderId(concertId) {
@@ -47,18 +48,12 @@ export default function PaymentPage() {
   const location           = useLocation()
   const { token, user }    = useAuthStore()
 
-  /* navigation state 또는 직접 접근 */
   const [concert, setConcert] = useState(location.state?.concert ?? null)
   const [loading, setLoading] = useState(!location.state?.concert)
   const [error, setError]     = useState(null)
-
-  /* Toss SDK */
-  const [tossPayment, setTossPayment] = useState(null)
-  const [sdkReady, setSdkReady]       = useState(false)
-
-  /* 결제 시도 상태 */
-  const [submitting, setSubmitting]   = useState(false)
-  const [orderId, setOrderId]         = useState(() => generateOrderId(concertId))
+  const [submitting, setSubmitting] = useState(false)
+  const [orderId, setOrderId]       = useState(() => generateOrderId(concertId))
+  const submittingRef               = useRef(false)   // 이중 클릭 방지
 
   /* ── 비로그인 리다이렉트 ── */
   useEffect(() => {
@@ -95,42 +90,47 @@ export default function PaymentPage() {
     fetchAndValidate()
   }, [concertId, token, concert])
 
-  /* ── Toss SDK 초기화 ── */
-  useEffect(() => {
-    if (!TOSS_CLIENT_KEY || !concert) return
-    loadTossPayments(TOSS_CLIENT_KEY)
-      .then((tp) => {
-        setTossPayment(tp.payment({ customerKey: ANONYMOUS }))
-        setSdkReady(true)
-      })
-      .catch(() => setError('결제 모듈을 불러올 수 없습니다.'))
-  }, [concert])
-
   /* ── 결제 요청 ── */
   const handlePay = async () => {
-    if (!tossPayment || !concert) return
+    if (!concert || submittingRef.current) return
+
+    // 개발 안전장치: test_ 키가 아니면 결제 차단
+    if (!TOSS_CLIENT_KEY?.startsWith('test_')) {
+      console.warn('[결제 안전장치] 테스트 키(test_ck_...)가 아닙니다. 결제를 차단합니다.')
+      alert('개발 환경에서는 테스트 클라이언트 키(test_ck_...)만 사용할 수 있습니다.')
+      return
+    }
+
+    submittingRef.current = true
     setSubmitting(true)
     setError(null)
+
+    // dev 환경에서는 orderId / orderName에 테스트 식별자 추가
+    const payOrderId  = IS_DEV ? `dev-order-${orderId}` : orderId
+    const payOrderName = IS_DEV ? `[TEST] ${concert.title}` : concert.title
+
     try {
-      await tossPayment.requestPayment({
+      const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY)
+      const payment = tossPayments.payment({ customerKey: ANONYMOUS })
+
+      await payment.requestPayment({
         method: 'CARD',
+        orderId: payOrderId,
+        orderName: payOrderName,
         amount: { currency: 'KRW', value: concert.price },
-        orderId,
-        orderName: concert.title,
         successUrl: `${window.location.origin}/payment/success?concertId=${concertId}`,
         failUrl:    `${window.location.origin}/payment/fail?concertId=${concertId}`,
         customerEmail: user?.sub ?? '',
         customerName:  user?.sub?.split('@')[0] ?? '고객',
-        card: { useEscrow: false, flowMode: 'DEFAULT', useCardPoint: false, useAppCardOnly: false },
       })
-      // requestPayment 는 페이지를 이동시키므로 이 아래는 실행되지 않음
+      // requestPayment는 successUrl로 리다이렉트하므로 이 이후 코드는 실행되지 않음
     } catch (err) {
-      // 사용자가 창을 닫거나 SDK 오류
       if (err?.code !== 'USER_CANCEL') {
         setError(err?.message || '결제 요청 중 오류가 발생했습니다.')
       }
       // 다음 시도를 위해 새 orderId 발급
       setOrderId(generateOrderId(concertId))
+      submittingRef.current = false
       setSubmitting(false)
     }
   }
@@ -189,10 +189,10 @@ export default function PaymentPage() {
     )
   }
 
-  /* ════════��═══ 결제 입력 화면 ════════════ */
+  /* ════════════ 결제 ��력 화면 ════════════ */
   return (
-    <div className="min-h-[calc(100svh-56px)] bg-gray-50 flex flex-col items-center px-4 pt-6 pb-32 md:justify-center md:pb-0">
-      <div className="w-full max-w-sm">
+    <div className="min-h-[calc(100svh-56px)] bg-gray-50 px-4 pt-6 pb-32 md:pb-12">
+      <div className="max-w-lg mx-auto">
 
         <Link
           to={`/concerts/${concertId}/booking`}
@@ -208,59 +208,44 @@ export default function PaymentPage() {
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">예매 정보</p>
           <div className="space-y-0.5">
             <SummaryRow label="공연명"   value={concert?.title ?? '-'} />
-            {concert?.artist   && <SummaryRow label="아티스트" value={concert.artist} />}
-            {concert?.eventAt  && <SummaryRow label="일시"     value={formatDateTime(concert.eventAt)} />}
+            {concert?.artist  && <SummaryRow label="아티스트" value={concert.artist} />}
+            {concert?.eventAt && <SummaryRow label="일시"     value={formatDateTime(concert.eventAt)} />}
           </div>
           <div className="mt-3 pt-3 border-t border-gray-100">
             <SummaryRow label="결제 금액" value={formatPrice(concert?.price)} highlight />
           </div>
         </div>
 
-        {/* 결제 수단 안내 */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">결제 수단</p>
-          <div className="flex items-center gap-3 py-2">
-            <span className="text-2xl">💳</span>
-            <div>
-              <p className="text-sm font-semibold text-gray-800">신용카드</p>
-              <p className="text-xs text-gray-400">Toss Payments 테스트 결제</p>
-            </div>
-            <span className="ml-auto text-xs font-bold px-2 py-1 bg-primary-50 text-primary-700 rounded-full">선택됨</span>
-          </div>
-        </div>
-
-        {/* SDK 로딩 중 안내 */}
-        {!sdkReady && concert && (
-          <div className="flex items-center gap-2 text-sm text-gray-400 mb-4 justify-center">
-            <LoadingSpinner size="sm" />
-            결제 모듈 초기화 중...
+        {/* 개발 환경 안내 배너 */}
+        {IS_DEV && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 mb-4">
+            <p className="text-xs text-yellow-700 font-semibold">개발 환경 — 테스트 결제</p>
+            <p className="text-xs text-yellow-600 mt-0.5">실제 결제가 발생하지 않습니다. 테스트 카드로 진행하세요.</p>
           </div>
         )}
 
-        {/* 오류 */}
-        {error && !['already_confirmed','already_cancelled','no_booking'].includes(error) && (
+        {/* 오류 메시지 */}
+        {error && !['already_confirmed', 'already_cancelled', 'no_booking'].includes(error) && (
           <div className="bg-red-50 rounded-xl px-4 py-3 mb-4">
             <p className="text-sm text-red-600 text-center">{error}</p>
           </div>
         )}
 
         {/* CTA */}
-        <div className="fixed bottom-16 left-0 right-0 px-4 md:static md:bottom-auto md:px-0">
-          <button
-            onClick={handlePay}
-            disabled={submitting || !sdkReady}
-            className="w-full py-4 bg-primary-500 hover:bg-primary-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-lg rounded-2xl transition-colors shadow-md shadow-primary-100"
-          >
-            {submitting ? (
-              <span className="flex items-center justify-center gap-2">
-                <LoadingSpinner size="sm" />
-                결제창 열는 중...
-              </span>
-            ) : (
-              `${formatPrice(concert?.price)} 카드 결제하기`
-            )}
-          </button>
-        </div>
+        <button
+          onClick={handlePay}
+          disabled={submitting}
+          className="w-full py-4 bg-primary-500 hover:bg-primary-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-lg rounded-2xl transition-colors shadow-md shadow-primary-100"
+        >
+          {submitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <LoadingSpinner size="sm" />
+              결제 처리 중...
+            </span>
+          ) : (
+            `${formatPrice(concert?.price)} 결제하기`
+          )}
+        </button>
       </div>
     </div>
   )

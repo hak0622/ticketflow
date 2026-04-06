@@ -17,12 +17,12 @@
 - [x] BookingExpiryScheduler 구현
 
 ## 현재 진행 작업
-- [ ] React + Vite 프론트 1차 MVP 설계
+- [x] React + Vite 프론트 1차 MVP 설계
 
 ## 다음 작업 (우선순위 순)
-- [ ] 프론트 프로젝트 생성 (Vite + React)
-- [ ] 공연 목록 / 상세 / 대기열 / 결제 / 내 예매 화면 구현
-- [ ] axios API 연동
+- [x] 프론트 프로젝트 생성 (Vite + React)
+- [x] 공연 목록 / 상세 / 대기열 / 결제 / 내 예매 화면 구현
+- [x] axios API 연동
 - [ ] 최소 상태 관리 구조 확정
 
 ## 2차 작업 (확장)

@@ -40,8 +40,8 @@ public class ConcertQueueScheduler {
             Long concertId = concert.getId();
 
             try {
-                // 오픈 전이면 아직 입장권 발급 안 함
-                if (concert.getEventAt() != null && now.isBefore(concert.getEventAt())) {
+                // 이미 종료된 공연은 스킵 (예매는 공연 전에 진행)
+                if (concert.getEventAt() != null && now.isAfter(concert.getEventAt())) {
                     continue;
                 }
 
