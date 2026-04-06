@@ -1,4 +1,4 @@
-import axiosInstance from './axios'
+import axiosInstance from '../../shared/api/axios'
 
 export const getConcerts = () => axiosInstance.get('/concerts')
 

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { getMyBookings } from '../api/booking'
-import useAuthStore from '../store/authStore'
-import LoadingSpinner from '../components/common/LoadingSpinner'
+import { getMyBookings } from '../features/booking/api'
+import useAuthStore from '../features/auth/store'
+import LoadingSpinner from '../shared/ui/LoadingSpinner'
 
 /* ── 예매 상태 배지 설정 ──────────────────────────── */
 const BOOKING_STATUS_CONFIG = {

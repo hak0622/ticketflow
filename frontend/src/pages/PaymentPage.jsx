@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { loadTossPayments, ANONYMOUS } from '@tosspayments/tosspayments-sdk'
-import { getConcert } from '../api/concert'
-import { getBookingDetail } from '../api/booking'
-import useAuthStore from '../store/authStore'
-import LoadingSpinner from '../components/common/LoadingSpinner'
+import { getConcert } from '../features/concert/api'
+import { getBookingDetail } from '../features/booking/api'
+import useAuthStore from '../features/auth/store'
+import LoadingSpinner from '../shared/ui/LoadingSpinner'
 
 const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY
 const IS_DEV = import.meta.env.DEV

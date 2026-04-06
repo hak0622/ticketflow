@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getConcerts } from '../api/concert'
+import { getConcerts } from '../features/concert/api'
 import HeroCarousel from '../components/concert/HeroCarousel'
 import ConcertCard from '../components/concert/ConcertCard'
-import LoadingSpinner from '../components/common/LoadingSpinner'
-import PageContainer from '../components/common/PageContainer'
+import LoadingSpinner from '../shared/ui/LoadingSpinner'
+import PageContainer from '../shared/ui/PageContainer'
 import { getPosterByConcert } from '../constants/posterMap'
 
 /* ─── 목 데이터 (API 실패 시 폴백) ───────────── */

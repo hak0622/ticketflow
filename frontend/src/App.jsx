@@ -12,11 +12,10 @@ import PaymentSuccessPage from './pages/PaymentSuccessPage'
 import PaymentFailPage from './pages/PaymentFailPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
-import useAuthStore from './store/authStore'
+import { applyOAuthToken } from './features/auth/auth-actions'
 
 /** OAuth2 콜백 처리: URL에 ?token= 이 있으면 저장 후 제거 */
 function OAuthCallback() {
-  const { setToken } = useAuthStore()
   const navigate = useNavigate()
   const { search } = useLocation()
 
@@ -24,7 +23,7 @@ function OAuthCallback() {
     const params = new URLSearchParams(search)
     const token = params.get('token')
     if (token) {
-      setToken(token)
+      applyOAuthToken(token)
       // 로그인 전 방문하려던 경로로 복귀, 없으면 홈(/)으로
       const redirect = sessionStorage.getItem('loginRedirect') || '/'
       sessionStorage.removeItem('loginRedirect')

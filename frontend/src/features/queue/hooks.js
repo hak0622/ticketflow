@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { getQueueStatus } from '../api/booking'
+import { getQueueStatus } from './api'
 
 /**
- * 대기열 상태를 5초마다 폴링하는 훅
+ * 대기열 서버 상태를 5초마다 폴링하는 훅
  *
  * 반환값:
  *  - data   : { concertId, status, position?, total?, message? }
@@ -20,12 +20,11 @@ export function useQueuePolling(concertId, { interval = 5000, onAdmitted } = {})
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
   const timerRef              = useRef(null)
-  const stoppedRef            = useRef(false)   // 중단 플래그
-  const errorCountRef         = useRef(0)        // 연속 에러 횟수
+  const stoppedRef            = useRef(false)
+  const errorCountRef         = useRef(0)
   const MAX_ERRORS            = 3
   const onAdmittedRef         = useRef(onAdmitted)
 
-  // onAdmitted가 렌더마다 새 함수여도 stale closure 방지
   useEffect(() => { onAdmittedRef.current = onAdmitted }, [onAdmitted])
 
   const stopPolling = useCallback(() => {
@@ -42,10 +41,10 @@ export function useQueuePolling(concertId, { interval = 5000, onAdmitted } = {})
       setError(null)
       errorCountRef.current = 0
 
-      // 터미널 상태 → 즉시 폴링 중단
+      // 서버가 더 이상 대기열 진행 상태가 아니라고 응답하면 폴링 종료
       if (resData.status === 'ADMITTED') {
         stopPolling()
-        onAdmittedRef.current?.()   // 콜백 즉시 실행
+        onAdmittedRef.current?.()
       } else if (resData.status === 'BOOKED' || resData.status === 'NOT_IN_QUEUE') {
         stopPolling()
       }
@@ -62,7 +61,7 @@ export function useQueuePolling(concertId, { interval = 5000, onAdmitted } = {})
 
   useEffect(() => {
     stoppedRef.current = false
-    poll()  // 즉시 1회 호출
+    poll()
     timerRef.current = setInterval(poll, interval)
     return () => {
       stoppedRef.current = true

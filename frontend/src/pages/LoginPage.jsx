@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { loginWithGoogle } from "../api/auth";
-import useAuthStore from "../store/authStore";
+import { loginWithGoogle } from "../features/auth/api";
+import useAuthStore from "../features/auth/store";
 
 export default function LoginPage() {
   const { token } = useAuthStore();
