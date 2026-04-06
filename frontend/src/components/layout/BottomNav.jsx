@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import useAuthStore from '../../store/authStore'
+import useAuthStore from '../../features/auth/store'
 
 function NavItem({ to, label, icon, active }) {
   return (

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getConcert } from '../api/concert'
-import { registerQueue } from '../api/booking'
-import useAuthStore from '../store/authStore'
-import LoadingSpinner from '../components/common/LoadingSpinner'
-import StatusBadge from '../components/common/StatusBadge'
-import PageContainer from '../components/common/PageContainer'
+import { getConcert } from '../features/concert/api'
+import { registerQueue } from '../features/booking/api'
+import useAuthStore from '../features/auth/store'
+import LoadingSpinner from '../shared/ui/LoadingSpinner'
+import StatusBadge from '../shared/ui/StatusBadge'
+import PageContainer from '../shared/ui/PageContainer'
 import { getPosterByConcert } from '../constants/posterMap'
 
 /* ─── 포맷 유틸 ──────────────────────────────── */

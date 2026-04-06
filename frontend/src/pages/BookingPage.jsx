@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { getConcert } from '../api/concert'
-import { createBooking } from '../api/booking'
-import useAuthStore from '../store/authStore'
-import LoadingSpinner from '../components/common/LoadingSpinner'
+import { getConcert } from '../features/concert/api'
+import { createBooking } from '../features/booking/api'
+import useAuthStore from '../features/auth/store'
+import LoadingSpinner from '../shared/ui/LoadingSpinner'
 
 /* ── 포맷 유틸 ─────────────────────────────────── */
 function formatDateTime(dateStr) {

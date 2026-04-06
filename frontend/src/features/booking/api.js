@@ -1,12 +1,8 @@
-import axiosInstance from './axios'
+import axiosInstance from '../../shared/api/axios'
 
 /** 대기열 등록 - POST /api/concerts/:id/queue */
 export const registerQueue = (concertId) =>
   axiosInstance.post(`/concerts/${concertId}/queue`)
-
-/** 대기 순번 조회 - GET /api/concerts/:id/queue/me */
-export const getQueueStatus = (concertId) =>
-  axiosInstance.get(`/concerts/${concertId}/queue/me`)
 
 /** 예매 생성 - POST /api/concerts/:id/booking */
 export const createBooking = (concertId, data) =>

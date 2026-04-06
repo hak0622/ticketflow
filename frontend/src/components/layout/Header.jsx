@@ -1,16 +1,15 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { HiOutlineTicket } from 'react-icons/hi2'
 import { HiOutlineUser, HiOutlineArrowRightOnRectangle, HiOutlineArrowLeftOnRectangle } from 'react-icons/hi2'
-import useAuthStore from '../../store/authStore'
-import { serverLogout } from '../../api/auth'
+import useAuthStore from '../../features/auth/store'
+import { performLogout } from '../../features/auth/auth-actions'
 
 export default function Header() {
-  const { token, logout } = useAuthStore()
+  const { token } = useAuthStore()
   const navigate = useNavigate()
 
   const handleLogout = async () => {
-    await serverLogout()
-    logout()
+    await performLogout()
     navigate('/', { replace: true })
   }
 

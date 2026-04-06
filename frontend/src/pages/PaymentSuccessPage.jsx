@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { tossConfirm } from '../api/booking'
-import useAuthStore from '../store/authStore'
-import LoadingSpinner from '../components/common/LoadingSpinner'
+import { tossConfirm } from '../features/booking/api'
+import useAuthStore from '../features/auth/store'
+import LoadingSpinner from '../shared/ui/LoadingSpinner'
 
 /**
  * Toss Payments 결제 성공 콜백 페이지
