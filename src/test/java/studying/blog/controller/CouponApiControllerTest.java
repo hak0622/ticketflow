@@ -39,7 +39,7 @@ class CouponApiControllerTest {
     @BeforeEach
     void setUp() {
         auth = new UsernamePasswordAuthenticationToken(
-                new CustomPrincipal(1L, "test@test.com"),
+                CustomPrincipal.of(1L, "test@test.com", List.of(new SimpleGrantedAuthority("ROLE_USER"))),
                 null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
@@ -75,6 +75,6 @@ class CouponApiControllerTest {
         mockMvc.perform(post("/api/coupons/WELCOME5000/issue")
                         .with(authentication(auth)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("재고 없음"));
+                .andExpect(jsonPath("$.message").value("재고 없음"));
     }
 }

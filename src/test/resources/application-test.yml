@@ -1,10 +1,4 @@
 spring:
-  datasource:
-    url: jdbc:h2:mem:testdb;MODE=MySQL;NON_KEYWORDS=VALUE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -14,9 +8,11 @@ spring:
         format_sql: true
 
   data:
-    redis:
-      host: localhost
-      port: 6379
+    redis: {}
+
+  task:
+    scheduling:
+      enabled: false
 
   security:
     oauth2:
@@ -32,3 +28,9 @@ spring:
 jwt:
   issuer: test@test.com
   secret_key: dGVzdC1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLW9ubHk=
+
+oauth2:
+  redirect-url: http://localhost:3000/oauth2/redirect
+
+toss:
+  secret-key: test-toss-secret-key

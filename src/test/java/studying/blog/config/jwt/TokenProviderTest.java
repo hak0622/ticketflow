@@ -7,7 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.test.context.ActiveProfiles;
+import studying.blog.config.CustomPrincipal;
 import studying.blog.config.JwtProperties;
 import studying.blog.config.TokenProvider;
 import studying.blog.domain.User;
@@ -20,6 +21,7 @@ import java.util.Map;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 @SpringBootTest
+@ActiveProfiles("test")
 @Transactional
 public class TokenProviderTest {
     @Autowired private TokenProvider tokenProvider;
@@ -63,11 +65,14 @@ public class TokenProviderTest {
         String userEmail = "user@gmail.com";
         String token = JwtFactory.builder()
                 .subject(userEmail)
+                .claims(Map.of("id", 1L, "role", "USER"))
                 .build()
                 .createToken(jwtProperties);
 
         Authentication authentication = tokenProvider.getAuthentication(token);
-        assertThat(((UserDetails)authentication.getPrincipal()).getUsername()).isEqualTo(userEmail);
+        CustomPrincipal principal = (CustomPrincipal) authentication.getPrincipal();
+        assertThat(principal.getUsername()).isEqualTo(userEmail);
+        assertThat(principal.getUserId()).isEqualTo(1L);
     }
 
     @DisplayName("getUserId() : 토큰으로 유저 ID를 가져올 수 있다.")

@@ -63,7 +63,7 @@ public class TokenProvider {
 
         Set<SimpleGrantedAuthority>authorities = Collections.singleton(new SimpleGrantedAuthority("ROLE_" + role));
 
-        CustomPrincipal principal = new CustomPrincipal(userId, email);
+        CustomPrincipal principal = CustomPrincipal.of(userId, email, authorities);
 
         return new UsernamePasswordAuthenticationToken(principal,token,authorities);
     }

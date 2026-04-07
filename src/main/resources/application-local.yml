@@ -24,3 +24,12 @@ jwt:
 
 oauth2:
   redirect-url: http://localhost:5173
+
+app:
+  test-support:
+    enabled: true
+    token-expiration-minutes: 120
+    seed-emails:
+      - test1@test.com
+      - test2@test.com
+      - test3@test.com

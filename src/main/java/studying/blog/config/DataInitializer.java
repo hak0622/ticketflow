@@ -26,7 +26,7 @@ public class DataInitializer implements CommandLineRunner {
                 .title("2026 봄 페스티벌")
                 .artist("Various Artists")
                 .price(10)
-                .eventAt(LocalDateTime.now().minusMinutes(1))
+                .eventAt(LocalDateTime.now().plusMinutes(1))
                 .totalSeats(100)
                 .bookedCount(0)
                 .status(ConcertStatus.OPEN)

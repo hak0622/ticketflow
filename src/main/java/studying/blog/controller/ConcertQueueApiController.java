@@ -2,7 +2,7 @@ package studying.blog.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import studying.blog.config.CustomPrincipal;
 import studying.blog.dto.BookingResult;
@@ -18,18 +18,10 @@ public class ConcertQueueApiController {
     private final QueueService queueService;
     private final BookingService bookingService;
 
-    private Long currentUserId(){
-        CustomPrincipal principal = (CustomPrincipal) SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getPrincipal();
-
-        return principal.getUserId();
-    }
-
     @PostMapping("/{concertId}/queue")
-    public ResponseEntity<?> enqueue(@PathVariable Long concertId) {
-        Long userId = currentUserId();
+    public ResponseEntity<?> enqueue(@PathVariable Long concertId,
+                                     @AuthenticationPrincipal CustomPrincipal principal) {
+        Long userId = principal.getUserId();
 
         BookingResult my = bookingService.myBooking(concertId, userId);
         if("BOOKED".equals(my.getStatus())){
@@ -53,8 +45,9 @@ public class ConcertQueueApiController {
 
     //폴링 : 내 순번 조회
     @GetMapping("/{concertId}/queue/me")
-    public ResponseEntity<?> myQueue(@PathVariable Long concertId){
-        Long userId = currentUserId();
+    public ResponseEntity<?> myQueue(@PathVariable Long concertId,
+                                     @AuthenticationPrincipal CustomPrincipal principal){
+        Long userId = principal.getUserId();
 
         BookingResult my = bookingService.myBooking(concertId, userId);
         if ("BOOKED".equals(my.getStatus())) {

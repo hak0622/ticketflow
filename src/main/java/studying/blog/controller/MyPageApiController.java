@@ -1,9 +1,8 @@
 package studying.blog.controller;
 
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,17 +18,9 @@ import java.util.List;
 public class MyPageApiController {
     private final MyPageService myPageService;
 
-    private Long currentUserId(){
-        CustomPrincipal principal = (CustomPrincipal) SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getPrincipal();
-        return principal.getUserId();
-    }
-
     @GetMapping("/bookings")
-    public ResponseEntity<List<MyBookingResponse>> myBookings(){
-        Long userId = currentUserId();
+    public ResponseEntity<List<MyBookingResponse>> myBookings(@AuthenticationPrincipal CustomPrincipal principal){
+        Long userId = principal.getUserId();
         return ResponseEntity.ok(myPageService.getMyBookings(userId));
     }
 }
