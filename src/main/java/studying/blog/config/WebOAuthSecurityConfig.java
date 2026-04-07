@@ -1,9 +1,14 @@
 package studying.blog.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -16,7 +21,8 @@ import studying.blog.config.oauth.OAuth2UserCustomService;
 import studying.blog.repository.RefreshTokenRepository;
 import studying.blog.service.UserService;
 
-import static org.springframework.boot.autoconfigure.security.servlet.PathRequest.toH2Console;
+import java.io.IOException;
+import java.util.Map;
 
 @Configuration
 @RequiredArgsConstructor
@@ -51,10 +57,23 @@ public class WebOAuthSecurityConfig {
         http.addFilterBefore(tokenAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         http.authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/token").permitAll()
+                .requestMatchers("/api/token", "/api/test-support/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/concerts", "/api/concerts/*").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                .requestMatchers("/api/concerts/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/concerts").authenticated()
+                .requestMatchers("/api/coupons/**").authenticated()
+                .requestMatchers("/api/me/**").authenticated()
+                .requestMatchers("/api/concerts/*/queue", "/api/concerts/*/queue/me").authenticated()
+                .requestMatchers("/api/concerts/*/booking", "/api/concerts/*/booking/me", "/api/concerts/*/booking/detail").authenticated()
+                .requestMatchers("/api/concerts/*/payment", "/api/concerts/*/payment/me", "/api/concerts/*/payment/toss-confirm").authenticated()
                 .anyRequest().authenticated()
+        );
+
+        http.exceptionHandling(ex -> ex
+                .authenticationEntryPoint((request, response, authException) ->
+                        writeSecurityError(response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "인증이 필요합니다."))
+                .accessDeniedHandler((request, response, accessDeniedException) ->
+                        writeSecurityError(response, HttpStatus.FORBIDDEN, "FORBIDDEN", "접근 권한이 없습니다."))
         );
 
         return http.build();
@@ -120,5 +139,18 @@ public class WebOAuthSecurityConfig {
     @Bean
     public BCryptPasswordEncoder bCryptPasswordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    private void writeSecurityError(HttpServletResponse response,
+                                    HttpStatus status,
+                                    String error,
+                                    String message) throws IOException {
+        response.setStatus(status.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        new ObjectMapper().writeValue(response.getWriter(), Map.of(
+                "status", status.value(),
+                "error", error,
+                "message", message
+        ));
     }
 }

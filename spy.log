@@ -266,3 +266,33 @@
 1775275896232|0|statement|connection 153|url jdbc:h2:mem:testdb|     drop table if exists payment_compensation_outbox cascade |     drop table if exists payment_compensation_outbox cascade 
 1775275896232|0|statement|connection 153|url jdbc:h2:mem:testdb|     drop table if exists refresh_token cascade |     drop table if exists refresh_token cascade 
 1775275896232|0|statement|connection 153|url jdbc:h2:mem:testdb|     drop table if exists users cascade |     drop table if exists users cascade 
+1775550032419|21|statement|connection 103|url jdbc:mysql://localhost:55897/blog_test|     alter table booking         drop         foreign key FKfd8akbanj9qwf0130goqumjvd|     alter table booking         drop         foreign key FKfd8akbanj9qwf0130goqumjvd
+1775550032427|7|statement|connection 103|url jdbc:mysql://localhost:55897/blog_test|     alter table coupon_issue         drop         foreign key FKaxdtc4pg7dy7rmvkvqxdag9jn|     alter table coupon_issue         drop         foreign key FKaxdtc4pg7dy7rmvkvqxdag9jn
+1775550032439|11|statement|connection 103|url jdbc:mysql://localhost:55897/blog_test|     alter table payment         drop         foreign key FKqewrl4xrv9eiad6eab3aoja65|     alter table payment         drop         foreign key FKqewrl4xrv9eiad6eab3aoja65
+1775550032447|7|statement|connection 103|url jdbc:mysql://localhost:55897/blog_test|     drop table if exists booking|     drop table if exists booking
+1775550032453|5|statement|connection 103|url jdbc:mysql://localhost:55897/blog_test|     drop table if exists concert|     drop table if exists concert
+1775550032464|11|statement|connection 103|url jdbc:mysql://localhost:55897/blog_test|     drop table if exists coupon|     drop table if exists coupon
+1775550032473|8|statement|connection 103|url jdbc:mysql://localhost:55897/blog_test|     drop table if exists coupon_issue|     drop table if exists coupon_issue
+1775550032480|7|statement|connection 103|url jdbc:mysql://localhost:55897/blog_test|     drop table if exists payment|     drop table if exists payment
+1775550032487|6|statement|connection 103|url jdbc:mysql://localhost:55897/blog_test|     drop table if exists payment_compensation_outbox|     drop table if exists payment_compensation_outbox
+1775550032494|6|statement|connection 103|url jdbc:mysql://localhost:55897/blog_test|     drop table if exists refresh_token|     drop table if exists refresh_token
+1775550032501|6|statement|connection 103|url jdbc:mysql://localhost:55897/blog_test|     drop table if exists users|     drop table if exists users
+1775550084745|1|statement|connection 114|url jdbc:h2:mem:40dbd21b-d02c-4779-830c-b48bf0eeb401|     drop table if exists booking cascade |     drop table if exists booking cascade 
+1775550084746|0|statement|connection 114|url jdbc:h2:mem:40dbd21b-d02c-4779-830c-b48bf0eeb401|     drop table if exists concert cascade |     drop table if exists concert cascade 
+1775550084747|0|statement|connection 114|url jdbc:h2:mem:40dbd21b-d02c-4779-830c-b48bf0eeb401|     drop table if exists coupon cascade |     drop table if exists coupon cascade 
+1775550084747|0|statement|connection 114|url jdbc:h2:mem:40dbd21b-d02c-4779-830c-b48bf0eeb401|     drop table if exists coupon_issue cascade |     drop table if exists coupon_issue cascade 
+1775550084748|0|statement|connection 114|url jdbc:h2:mem:40dbd21b-d02c-4779-830c-b48bf0eeb401|     drop table if exists payment cascade |     drop table if exists payment cascade 
+1775550084748|0|statement|connection 114|url jdbc:h2:mem:40dbd21b-d02c-4779-830c-b48bf0eeb401|     drop table if exists payment_compensation_outbox cascade |     drop table if exists payment_compensation_outbox cascade 
+1775550084748|0|statement|connection 114|url jdbc:h2:mem:40dbd21b-d02c-4779-830c-b48bf0eeb401|     drop table if exists refresh_token cascade |     drop table if exists refresh_token cascade 
+1775550084749|0|statement|connection 114|url jdbc:h2:mem:40dbd21b-d02c-4779-830c-b48bf0eeb401|     drop table if exists users cascade |     drop table if exists users cascade 
+1775550084780|19|statement|connection 115|url jdbc:mysql://localhost:56221/blog_test|     alter table booking         drop         foreign key FKfd8akbanj9qwf0130goqumjvd|     alter table booking         drop         foreign key FKfd8akbanj9qwf0130goqumjvd
+1775550084791|10|statement|connection 115|url jdbc:mysql://localhost:56221/blog_test|     alter table coupon_issue         drop         foreign key FKaxdtc4pg7dy7rmvkvqxdag9jn|     alter table coupon_issue         drop         foreign key FKaxdtc4pg7dy7rmvkvqxdag9jn
+1775550084801|9|statement|connection 115|url jdbc:mysql://localhost:56221/blog_test|     alter table payment         drop         foreign key FKqewrl4xrv9eiad6eab3aoja65|     alter table payment         drop         foreign key FKqewrl4xrv9eiad6eab3aoja65
+1775550084808|6|statement|connection 115|url jdbc:mysql://localhost:56221/blog_test|     drop table if exists booking|     drop table if exists booking
+1775550084813|5|statement|connection 115|url jdbc:mysql://localhost:56221/blog_test|     drop table if exists concert|     drop table if exists concert
+1775550084818|5|statement|connection 115|url jdbc:mysql://localhost:56221/blog_test|     drop table if exists coupon|     drop table if exists coupon
+1775550084824|5|statement|connection 115|url jdbc:mysql://localhost:56221/blog_test|     drop table if exists coupon_issue|     drop table if exists coupon_issue
+1775550084831|6|statement|connection 115|url jdbc:mysql://localhost:56221/blog_test|     drop table if exists payment|     drop table if exists payment
+1775550084838|7|statement|connection 115|url jdbc:mysql://localhost:56221/blog_test|     drop table if exists payment_compensation_outbox|     drop table if exists payment_compensation_outbox
+1775550084843|4|statement|connection 115|url jdbc:mysql://localhost:56221/blog_test|     drop table if exists refresh_token|     drop table if exists refresh_token
+1775550084850|6|statement|connection 115|url jdbc:mysql://localhost:56221/blog_test|     drop table if exists users|     drop table if exists users
