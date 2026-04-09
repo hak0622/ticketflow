@@ -27,7 +27,13 @@ oauth2:
 
 app:
   test-support:
-    enabled: true
+    enabled: false
+    user-count: 100
+    email-prefix: test
+    email-domain: test.com
+    default-password: password123!
+    nickname-prefix: test-user-
+    csv-output-path: booking-users.csv
     token-expiration-minutes: 120
     seed-emails:
       - test1@test.com
