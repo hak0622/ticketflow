@@ -38,3 +38,10 @@ out/
 
 ### Secrets ###
 .env
+
+# CSV test data
+*.csv
+
+# JMeter
+*.jmx
+
