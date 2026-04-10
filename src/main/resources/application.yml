@@ -4,6 +4,7 @@ spring:
     group:
       "local": "local"
       "prod": "prod"
+      "docker": "docker"
 
   security:
     oauth2:
