@@ -46,12 +46,17 @@ const MOCK_CONCERTS = [
   },
 ]
 
-function filterConcertsByGenre(concerts, genre) {
-  if (!genre) {
-    return concerts
-  }
+function applyFallbackFilter(concerts, { genre, keyword, status }) {
+  return concerts.filter((concert) => {
+    const matchesGenre = !genre || concert.genre === genre
+    const matchesStatus = !status || concert.status === status
+    const matchesKeyword =
+      !keyword ||
+      concert.title?.toLowerCase().includes(keyword.toLowerCase()) ||
+      concert.artist?.toLowerCase().includes(keyword.toLowerCase())
 
-  return concerts.filter((concert) => concert.genre === genre)
+    return matchesGenre && matchesStatus && matchesKeyword
+  })
 }
 
 export default function ConcertListPage() {
@@ -59,20 +64,50 @@ export default function ConcertListPage() {
   const [concerts, setConcerts] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const queryValue = searchParams.get('genre') || ''
-  const category = CATEGORY_BY_QUERY[queryValue] || CATEGORY_BY_QUERY['']
+  const genreQuery = searchParams.get('genre') || ''
+  const keyword = searchParams.get('keyword')?.trim() || ''
+  const status = searchParams.get('status') || ''
+  const category = CATEGORY_BY_QUERY[genreQuery] || CATEGORY_BY_QUERY['']
   const apiGenre = category?.genre || undefined
+  const apiKeyword = keyword || undefined
+  const apiStatus = status || undefined
 
   useEffect(() => {
+    const params = {}
+
+    if (apiGenre) params.genre = apiGenre
+    if (apiKeyword) params.keyword = apiKeyword
+    if (apiStatus) params.status = apiStatus
+
     setLoading(true)
 
-    getConcerts(apiGenre)
+    getConcerts(params)
       .then((res) => setConcerts(res.data))
-      .catch(() => setConcerts(filterConcertsByGenre(MOCK_CONCERTS, apiGenre)))
+      .catch(() =>
+        setConcerts(
+          applyFallbackFilter(MOCK_CONCERTS, {
+            genre: apiGenre,
+            keyword: apiKeyword,
+            status: apiStatus,
+          }),
+        ),
+      )
       .finally(() => setLoading(false))
-  }, [apiGenre])
+  }, [apiGenre, apiKeyword, apiStatus])
 
   const title = useMemo(() => category?.label || '전체', [category])
+  const description = useMemo(() => {
+    if (apiKeyword && apiGenre) {
+      return `${apiGenre} 장르에서 "${apiKeyword}" 검색 결과`
+    }
+    if (apiKeyword) {
+      return `"${apiKeyword}" 검색 결과`
+    }
+    if (apiGenre) {
+      return `${apiGenre} 장르 공연을 모아봤어요`
+    }
+    return '전체 공연을 한 번에 둘러보세요'
+  }, [apiGenre, apiKeyword])
 
   return (
     <div className="min-h-screen bg-[#F9F9F9] pb-20 md:pb-0">
@@ -87,9 +122,7 @@ export default function ConcertListPage() {
                 <h1 className="text-3xl md:text-4xl font-black font-jakarta text-gray-900 leading-none mb-2">
                   {title}
                 </h1>
-                <p className="text-sm text-gray-500">
-                  {apiGenre ? `${apiGenre} 장르 공연을 모아봤어요` : '전체 공연을 한 번에 둘러보세요'}
-                </p>
+                <p className="text-sm text-gray-500">{description}</p>
               </div>
               {!loading && (
                 <span className="text-sm text-gray-400">{concerts.length}개</span>

@@ -1,8 +1,8 @@
 import axiosInstance from '../../shared/api/axios'
 
-export const getConcerts = (genre) =>
+export const getConcerts = (params = {}) =>
   axiosInstance.get('/concerts', {
-    params: genre ? { genre } : {},
+    params,
   })
 
 export const getConcert = (id) => axiosInstance.get(`/concerts/${id}`)

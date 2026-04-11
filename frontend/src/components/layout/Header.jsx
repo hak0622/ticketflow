@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { HiOutlineTicket } from 'react-icons/hi2'
 import { HiOutlineUser, HiOutlineArrowRightOnRectangle, HiOutlineArrowLeftOnRectangle } from 'react-icons/hi2'
@@ -8,10 +9,38 @@ import { CONCERT_CATEGORIES } from '../../constants/concertCategories'
 export default function Header() {
   const { token } = useAuthStore()
   const navigate = useNavigate()
+  const location = useLocation()
+  const currentKeyword = new URLSearchParams(location.search).get('keyword') || ''
+  const [searchKeyword, setSearchKeyword] = useState(currentKeyword)
+
+  useEffect(() => {
+    setSearchKeyword(currentKeyword)
+  }, [currentKeyword])
 
   const handleLogout = async () => {
     await performLogout()
     navigate('/', { replace: true })
+  }
+
+  const moveToSearchResult = () => {
+    const params = new URLSearchParams(location.search)
+    const normalized = searchKeyword.trim()
+
+    if (normalized) {
+      params.set('keyword', normalized)
+    } else {
+      params.delete('keyword')
+    }
+
+    navigate({
+      pathname: '/concerts',
+      search: params.toString() ? `?${params.toString()}` : '',
+    })
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    moveToSearchResult()
   }
 
   return (
@@ -30,17 +59,26 @@ export default function Header() {
           </Link>
 
           {/* 검색 바 (데스크탑) */}
-          <div className="hidden md:flex flex-1 max-w-xl items-center gap-3 bg-gray-100 rounded-full px-4 py-2">
-            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+          <form
+            onSubmit={handleSubmit}
+            className="hidden md:flex flex-1 max-w-xl items-center gap-3 bg-gray-100 rounded-full px-4 py-2"
+          >
+            <button
+              type="submit"
+              className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
             <input
               type="text"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
               placeholder="공연, 아티스트 검색..."
               className="bg-transparent border-none outline-none w-full text-sm text-gray-700 placeholder-gray-400"
-              readOnly
             />
-          </div>
+          </form>
 
           {/* 우측 액션 영역 */}
           <div className="flex items-center gap-1 md:gap-2 shrink-0">
@@ -101,12 +139,18 @@ function CategoryNav() {
   const isConcertListPage = location.pathname === '/concerts'
 
   const handleCategoryClick = (category) => {
-    if (!category.queryValue) {
-      navigate('/concerts')
-      return
+    const params = new URLSearchParams(location.search)
+
+    if (category.queryValue) {
+      params.set('genre', category.queryValue)
+    } else {
+      params.delete('genre')
     }
 
-    navigate(`/concerts?genre=${category.queryValue}`)
+    navigate({
+      pathname: '/concerts',
+      search: params.toString() ? `?${params.toString()}` : '',
+    })
   }
 
   return (

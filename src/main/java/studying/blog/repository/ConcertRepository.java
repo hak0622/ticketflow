@@ -11,7 +11,7 @@ import studying.blog.domain.ConcertStatus;
 import java.util.List;
 import java.util.Optional;
 
-public interface ConcertRepository extends JpaRepository<Concert, Long> {
+public interface ConcertRepository extends JpaRepository<Concert, Long>, ConcertRepositoryCustom {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from Concert c where c.id = :id")
     Optional<Concert> findByIdForUpdate(@Param("id") Long id);
