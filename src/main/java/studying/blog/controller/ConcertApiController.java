@@ -9,6 +9,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import studying.blog.dto.ConcertCreateRequest;
 import studying.blog.dto.ConcertResponse;
+import studying.blog.dto.ConcertSearchCondition;
 import studying.blog.service.ConcertService;
 
 import java.util.List;
@@ -22,8 +23,8 @@ public class ConcertApiController {
 
     @Operation(summary = "공연 목록 조회")
     @GetMapping
-    public ResponseEntity<List<ConcertResponse>> list(@RequestParam(required = false) String genre){
-        return ResponseEntity.ok(concertService.findAll(genre));
+    public ResponseEntity<List<ConcertResponse>> list(ConcertSearchCondition condition){
+        return ResponseEntity.ok(concertService.search(condition));
     }
 
     @Operation(summary = "공연 생성", description = "인증 필요")

@@ -9,6 +9,7 @@ import studying.blog.dto.BookingAdminResponse;
 import studying.blog.dto.ConcertAdminUpsertRequest;
 import studying.blog.dto.ConcertCreateRequest;
 import studying.blog.dto.ConcertResponse;
+import studying.blog.dto.ConcertSearchCondition;
 import studying.blog.repository.BookingRepository;
 import studying.blog.repository.ConcertRepository;
 
@@ -60,6 +61,13 @@ public class ConcertService {
     @Transactional(readOnly = true)
     public List<ConcertResponse> findAll() {
         return findAll(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ConcertResponse> search(ConcertSearchCondition condition) {
+        return concertRepository.search(condition).stream()
+                .map(ConcertResponse::from)
+                .toList();
     }
 
     @Transactional
