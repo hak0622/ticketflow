@@ -1,6 +1,7 @@
 package studying.blog.integration;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import studying.blog.domain.Booking;
 import studying.blog.domain.BookingStatus;
@@ -19,6 +20,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Tag("integration")
 class BookingLifecycleIntegrationTest extends IntegrationTestSupport {
 
     @Autowired

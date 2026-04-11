@@ -73,7 +73,24 @@ dependencies {
 
 
 tasks.named('test') {
-	useJUnitPlatform()
+	useJUnitPlatform {
+		if (project.hasProperty('excludeTags')) {
+			excludeTags(project.property('excludeTags').toString().split(',') as String[])
+		}
+	}
+	testLogging {
+		showStandardStreams = true
+	}
+}
+
+tasks.register('ciTest', Test) {
+	group = 'verification'
+	description = 'Runs stable tests only for CI.'
+
+	useJUnitPlatform {
+		excludeTags 'experiment', 'integration'
+	}
+
 	testLogging {
 		showStandardStreams = true
 	}

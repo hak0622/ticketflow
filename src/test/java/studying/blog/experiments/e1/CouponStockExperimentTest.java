@@ -2,6 +2,7 @@ package studying.blog.experiments.e1;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * - 측정: 성공 건수, DB 발급 건수, 초과 발급 건수, 소요 시간, TPS
  * - 기준: 초과 발급 0건 + TPS 최고인 방식 채택
  */
+@Tag("experiment")
 class CouponStockExperimentTest extends RedisTestSupport {
 
     static final int TOTAL_QTY = 50;
