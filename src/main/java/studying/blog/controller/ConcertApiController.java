@@ -22,8 +22,8 @@ public class ConcertApiController {
 
     @Operation(summary = "공연 목록 조회")
     @GetMapping
-    public ResponseEntity<List<ConcertResponse>> list(){
-        return ResponseEntity.ok(concertService.findAll());
+    public ResponseEntity<List<ConcertResponse>> list(@RequestParam(required = false) String genre){
+        return ResponseEntity.ok(concertService.findAll(genre));
     }
 
     @Operation(summary = "공연 생성", description = "인증 필요")

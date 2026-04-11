@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-ro
 import Header from './components/layout/Header'
 import BottomNav from './components/layout/BottomNav'
 import HomePage from './pages/HomePage'
+import ConcertListPage from './pages/ConcertListPage'
 import ConcertDetailPage from './pages/ConcertDetailPage'
 import QueuePage from './pages/QueuePage'
 import BookingPage from './pages/BookingPage'
@@ -41,6 +42,7 @@ function Layout() {
       <Header />
       <Routes>
         <Route path="/"                     element={<HomePage />} />
+        <Route path="/concerts"            element={<ConcertListPage />} />
         <Route path="/concerts/:id"         element={<ConcertDetailPage />} />
         <Route path="/concerts/:id/queue"   element={<QueuePage />} />
         <Route path="/concerts/:id/booking" element={<BookingPage />} />
