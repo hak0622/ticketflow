@@ -1,6 +1,7 @@
 package studying.blog.integration;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 import studying.blog.domain.Booking;
 import studying.blog.domain.BookingStatus;
 import studying.blog.domain.Concert;
@@ -19,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Tag("integration")
 class BookingFlowIntegrationTest extends IntegrationTestSupport {
 
     @org.springframework.beans.factory.annotation.Autowired

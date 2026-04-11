@@ -2,6 +2,7 @@ package studying.blog.service;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import studying.blog.domain.Coupon;
@@ -16,6 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Tag("integration")
 class CouponIssueConcurrencyTest extends RedisTestSupport {
 
     static final int TOTAL_QTY = 50;

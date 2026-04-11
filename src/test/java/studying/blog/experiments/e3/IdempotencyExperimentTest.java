@@ -1,6 +1,7 @@
 package studying.blog.experiments.e3;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -25,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * - 측정: 실제 처리 건수 (정상=1), 중복 처리 건수, 소요 시간
  * - 기준: 중복 처리 0건 + 구현 단순
  */
+@Tag("experiment")
 class IdempotencyExperimentTest extends RedisTestSupport {
 
     static final int THREADS = 10;

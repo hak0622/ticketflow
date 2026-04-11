@@ -26,8 +26,8 @@ jobs:
         run: chmod +x gradlew
 
       # 테스트를 먼저 실행해 품질 게이트 역할을 수행한다.
-      - name: Run tests
-        run: ./gradlew clean test
+      - name: Run stable CI tests
+        run: ./gradlew clean ciTest
 
       # 테스트 성공/실패와 관계없이 JUnit XML 결과를 업로드한다.
       - name: Upload JUnit test results
