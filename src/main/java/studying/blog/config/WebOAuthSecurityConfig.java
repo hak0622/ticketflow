@@ -58,6 +58,7 @@ public class WebOAuthSecurityConfig {
 
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/token", "/api/test-support/**").permitAll()
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/concerts", "/api/concerts/*").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/concerts").authenticated()

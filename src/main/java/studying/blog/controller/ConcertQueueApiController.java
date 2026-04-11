@@ -1,5 +1,8 @@
 package studying.blog.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -11,6 +14,7 @@ import studying.blog.service.QueueService;
 
 import java.util.Map;
 
+@Tag(name = "Queue", description = "대기열 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/concerts")
@@ -18,6 +22,9 @@ public class ConcertQueueApiController {
     private final QueueService queueService;
     private final BookingService bookingService;
 
+    @Operation(summary = "대기열 등록",
+            description = "콘서트 대기열에 등록합니다. 이미 예매한 경우 BOOKED, 대기 중이면 QUEUED와 순번을 반환합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/{concertId}/queue")
     public ResponseEntity<?> enqueue(@PathVariable Long concertId,
                                      @AuthenticationPrincipal CustomPrincipal principal) {
@@ -43,7 +50,9 @@ public class ConcertQueueApiController {
         ));
     }
 
-    //폴링 : 내 순번 조회
+    @Operation(summary = "대기 순번 폴링",
+            description = "현재 대기 순번을 조회합니다. 입장 가능하면 ADMITTED, 대기 중이면 QUEUED+순번을 반환합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/{concertId}/queue/me")
     public ResponseEntity<?> myQueue(@PathVariable Long concertId,
                                      @AuthenticationPrincipal CustomPrincipal principal){
@@ -61,7 +70,6 @@ public class ConcertQueueApiController {
         Long position = queueService.getPosition(concertId, userId);
         Long total = queueService.getTotal(concertId);
 
-        //아직 대기열 안에 있으면 계속 QUEUED 상태
         if (position != null) {
             return ResponseEntity.ok(Map.of(
                     "concertId", concertId,
@@ -71,7 +79,6 @@ public class ConcertQueueApiController {
             ));
         }
 
-        // 대기열엔 없지만, admitted에 있으면 "진짜 SUCCESS"
         if (queueService.isAdmitted(concertId, userId)) {
             return ResponseEntity.ok(Map.of(
                     "concertId", concertId,
@@ -79,7 +86,6 @@ public class ConcertQueueApiController {
             ));
         }
 
-        //둘 다 아니면 "대기열에 없음/만료"
         return ResponseEntity.ok(Map.of(
                 "concertId", concertId,
                 "status", "NOT_IN_QUEUE",
