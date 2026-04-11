@@ -67,20 +67,15 @@ export default function HomePage() {
   const [concerts, setConcerts] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatus] = useState('all')
-  const [genreFilter, setGenre] = useState('all')
 
   useEffect(() => {
+    setLoading(true)
+
     getConcerts()
       .then((res) => setConcerts(res.data))
       .catch(() => setConcerts(MOCK_CONCERTS))
       .finally(() => setLoading(false))
   }, [])
-
-  /* 장르 목록 (동적 생성) */
-  const genres = useMemo(
-    () => [...new Set(concerts.map((c) => c.genre).filter(Boolean))],
-    [concerts],
-  )
 
   /* 필터 적용 */
   const filtered = useMemo(() => {
@@ -89,10 +84,9 @@ export default function HomePage() {
         statusFilter === 'all' ||
         (statusFilter === 'OPEN' && c.status === 'OPEN') ||
         (statusFilter === 'sold' && c.status !== 'OPEN')
-      const byGenre = genreFilter === 'all' || c.genre === genreFilter
-      return byStatus && byGenre
+      return byStatus
     })
-  }, [concerts, statusFilter, genreFilter])
+  }, [concerts, statusFilter])
 
   /* 트렌딩: 필터 적용, 최대 5개 */
   const trending = filtered.slice(0, 5)
@@ -130,14 +124,6 @@ export default function HomePage() {
                 active={statusFilter === 'sold'}
                 onClick={() => setStatus('sold')}
               />
-              {genres.map((g) => (
-                <Chip
-                  key={g}
-                  label={g}
-                  active={genreFilter === g}
-                  onClick={() => setGenre(genreFilter === g ? 'all' : g)}
-                />
-              ))}
             </section>
           )}
 

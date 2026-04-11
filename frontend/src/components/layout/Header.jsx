@@ -1,8 +1,9 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { HiOutlineTicket } from 'react-icons/hi2'
 import { HiOutlineUser, HiOutlineArrowRightOnRectangle, HiOutlineArrowLeftOnRectangle } from 'react-icons/hi2'
 import useAuthStore from '../../features/auth/store'
 import { performLogout } from '../../features/auth/auth-actions'
+import { CONCERT_CATEGORIES } from '../../constants/concertCategories'
 
 export default function Header() {
   const { token } = useAuthStore()
@@ -94,12 +95,31 @@ export default function Header() {
 
 /* ── 카테고리 탭 (별도 컴포넌트, HomePage의 필터 칩과 별개) ── */
 function CategoryNav() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const currentGenre = new URLSearchParams(location.search).get('genre') || ''
+  const isConcertListPage = location.pathname === '/concerts'
+
+  const handleCategoryClick = (category) => {
+    if (!category.queryValue) {
+      navigate('/concerts')
+      return
+    }
+
+    navigate(`/concerts?genre=${category.queryValue}`)
+  }
+
   return (
     <div className="border-t border-gray-100">
       <div className="max-w-screen-xl mx-auto px-4 md:px-6 lg:px-8">
         <nav className="flex items-center justify-center gap-1 md:gap-2 overflow-x-auto scrollbar-none py-1">
-          {CATEGORIES.map(({ label, href }) => (
-            <CategoryTab key={label} label={label} href={href} />
+          {CONCERT_CATEGORIES.map((category) => (
+            <CategoryTab
+              key={category.label}
+              label={category.label}
+              active={isConcertListPage && currentGenre === category.queryValue}
+              onClick={() => handleCategoryClick(category)}
+            />
           ))}
         </nav>
       </div>
@@ -107,24 +127,18 @@ function CategoryNav() {
   )
 }
 
-const CATEGORIES = [
-  { label: '뮤지컬',    href: '/' },
-  { label: '콘서트',    href: '/' },
-  { label: '스포츠',    href: '/' },
-  { label: '전시/행사', href: '/' },
-  { label: '클래식/무용', href: '/' },
-  { label: '아동/가족', href: '/' },
-  { label: '연극',      href: '/' },
-  { label: '레저/캠핑', href: '/' },
-]
-
-function CategoryTab({ label, href }) {
+function CategoryTab({ label, active, onClick }) {
   return (
-    <Link
-      to={href}
-      className="flex-shrink-0 px-4 md:px-5 py-2.5 md:py-3 text-sm md:text-[15px] font-semibold text-gray-600 hover:text-primary-600 transition-colors whitespace-nowrap rounded-md hover:bg-primary-50"
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-shrink-0 px-4 md:px-5 py-2.5 md:py-3 text-sm md:text-[15px] font-semibold transition-colors whitespace-nowrap rounded-md ${
+        active
+          ? 'text-primary-600 bg-primary-50'
+          : 'text-gray-600 hover:text-primary-600 hover:bg-primary-50'
+      }`}
     >
       {label}
-    </Link>
+    </button>
   )
 }

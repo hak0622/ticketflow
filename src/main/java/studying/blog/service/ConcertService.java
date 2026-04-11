@@ -44,14 +44,22 @@ public class ConcertService {
     }
 
     @Transactional(readOnly = true)
-    public List<ConcertResponse> findAll(){
-        List<Concert> concerts = concertRepository.findAll();
+    public List<ConcertResponse> findAll(String genre){
+        String normalizedGenre = genre == null ? null : genre.trim();
+        List<Concert> concerts = (normalizedGenre == null || normalizedGenre.isBlank())
+                ? concertRepository.findAll()
+                : concertRepository.findByGenre(normalizedGenre);
         List<ConcertResponse> result = new ArrayList<>();
 
         for (Concert concert : concerts) {
             result.add(ConcertResponse.from(concert));
         }
         return result;
+    }
+
+    @Transactional(readOnly = true)
+    public List<ConcertResponse> findAll() {
+        return findAll(null);
     }
 
     @Transactional

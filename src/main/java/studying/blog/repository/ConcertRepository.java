@@ -17,4 +17,6 @@ public interface ConcertRepository extends JpaRepository<Concert, Long> {
     Optional<Concert> findByIdForUpdate(@Param("id") Long id);
 
     List<Concert> findByStatus(ConcertStatus status);
+
+    List<Concert> findByGenre(String genre);
 }
