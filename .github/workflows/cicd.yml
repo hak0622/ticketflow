@@ -27,23 +27,23 @@ jobs:
 
       # 테스트를 먼저 실행해 품질 게이트 역할을 수행한다.
       - name: Run stable CI tests
-        run: ./gradlew clean ciTest
+        run: ./gradlew clean ciTest --info --stacktrace
 
       # 테스트 성공/실패와 관계없이 JUnit XML 결과를 업로드한다.
-      - name: Upload JUnit test results
+      - name: Upload JUnit ciTest results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: junit-test-results
-          path: build/test-results/test
+          name: junit-ci-test-results
+          path: build/test-results/ciTest
 
       # 브라우저에서 확인 가능한 HTML 리포트도 함께 업로드한다.
-      - name: Upload HTML test report
+      - name: Upload HTML ciTest report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: html-test-report
-          path: build/reports/tests/test
+          name: html-ci-test-report
+          path: build/reports/tests/ciTest
 
   build:
     name: Build
