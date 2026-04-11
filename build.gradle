@@ -78,6 +78,7 @@ tasks.named('test') {
 			excludeTags(project.property('excludeTags').toString().split(',') as String[])
 		}
 	}
+	systemProperty 'spring.profiles.active', 'test'
 	testLogging {
 		showStandardStreams = true
 	}
@@ -91,8 +92,17 @@ tasks.register('ciTest', Test) {
 		excludeTags 'experiment', 'integration'
 	}
 
+	systemProperty 'spring.profiles.active', 'test'
+
 	testLogging {
 		showStandardStreams = true
+		events "passed", "failed", "skipped"
+		exceptionFormat "full"
+	}
+
+	reports {
+		junitXml.required = true
+		html.required = true
 	}
 }
 
