@@ -2,6 +2,7 @@ package studying.blog.scheduler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ public class BookingExpiryScheduler {
     private static final int EXPIRY_MINUTES = 30;
 
     @Scheduled(fixedDelay = 60_000)
+    @SchedulerLock(name = "BookingExpiryScheduler", lockAtMostFor = "55s", lockAtLeastFor = "0s")
     @Transactional
     public void expireStaleBookings() {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(EXPIRY_MINUTES);

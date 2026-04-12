@@ -27,7 +27,6 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
@@ -202,13 +201,29 @@ public class PaymentService {
             throw new IllegalArgumentException("결제 금액이 일치하지 않습니다.");
         }
 
-        // 4. Toss 결제 승인 API 호출
-        String paymentMethod = callTossConfirmApi(request.getPaymentKey(), orderId, request.getAmount());
-
-        // 5. Payment 엔티티 생성 후 즉시 완료 처리
+        // 4. Payment PENDING으로 먼저 저장 — API 실패 시에도 보상 처리 진입점 확보
         Payment payment = Payment.create(booking, userId, concertId,
-                request.getAmount(), paymentMethod, orderId);
+                request.getAmount(), "TOSS", orderId);
         paymentRepository.save(payment);
+
+        // 5. Toss 결제 승인 API 호출
+        String paymentMethod;
+        try {
+            paymentMethod = callTossConfirmApi(request.getPaymentKey(), orderId, request.getAmount());
+        } catch (Exception e) {
+            // API 실패 시 Mock과 동일하게 Outbox 생성 (같은 트랜잭션에 원자적으로 커밋)
+            payment.fail("Toss API 실패: " + e.getMessage());
+            String payload = buildPayload(booking.getId(), concertId, userId, payment.getId());
+            outboxRepository.save(PaymentCompensationOutbox.create(payload));
+
+            log.warn("[TOSS][FAILED] userId={} concertId={} bookingId={} paymentId={} orderId={} error={}",
+                    userId, concertId, booking.getId(), payment.getId(), orderId, e.getMessage());
+            meterRegistry.counter("payment.attempt", "method", "TOSS", "result", "FAILED").increment();
+            return PaymentResponse.from(payment);
+        }
+
+        // 6. 승인 성공
+        payment.updatePaymentMethod(paymentMethod);
         payment.complete();
         booking.confirm();
 

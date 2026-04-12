@@ -82,4 +82,8 @@ public class Payment {
         this.status = PaymentStatus.FAILED;
         this.failureReason = reason;
     }
+
+    public void updatePaymentMethod(String paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
 }
