@@ -6,13 +6,9 @@ import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClient;
 import studying.blog.domain.*;
 import studying.blog.dto.PaymentRequest;
 import studying.blog.dto.PaymentResponse;
@@ -22,9 +18,7 @@ import studying.blog.repository.ConcertRepository;
 import studying.blog.repository.PaymentCompensationOutboxRepository;
 import studying.blog.repository.PaymentRepository;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -41,6 +35,7 @@ public class PaymentService {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final TossPaymentClient tossPaymentClient;
 
     @Value("${payment.mock.fail-rate:0}")
     private int failRate;
@@ -162,15 +157,10 @@ public class PaymentService {
 
     // ─── Toss Payments 승인 ─────────────────────────────────────────
 
-    private static final String TOSS_CONFIRM_URL = "https://api.tosspayments.com/v1/payments/confirm";
-    private final RestClient tossRestClient = RestClient.create();
-
-    @Value("${toss.secret-key}")
-    private String tossSecretKey;
-
     /**
      * Toss Payments 결제 승인.
      * orderId 를 idempotencyKey 로 사용해 중복 승인을 방지한다.
+     * API 호출은 TossPaymentClient (Circuit Breaker + timeout) 에 위임한다.
      */
     @Transactional
     public PaymentResponse tossConfirm(Long concertId, Long userId, TossConfirmRequest request) {
@@ -206,10 +196,10 @@ public class PaymentService {
                 request.getAmount(), "TOSS", orderId);
         paymentRepository.save(payment);
 
-        // 5. Toss 결제 승인 API 호출
+        // 5. Toss 결제 승인 API 호출 (Circuit Breaker 적용, timeout 3s)
         String paymentMethod;
         try {
-            paymentMethod = callTossConfirmApi(request.getPaymentKey(), orderId, request.getAmount());
+            paymentMethod = tossPaymentClient.confirm(request.getPaymentKey(), orderId, request.getAmount());
         } catch (Exception e) {
             // API 실패 시 Mock과 동일하게 Outbox 생성 (같은 트랜잭션에 원자적으로 커밋)
             payment.fail("Toss API 실패: " + e.getMessage());
@@ -234,25 +224,4 @@ public class PaymentService {
         return PaymentResponse.from(payment);
     }
 
-    /**
-     * Toss Payments 서버에 결제 승인 요청을 보낸다.
-     * 응답의 method 필드를 반환한다 (결제 수단 기록용).
-     */
-    private String callTossConfirmApi(String paymentKey, String orderId, Integer amount) {
-        String credentials = Base64.getEncoder()
-                .encodeToString((tossSecretKey + ":").getBytes(StandardCharsets.UTF_8));
-
-        Map<String, Object> responseBody = tossRestClient.post()
-                .uri(TOSS_CONFIRM_URL)
-                .header(HttpHeaders.AUTHORIZATION, "Basic " + credentials)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("paymentKey", paymentKey, "orderId", orderId, "amount", amount))
-                .retrieve()
-                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
-
-        if (responseBody == null) {
-            throw new IllegalStateException("Toss 결제 승인 응답이 비어 있습니다.");
-        }
-        return String.valueOf(responseBody.getOrDefault("method", "TOSS"));
-    }
 }
