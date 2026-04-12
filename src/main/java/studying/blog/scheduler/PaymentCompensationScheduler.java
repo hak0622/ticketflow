@@ -31,11 +31,12 @@ public class PaymentCompensationScheduler {
         log.info("[OUTBOX][START] pendingCount={}", pending.size());
 
         for (PaymentCompensationOutbox outbox : pending) {
+            Long outboxId = outbox.getId();
             try {
-                outboxProcessor.process(outbox);
+                outboxProcessor.process(outboxId);
                 meterRegistry.counter("scheduler.payment_compensation.processed", "result", "PUBLISHED").increment();
             } catch (Exception e) {
-                outboxProcessor.markRetry(outbox, e);
+                outboxProcessor.markRetry(outboxId, e);
                 meterRegistry.counter("scheduler.payment_compensation.processed", "result", "FAILED").increment();
             }
         }

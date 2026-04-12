@@ -16,6 +16,7 @@ import studying.blog.domain.OutboxStatus;
 import studying.blog.domain.PaymentCompensationOutbox;
 import studying.blog.repository.BookingRepository;
 import studying.blog.repository.ConcertRepository;
+import studying.blog.repository.PaymentCompensationOutboxRepository;
 
 import java.util.Map;
 
@@ -29,6 +30,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class PaymentCompensationOutboxProcessor {
 
+    private final PaymentCompensationOutboxRepository outboxRepository;
     private final BookingRepository bookingRepository;
     private final ConcertRepository concertRepository;
     private final ObjectMapper objectMapper;
@@ -41,8 +43,18 @@ public class PaymentCompensationOutboxProcessor {
         return meterRegistry.counter("outbox.failed");
     }
 
+    /**
+     * outboxId를 받아 REQUIRES_NEW 트랜잭션 내에서 직접 조회한다.
+     * 호출 측(processPending)에는 트랜잭션이 없으므로 findByStatus()가 반환한
+     * 엔티티는 detached 상태다. 그 객체를 그대로 넘기면 이 트랜잭션의
+     * persistence context에 등록되지 않아 dirty checking이 동작하지 않는다.
+     * findById()로 재조회해야 managed 엔티티가 되어 변경사항이 DB에 반영된다.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void process(PaymentCompensationOutbox outbox) throws Exception {
+    public void process(Long outboxId) throws Exception {
+        PaymentCompensationOutbox outbox = outboxRepository.findById(outboxId)
+                .orElseThrow(() -> new IllegalArgumentException("Outbox not found: " + outboxId));
+
         Map<String, Object> payload = objectMapper.readValue(
                 outbox.getPayload(), new TypeReference<>() {}
         );
@@ -56,7 +68,7 @@ public class PaymentCompensationOutboxProcessor {
         if (booking.getStatus() == BookingStatus.CANCELLED) {
             outbox.markPublished();
             log.info("[OUTBOX][SKIP] outboxId={} bookingId={} reason=already_cancelled",
-                    outbox.getId(), bookingId);
+                    outboxId, bookingId);
             return;
         }
 
@@ -68,16 +80,19 @@ public class PaymentCompensationOutboxProcessor {
         outbox.markPublished();
 
         log.info("[OUTBOX][PUBLISHED] outboxId={} bookingId={} concertId={} bookedCount={}",
-                outbox.getId(), bookingId, concertId, concert.getBookedCount());
+                outboxId, bookingId, concertId, concert.getBookedCount());
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void markRetry(PaymentCompensationOutbox outbox, Exception cause) {
+    public void markRetry(Long outboxId, Exception cause) {
+        PaymentCompensationOutbox outbox = outboxRepository.findById(outboxId)
+                .orElseThrow(() -> new IllegalArgumentException("Outbox not found: " + outboxId));
+
         outbox.incrementRetry(MAX_RETRY);
         boolean isFinal = outbox.getStatus() == OutboxStatus.FAILED;
         log.warn("[OUTBOX][{}] outboxId={} retryCount={} error={}",
                 isFinal ? "FAILED" : "RETRY",
-                outbox.getId(), outbox.getRetryCount(), cause.getMessage());
+                outboxId, outbox.getRetryCount(), cause.getMessage());
 
         // 재시도 소진 → 최종 FAILED 확정 시에만 증가
         if (isFinal) {
