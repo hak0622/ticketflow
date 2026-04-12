@@ -2,6 +2,7 @@ package studying.blog.scheduler;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -28,6 +29,7 @@ public class PaymentCompensationScheduler {
     private final BookingRepository bookingRepository;
     private final ConcertRepository concertRepository;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
     private static final int MAX_RETRY = 3;
 
@@ -42,8 +44,10 @@ public class PaymentCompensationScheduler {
         for (PaymentCompensationOutbox outbox : pending) {
             try {
                 processOne(outbox);
+                meterRegistry.counter("scheduler.payment_compensation.processed", "result", "PUBLISHED").increment();
             } catch (Exception e) {
                 outbox.incrementRetry(MAX_RETRY);
+                meterRegistry.counter("scheduler.payment_compensation.processed", "result", "FAILED").increment();
                 log.warn("[OUTBOX][{}] outboxId={} retryCount={} error={}",
                         outbox.getStatus() == OutboxStatus.FAILED ? "FAILED" : "RETRY",
                         outbox.getId(), outbox.getRetryCount(), e.getMessage());

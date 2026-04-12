@@ -2,6 +2,7 @@ package studying.blog.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,6 +41,7 @@ public class PaymentService {
     private final PaymentCompensationOutboxRepository outboxRepository;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
     @Value("${payment.mock.fail-rate:0}")
     private int failRate;
@@ -67,6 +69,7 @@ public class PaymentService {
         if (existing.isPresent()) {
             log.info("[PAYMENT][CACHED] userId={} concertId={} idempotencyKey={} status={}",
                     userId, concertId, iKey, existing.get().getStatus());
+            meterRegistry.counter("payment.attempt", "method", "MOCK", "result", "CACHED").increment();
             return PaymentResponse.from(existing.get());
         }
 
@@ -123,6 +126,7 @@ public class PaymentService {
             log.warn("[PAYMENT][FAILED] userId={} concertId={} bookingId={} paymentId={} idempotencyKey={}",
                     userId, concertId, booking.getId(), payment.getId(), iKey);
 
+            meterRegistry.counter("payment.attempt", "method", "MOCK", "result", "FAILED").increment();
             return PaymentResponse.from(payment);
         }
 
@@ -132,6 +136,7 @@ public class PaymentService {
         log.info("[PAYMENT][COMPLETED] userId={} concertId={} bookingId={} amount={} idempotencyKey={}",
                 userId, concertId, booking.getId(), concert.getPrice(), iKey);
 
+        meterRegistry.counter("payment.attempt", "method", "MOCK", "result", "COMPLETED").increment();
         return PaymentResponse.from(payment);
     }
 
@@ -177,6 +182,7 @@ public class PaymentService {
         if (existing.isPresent()) {
             log.info("[TOSS][CACHED] userId={} concertId={} orderId={} status={}",
                     userId, concertId, orderId, existing.get().getStatus());
+            meterRegistry.counter("payment.attempt", "method", "TOSS", "result", "CACHED").increment();
             return PaymentResponse.from(existing.get());
         }
 
@@ -209,6 +215,7 @@ public class PaymentService {
         log.info("[TOSS][CONFIRMED] userId={} concertId={} bookingId={} amount={} orderId={}",
                 userId, concertId, booking.getId(), request.getAmount(), orderId);
 
+        meterRegistry.counter("payment.attempt", "method", "TOSS", "result", "COMPLETED").increment();
         return PaymentResponse.from(payment);
     }
 

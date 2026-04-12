@@ -1,5 +1,6 @@
 package studying.blog.service;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -20,6 +21,7 @@ public class QueueService {
 
     private final StringRedisTemplate redisTemplate;
     private final ConcertRepository concertRepository;
+    private final MeterRegistry meterRegistry;
 
     // 느린 Redis 호출 감지 기준(운영에서 병목 찾기용)
     private static final long SLOW_REDIS_MS = 30;
@@ -76,6 +78,7 @@ public class QueueService {
                     .warn("[QUEUE][SLOW] op=enqueue concertId={} userId={} tookMs={}", concertId, userId, ms);
         }
 
+        meterRegistry.counter("queue.enqueue").increment();
         return rank != null ? rank + 1 : null;
     }
 

@@ -1,5 +1,6 @@
 package studying.blog.service;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ public class BookingService {
     private final ConcertRepository concertRepository;
     private final BookingRepository bookingRepository;
     private final QueueService queueService;
+    private final MeterRegistry meterRegistry;
 
     @Transactional
     public BookingResult book(Long concertId, Long userId) {
@@ -42,12 +44,14 @@ public class BookingService {
                 log.info("[BOOKING][RESULT] userId={} concertId={} status=ALREADY_BOOKED reason=already_in_db claimMs={}",
                         userId, concertId, claimMs);
 
+                meterRegistry.counter("booking.attempt", "result", "ALREADY_BOOKED").increment();
                 return new BookingResult("ALREADY_BOOKED", concert.getId(), concert.getTitle());
             }
 
             log.info("[BOOKING][CLAIM_FAIL] userId={} concertId={} reason=no_admitted_or_expired claimMs={}",
                     userId, concertId, claimMs);
 
+            meterRegistry.counter("booking.attempt", "result", "CLAIM_FAIL").increment();
             throw new IllegalStateException("입장 권한이 없습니다. (입장권이 없거나 만료/이미 사용됨)");
         }
 
@@ -65,10 +69,12 @@ public class BookingService {
             // 상태 체크
             if (concert.getStatus() == ConcertStatus.CLOSED) {
                 log.info("[BOOKING][RESULT] userId={} concertId={} status=CLOSED lockMs={}", userId, concertId, lockMs);
+                meterRegistry.counter("booking.attempt", "result", "CLOSED").increment();
                 throw new IllegalStateException("마감된 콘서트입니다.");
             }
             if (concert.getStatus() == ConcertStatus.SOLD_OUT) {
                 log.info("[BOOKING][RESULT] userId={} concertId={} status=SOLD_OUT lockMs={}", userId, concertId, lockMs);
+                meterRegistry.counter("booking.attempt", "result", "SOLD_OUT").increment();
                 throw new IllegalStateException("정원이 마감되었습니다.");
             }
 
@@ -81,6 +87,7 @@ public class BookingService {
                 log.info("[BOOKING][RESULT] userId={} concertId={} status=ALREADY_BOOKED lockMs={} existsMs={}",
                         userId, concertId, lockMs, existsMs);
 
+                meterRegistry.counter("booking.attempt", "result", "ALREADY_BOOKED").increment();
                 return new BookingResult("ALREADY_BOOKED", concert.getId(), concert.getTitle());
             }
 
@@ -90,6 +97,7 @@ public class BookingService {
                 log.info("[BOOKING][RESULT] userId={} concertId={} status=SOLD_OUT lockMs={} existsMs={}",
                         userId, concertId, lockMs, existsMs);
 
+                meterRegistry.counter("booking.attempt", "result", "SOLD_OUT").increment();
                 throw new IllegalStateException("정원이 마감되었습니다.");
             }
 
@@ -113,6 +121,7 @@ public class BookingService {
             log.info("[BOOKING][RESULT] userId={} concertId={} status=BOOKED bookingId={} lockMs={} existsMs={} saveMs={} totalMs={}",
                     userId, concertId, booking.getId(), lockMs, existsMs, saveMs, totalMs);
 
+            meterRegistry.counter("booking.attempt", "result", "BOOKED").increment();
             return new BookingResult("BOOKED", concert.getId(), concert.getTitle());
 
         } catch (RuntimeException e) {

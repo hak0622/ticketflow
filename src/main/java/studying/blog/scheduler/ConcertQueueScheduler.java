@@ -1,5 +1,6 @@
 package studying.blog.scheduler;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -19,6 +20,7 @@ public class ConcertQueueScheduler {
 
     private final QueueService queueService;
     private final ConcertRepository concertRepository;
+    private final MeterRegistry meterRegistry;
 
     private static final long SLOW_SCHEDULER_MS = 100;
 
@@ -59,6 +61,7 @@ public class ConcertQueueScheduler {
                 if (!granted.isEmpty()) {
                     log.info("[SCHEDULER][GRANT] concertId={} grantedCount={} batchSize={} ttlSec={} tookMs={}",
                             concertId, granted.size(), batchSize, ttlSeconds, concertMs);
+                    meterRegistry.counter("scheduler.queue.granted").increment(granted.size());
                 } else if (concertMs >= SLOW_SCHEDULER_MS) {
                     log.warn("[SCHEDULER][SLOW] concertId={} grantedCount=0 tookMs={}",
                             concertId, concertMs);
