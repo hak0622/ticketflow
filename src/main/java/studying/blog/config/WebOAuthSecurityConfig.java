@@ -60,6 +60,7 @@ public class WebOAuthSecurityConfig {
                 .requestMatchers("/api/token", "/api/test-support/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/concerts", "/api/concerts/*").permitAll()
+                .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/concerts").authenticated()
                 .requestMatchers("/api/coupons/**").authenticated()
@@ -98,6 +99,7 @@ public class WebOAuthSecurityConfig {
                 );
 
         http.authorizeHttpRequests(auth -> auth
+                .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                 .requestMatchers("/", "/lectures", "/login", "/oauth2/**").permitAll()
                 .requestMatchers("/admin/**").authenticated()
                 // 페이지 중 로그인 필요하면 여기서 authenticated()로 걸면 됨
