@@ -153,8 +153,21 @@ export default function BookingPage() {
           </div>
 
           <div className="mt-3 pt-3 border-t border-gray-100 space-y-0.5">
-            <InfoRow label="티켓 가격" value={formatPrice(concert.price)} highlight />
-            <InfoRow label="잔여석"    value={`${remaining}석`} />
+            {concert.discountedPrice != null ? (
+              <div className="flex justify-between items-start py-2.5 border-b border-gray-100">
+                <span className="text-sm text-gray-400 shrink-0">티켓 가격</span>
+                <div className="flex flex-col items-end ml-4">
+                  <span className="text-gray-400 line-through text-xs">{formatPrice(concert.price)}</span>
+                  <span className="text-primary-600 font-bold text-base">
+                    {formatPrice(concert.discountedPrice)}
+                    <span className="text-red-500 text-xs font-black ml-1">({concert.discountRate}% 할인)</span>
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <InfoRow label="티켓 가격" value={formatPrice(concert.price)} highlight />
+            )}
+            <InfoRow label="잔여석" value={`${remaining}석`} />
           </div>
         </div>
 

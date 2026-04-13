@@ -16,9 +16,8 @@ function formatPrice(price) {
 
 function DiscountCard({ concert }) {
   const navigate = useNavigate()
-  const { id, title, venue, eventAt, price, posterUrl, discountRate } = concert
+  const { id, title, venue, eventAt, price, posterUrl, discountRate, discountedPrice } = concert
   const imageSrc = posterUrl ?? getPosterByConcert(concert)
-  const discountedPrice = Math.round((price * (1 - discountRate / 100)) / 100) * 100
 
   return (
     <div
@@ -60,8 +59,14 @@ function DiscountCard({ concert }) {
 
       {/* 가격 */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-gray-400 line-through text-xs">{formatPrice(price)}</span>
-        <span className="text-red-500 font-bold text-sm">{formatPrice(discountedPrice)}</span>
+        {discountedPrice != null ? (
+          <>
+            <span className="text-gray-400 line-through text-xs">{formatPrice(price)}</span>
+            <span className="text-red-500 font-bold text-sm">{formatPrice(discountedPrice)}</span>
+          </>
+        ) : (
+          <span className="text-gray-900 font-bold text-sm">{formatPrice(price)}</span>
+        )}
       </div>
     </div>
   )

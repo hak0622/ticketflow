@@ -55,7 +55,7 @@ export default function Header() {
             to="/"
             className="text-xl font-black tracking-tighter text-primary-600 font-jakarta shrink-0"
           >
-            TICKETLY
+            TICKETFLOW
           </Link>
 
           {/* 검색 바 (데스크탑) */}

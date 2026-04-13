@@ -186,8 +186,17 @@ public class PaymentService {
         Concert concert = concertRepository.findById(concertId)
                 .orElseThrow(() -> new IllegalArgumentException("Concert not found: " + concertId));
 
-        // 3. 금액 위변조 검증
-        if (!request.getAmount().equals(concert.getPrice())) {
+        // 3. 금액 위변조 검증 (할인 적용 시 discountedPrice 기준으로 비교)
+        Integer expectedAmount = concert.getPrice();
+        if (concert.getDiscountRate() != null
+                && concert.getDiscountRate() > 0
+                && concert.getDiscountRate() <= 100
+                && concert.getPrice() != null) {
+            expectedAmount = (int) (Math.round(
+                    concert.getPrice() * (1 - concert.getDiscountRate() / 100.0) / 100.0
+            ) * 100);
+        }
+        if (!request.getAmount().equals(expectedAmount)) {
             throw new IllegalArgumentException("결제 금액이 일치하지 않습니다.");
         }
 

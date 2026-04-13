@@ -160,6 +160,8 @@ export default function ConcertDetailPage() {
     status,
     price,
     genre,
+    discountRate,
+    discountedPrice,
   } = concert
 
   const posterSrc = getPosterByConcert(concert)
@@ -286,9 +288,19 @@ export default function ConcertDetailPage() {
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1">
                   가격
                 </p>
-                <p className="text-2xl font-black text-gray-900">
-                  {formatPrice(price)}
-                </p>
+                {discountedPrice != null ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-block bg-red-500 text-white text-xs font-black px-1.5 py-0.5 rounded">
+                      {discountRate}%
+                    </span>
+                    <span className="text-gray-400 line-through text-sm">{formatPrice(price)}</span>
+                    <span className="text-2xl font-black text-red-500">{formatPrice(discountedPrice)}</span>
+                  </div>
+                ) : (
+                  <p className="text-2xl font-black text-gray-900">
+                    {formatPrice(price)}
+                  </p>
+                )}
               </div>
 
               {queueError && (
