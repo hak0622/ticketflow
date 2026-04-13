@@ -19,7 +19,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* 로고 */}
         <div className="text-center mb-8">
-          <span className="text-3xl font-black text-primary-600">TICKETLY</span>
+          <span className="text-3xl font-black text-primary-600">TICKETFLOW</span>
           <p className="mt-2 text-sm text-gray-500">콘서트 티켓 예매 플랫폼</p>
         </div>
 

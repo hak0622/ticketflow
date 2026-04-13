@@ -72,7 +72,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-sm">
         {/* 로고 */}
         <div className="text-center mb-8">
-          <span className="text-3xl font-black text-primary-600">TICKETLY</span>
+          <span className="text-3xl font-black text-primary-600">TICKETFLOW</span>
           <p className="mt-2 text-sm text-gray-500">지금 가입하고 공연을 예매하세요</p>
         </div>
 

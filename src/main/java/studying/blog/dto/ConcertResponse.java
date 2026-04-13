@@ -52,7 +52,20 @@ public class ConcertResponse {
     @Schema(description = "할인율 0~100 (null이면 할인 없음)", example = "25")
     private Integer discountRate;
 
+    @Schema(description = "할인 적용 가격 (null이면 할인 없음)", example = "99000")
+    private Integer discountedPrice;
+
     public static ConcertResponse from(Concert concert) {
+        Integer discountedPrice = null;
+        if (concert.getPrice() != null
+                && concert.getDiscountRate() != null
+                && concert.getDiscountRate() > 0
+                && concert.getDiscountRate() <= 100) {
+            discountedPrice = (int) (Math.round(
+                    concert.getPrice() * (1 - concert.getDiscountRate() / 100.0) / 100.0
+            ) * 100);
+        }
+
         return new ConcertResponse(
                 concert.getId(),
                 concert.getTitle(),
@@ -66,7 +79,8 @@ public class ConcertResponse {
                 concert.getGenre(),
                 concert.getVenue(),
                 concert.getBookingOpenAt(),
-                concert.getDiscountRate()
+                concert.getDiscountRate(),
+                discountedPrice
         );
     }
 }

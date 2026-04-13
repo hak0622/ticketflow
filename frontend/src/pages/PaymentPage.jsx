@@ -12,7 +12,7 @@ const IS_DEV = import.meta.env.DEV
 /* ── orderId 생성 ───────────────────────────────── */
 function generateOrderId(concertId) {
   const rand = crypto.randomUUID().replace(/-/g, '').slice(0, 16)
-  return `TICKETLY-${concertId}-${rand}`
+  return `TICKETFLOW-${concertId}-${rand}`
 }
 
 /* ── 포맷 유틸 ─────────────────────────────────── */
@@ -113,11 +113,13 @@ export default function PaymentPage() {
       const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY)
       const payment = tossPayments.payment({ customerKey: ANONYMOUS })
 
+      const payAmount = concert.discountedPrice ?? concert.price
+
       await payment.requestPayment({
         method: 'CARD',
         orderId: payOrderId,
         orderName: payOrderName,
-        amount: { currency: 'KRW', value: concert.price },
+        amount: { currency: 'KRW', value: payAmount },
         successUrl: `${window.location.origin}/payment/success?concertId=${concertId}`,
         failUrl:    `${window.location.origin}/payment/fail?concertId=${concertId}`,
         customerEmail: user?.sub ?? '',
@@ -212,7 +214,20 @@ export default function PaymentPage() {
             {concert?.eventAt && <SummaryRow label="일시"     value={formatDateTime(concert.eventAt)} />}
           </div>
           <div className="mt-3 pt-3 border-t border-gray-100">
-            <SummaryRow label="결제 금액" value={formatPrice(concert?.price)} highlight />
+            {concert?.discountedPrice != null ? (
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-sm text-gray-400">결제 금액</span>
+                <div className="flex flex-col items-end ml-4">
+                  <span className="text-gray-400 line-through text-xs">{formatPrice(concert.price)}</span>
+                  <span className="text-primary-600 font-semibold text-base">
+                    {formatPrice(concert.discountedPrice)}
+                    <span className="text-red-500 text-xs font-black ml-1">({concert.discountRate}% 할인)</span>
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <SummaryRow label="결제 금액" value={formatPrice(concert?.price)} highlight />
+            )}
           </div>
         </div>
 
@@ -243,7 +258,7 @@ export default function PaymentPage() {
               결제 처리 중...
             </span>
           ) : (
-            `${formatPrice(concert?.price)} 결제하기`
+            `${formatPrice(concert?.discountedPrice ?? concert?.price)} 결제하기`
           )}
         </button>
       </div>
