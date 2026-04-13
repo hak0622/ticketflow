@@ -2,7 +2,7 @@
 
 # TicketFlow
 
-**수백 명이 동시에 몰리는 티켓팅 환경에서 초과 예매, 중복 결제, 보상 누락 없이 정합성을 유지하는 백엔드 시스템**
+**동시성 티켓팅 환경에서 초과 예매·중복 결제·보상 누락을 직접 재현하고, 각 문제를 독립적으로 해결한 백엔드 프로젝트입니다.**
 
 </div>
 
@@ -10,37 +10,40 @@
 
 ## 🙋‍♂️ 프로젝트 소개
 
-콘서트 티켓팅은 특정 시점에 대규모 요청이 동시에 몰리는 환경입니다. 단순한 CRUD 구조에서는 아래 문제들이 발생합니다.
+"동시에 100명이 좌석 1개에 몰리면 어떻게 될까?" 라는 질문에서 시작했습니다.
+
+단순한 CRUD 구조에서는 아래 문제들이 발생합니다.
 
 | 문제 | 원인 |
 |---|---|
 | **초과 예매** | 잔여석 확인과 INSERT 사이 타이밍 차이 |
-| **중복 결제** | 네트워크 재시도 또는 중복 요청 |
+| **중복 결제** | 네트워크 재시도 또는 동시 중복 요청 |
 | **보상 누락** | 결제 실패 후 좌석 복구 로직 유실 |
 | **방치 예약** | 미결제 예약의 좌석 장기 점유 |
 
-이 프로젝트는 각 문제를 독립적으로 분석하고, 아래 기술 포인트로 해결했습니다.
+각 문제를 `experiments/` 패키지에서 전략별로 직접 실험해 한계를 확인했고, 그 결과를 실제 구현에 반영했습니다.
 
-- Redis Sorted Set + Lua Script로 선착순 입장 순서를 원자적으로 제어
-- `SELECT ... FOR UPDATE`로 동시 좌석 점유 충돌 방지
-- DB 사전 조회 → Redis SETNX → DB unique key의 3계층 멱등성으로 중복 결제 차단
-- Transactional Outbox로 결제 실패 보상 이벤트 유실 방지
+- Redis Sorted Set + Lua Script — 선착순 입장 순서를 원자적으로 제어
+- `SELECT ... FOR UPDATE` — 최종 좌석 차감 구간의 동시성 충돌 방지
+- DB 사전 조회 → Redis SETNX → DB unique key — 3계층 멱등성으로 중복 결제 차단
+- Transactional Outbox — 결제 실패와 보상 이벤트를 같은 트랜잭션에 묶어 유실 방지
 
 ---
 
 ## 📂 프로젝트 구조
 
 ```text
-studying.blog/
-├── config/        # JWT, OAuth2, Security, ShedLock
-├── controller/    # Booking, Payment, Concert, Queue API
-├── domain/        # Concert, Booking, Payment, Outbox 핵심 엔티티
-├── dto/           # 요청/응답 DTO
-├── repository/    # JPA Repository (Pessimistic Lock 쿼리 포함)
-├── scheduler/     # QueueScheduler / ExpiryScheduler / CompensationScheduler
-├── service/       # 예매, 결제, 대기열, 쿠폰 등 비즈니스 로직
-├── experiments/   # 전략 비교 실험 코드 (e1 쿠폰 / e3 멱등성 / e4 보상)
-└── frontend/      # React + Vite UI
+ticketflow/
+├── backend/
+│   ├── config/        # JWT, OAuth2, Security, ShedLock
+│   ├── controller/    # Booking, Payment, Concert, Queue API
+│   ├── domain/        # Concert, Booking, Payment, Outbox 핵심 엔티티
+│   ├── dto/           # 요청/응답 DTO
+│   ├── repository/    # JPA Repository (Pessimistic Lock 쿼리 포함)
+│   ├── scheduler/     # QueueScheduler / ExpiryScheduler / CompensationScheduler
+│   ├── service/       # 예매, 결제, 대기열, 쿠폰 비즈니스 로직
+│   └── experiments/   # 전략 비교 실험 코드 (e1 쿠폰 / e3 멱등성 / e4 보상)
+└── frontend/          # React + Vite UI
 ```
 
 ---
