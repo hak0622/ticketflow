@@ -446,3 +446,73 @@
 1775893884265|0|statement|connection 112|url jdbc:h2:mem:cba50d8a-422c-45cb-9a8a-32708fde8140|     drop table if exists payment_compensation_outbox cascade |     drop table if exists payment_compensation_outbox cascade 
 1775893884265|0|statement|connection 112|url jdbc:h2:mem:cba50d8a-422c-45cb-9a8a-32708fde8140|     drop table if exists refresh_token cascade |     drop table if exists refresh_token cascade 
 1775893884265|0|statement|connection 112|url jdbc:h2:mem:cba50d8a-422c-45cb-9a8a-32708fde8140|     drop table if exists users cascade |     drop table if exists users cascade 
+1776069381282|0|statement|connection 441|url jdbc:h2:mem:08d565ed-426c-4841-974f-10618082757a|     drop table if exists booking cascade |     drop table if exists booking cascade 
+1776069381282|0|statement|connection 441|url jdbc:h2:mem:08d565ed-426c-4841-974f-10618082757a|     drop table if exists concert cascade |     drop table if exists concert cascade 
+1776069381283|0|statement|connection 441|url jdbc:h2:mem:08d565ed-426c-4841-974f-10618082757a|     drop table if exists coupon cascade |     drop table if exists coupon cascade 
+1776069381283|0|statement|connection 441|url jdbc:h2:mem:08d565ed-426c-4841-974f-10618082757a|     drop table if exists coupon_issue cascade |     drop table if exists coupon_issue cascade 
+1776069381283|0|statement|connection 441|url jdbc:h2:mem:08d565ed-426c-4841-974f-10618082757a|     drop table if exists payment cascade |     drop table if exists payment cascade 
+1776069381283|0|statement|connection 441|url jdbc:h2:mem:08d565ed-426c-4841-974f-10618082757a|     drop table if exists payment_compensation_outbox cascade |     drop table if exists payment_compensation_outbox cascade 
+1776069381283|0|statement|connection 441|url jdbc:h2:mem:08d565ed-426c-4841-974f-10618082757a|     drop table if exists refresh_token cascade |     drop table if exists refresh_token cascade 
+1776069381283|0|statement|connection 441|url jdbc:h2:mem:08d565ed-426c-4841-974f-10618082757a|     drop table if exists users cascade |     drop table if exists users cascade 
+1776069381288|0|statement|connection 442|url jdbc:h2:mem:08b4930f-983a-425a-86cd-b789f30f0bd9|     drop table if exists booking cascade |     drop table if exists booking cascade 
+1776069381288|0|statement|connection 442|url jdbc:h2:mem:08b4930f-983a-425a-86cd-b789f30f0bd9|     drop table if exists concert cascade |     drop table if exists concert cascade 
+1776069381288|0|statement|connection 442|url jdbc:h2:mem:08b4930f-983a-425a-86cd-b789f30f0bd9|     drop table if exists coupon cascade |     drop table if exists coupon cascade 
+1776069381288|0|statement|connection 442|url jdbc:h2:mem:08b4930f-983a-425a-86cd-b789f30f0bd9|     drop table if exists coupon_issue cascade |     drop table if exists coupon_issue cascade 
+1776069381288|0|statement|connection 442|url jdbc:h2:mem:08b4930f-983a-425a-86cd-b789f30f0bd9|     drop table if exists payment cascade |     drop table if exists payment cascade 
+1776069381288|0|statement|connection 442|url jdbc:h2:mem:08b4930f-983a-425a-86cd-b789f30f0bd9|     drop table if exists payment_compensation_outbox cascade |     drop table if exists payment_compensation_outbox cascade 
+1776069381288|0|statement|connection 442|url jdbc:h2:mem:08b4930f-983a-425a-86cd-b789f30f0bd9|     drop table if exists refresh_token cascade |     drop table if exists refresh_token cascade 
+1776069381289|0|statement|connection 442|url jdbc:h2:mem:08b4930f-983a-425a-86cd-b789f30f0bd9|     drop table if exists users cascade |     drop table if exists users cascade 
+1776069381294|0|statement|connection 443|url jdbc:h2:mem:216cd66e-c4e4-4def-a5fd-7f70d1354aac|     drop table if exists booking cascade |     drop table if exists booking cascade 
+1776069381294|0|statement|connection 443|url jdbc:h2:mem:216cd66e-c4e4-4def-a5fd-7f70d1354aac|     drop table if exists concert cascade |     drop table if exists concert cascade 
+1776069381294|0|statement|connection 443|url jdbc:h2:mem:216cd66e-c4e4-4def-a5fd-7f70d1354aac|     drop table if exists coupon cascade |     drop table if exists coupon cascade 
+1776069381294|0|statement|connection 443|url jdbc:h2:mem:216cd66e-c4e4-4def-a5fd-7f70d1354aac|     drop table if exists coupon_issue cascade |     drop table if exists coupon_issue cascade 
+1776069381294|0|statement|connection 443|url jdbc:h2:mem:216cd66e-c4e4-4def-a5fd-7f70d1354aac|     drop table if exists payment cascade |     drop table if exists payment cascade 
+1776069381294|0|statement|connection 443|url jdbc:h2:mem:216cd66e-c4e4-4def-a5fd-7f70d1354aac|     drop table if exists payment_compensation_outbox cascade |     drop table if exists payment_compensation_outbox cascade 
+1776069381294|0|statement|connection 443|url jdbc:h2:mem:216cd66e-c4e4-4def-a5fd-7f70d1354aac|     drop table if exists refresh_token cascade |     drop table if exists refresh_token cascade 
+1776069381294|0|statement|connection 443|url jdbc:h2:mem:216cd66e-c4e4-4def-a5fd-7f70d1354aac|     drop table if exists users cascade |     drop table if exists users cascade 
+1776069381312|11|statement|connection 444|url jdbc:mysql://localhost:53243/blog_test|     alter table booking         drop         foreign key FKfd8akbanj9qwf0130goqumjvd|     alter table booking         drop         foreign key FKfd8akbanj9qwf0130goqumjvd
+1776069381316|3|statement|connection 444|url jdbc:mysql://localhost:53243/blog_test|     alter table coupon_issue         drop         foreign key FKaxdtc4pg7dy7rmvkvqxdag9jn|     alter table coupon_issue         drop         foreign key FKaxdtc4pg7dy7rmvkvqxdag9jn
+1776069381321|5|statement|connection 444|url jdbc:mysql://localhost:53243/blog_test|     alter table payment         drop         foreign key FKqewrl4xrv9eiad6eab3aoja65|     alter table payment         drop         foreign key FKqewrl4xrv9eiad6eab3aoja65
+1776069381324|3|statement|connection 444|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists booking|     drop table if exists booking
+1776069381327|2|statement|connection 444|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists concert|     drop table if exists concert
+1776069381331|3|statement|connection 444|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists coupon|     drop table if exists coupon
+1776069381333|2|statement|connection 444|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists coupon_issue|     drop table if exists coupon_issue
+1776069381336|2|statement|connection 444|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists payment|     drop table if exists payment
+1776069381339|2|statement|connection 444|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists payment_compensation_outbox|     drop table if exists payment_compensation_outbox
+1776069381341|2|statement|connection 444|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists refresh_token|     drop table if exists refresh_token
+1776069381345|3|statement|connection 444|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists users|     drop table if exists users
+1776069381352|0|statement|connection 445|url jdbc:mysql://localhost:53243/blog_test|     alter table booking         drop         foreign key FKfd8akbanj9qwf0130goqumjvd|     alter table booking         drop         foreign key FKfd8akbanj9qwf0130goqumjvd
+1776069381352|0|statement|connection 445|url jdbc:mysql://localhost:53243/blog_test|     alter table coupon_issue         drop         foreign key FKaxdtc4pg7dy7rmvkvqxdag9jn|     alter table coupon_issue         drop         foreign key FKaxdtc4pg7dy7rmvkvqxdag9jn
+1776069381353|0|statement|connection 445|url jdbc:mysql://localhost:53243/blog_test|     alter table payment         drop         foreign key FKqewrl4xrv9eiad6eab3aoja65|     alter table payment         drop         foreign key FKqewrl4xrv9eiad6eab3aoja65
+1776069381355|1|statement|connection 445|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists booking|     drop table if exists booking
+1776069381356|1|statement|connection 445|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists concert|     drop table if exists concert
+1776069381357|0|statement|connection 445|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists coupon|     drop table if exists coupon
+1776069381358|0|statement|connection 445|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists coupon_issue|     drop table if exists coupon_issue
+1776069381359|0|statement|connection 445|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists payment|     drop table if exists payment
+1776069381360|0|statement|connection 445|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists payment_compensation_outbox|     drop table if exists payment_compensation_outbox
+1776069381362|1|statement|connection 445|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists refresh_token|     drop table if exists refresh_token
+1776069381363|0|statement|connection 445|url jdbc:mysql://localhost:53243/blog_test|     drop table if exists users|     drop table if exists users
+1776069381371|0|statement|connection 446|url jdbc:h2:mem:e66cee9e-fc73-4a1d-94d7-c90c36b25f8b|     drop table if exists booking cascade |     drop table if exists booking cascade 
+1776069381371|0|statement|connection 446|url jdbc:h2:mem:e66cee9e-fc73-4a1d-94d7-c90c36b25f8b|     drop table if exists concert cascade |     drop table if exists concert cascade 
+1776069381371|0|statement|connection 446|url jdbc:h2:mem:e66cee9e-fc73-4a1d-94d7-c90c36b25f8b|     drop table if exists coupon cascade |     drop table if exists coupon cascade 
+1776069381372|0|statement|connection 446|url jdbc:h2:mem:e66cee9e-fc73-4a1d-94d7-c90c36b25f8b|     drop table if exists coupon_issue cascade |     drop table if exists coupon_issue cascade 
+1776069381372|0|statement|connection 446|url jdbc:h2:mem:e66cee9e-fc73-4a1d-94d7-c90c36b25f8b|     drop table if exists payment cascade |     drop table if exists payment cascade 
+1776069381372|0|statement|connection 446|url jdbc:h2:mem:e66cee9e-fc73-4a1d-94d7-c90c36b25f8b|     drop table if exists payment_compensation_outbox cascade |     drop table if exists payment_compensation_outbox cascade 
+1776069381372|0|statement|connection 446|url jdbc:h2:mem:e66cee9e-fc73-4a1d-94d7-c90c36b25f8b|     drop table if exists refresh_token cascade |     drop table if exists refresh_token cascade 
+1776069381372|0|statement|connection 446|url jdbc:h2:mem:e66cee9e-fc73-4a1d-94d7-c90c36b25f8b|     drop table if exists users cascade |     drop table if exists users cascade 
+1776069381376|0|statement|connection 447|url jdbc:h2:mem:0178565d-3527-462f-ab15-3c998d625eab|     drop table if exists booking cascade |     drop table if exists booking cascade 
+1776069381376|0|statement|connection 447|url jdbc:h2:mem:0178565d-3527-462f-ab15-3c998d625eab|     drop table if exists concert cascade |     drop table if exists concert cascade 
+1776069381376|0|statement|connection 447|url jdbc:h2:mem:0178565d-3527-462f-ab15-3c998d625eab|     drop table if exists coupon cascade |     drop table if exists coupon cascade 
+1776069381376|0|statement|connection 447|url jdbc:h2:mem:0178565d-3527-462f-ab15-3c998d625eab|     drop table if exists coupon_issue cascade |     drop table if exists coupon_issue cascade 
+1776069381376|0|statement|connection 447|url jdbc:h2:mem:0178565d-3527-462f-ab15-3c998d625eab|     drop table if exists payment cascade |     drop table if exists payment cascade 
+1776069381376|0|statement|connection 447|url jdbc:h2:mem:0178565d-3527-462f-ab15-3c998d625eab|     drop table if exists payment_compensation_outbox cascade |     drop table if exists payment_compensation_outbox cascade 
+1776069381376|0|statement|connection 447|url jdbc:h2:mem:0178565d-3527-462f-ab15-3c998d625eab|     drop table if exists refresh_token cascade |     drop table if exists refresh_token cascade 
+1776069381376|0|statement|connection 447|url jdbc:h2:mem:0178565d-3527-462f-ab15-3c998d625eab|     drop table if exists users cascade |     drop table if exists users cascade 
+1776069381381|0|statement|connection 448|url jdbc:h2:mem:f76330c8-59a4-44ce-9ac8-e689338e1a68|     drop table if exists booking cascade |     drop table if exists booking cascade 
+1776069381381|0|statement|connection 448|url jdbc:h2:mem:f76330c8-59a4-44ce-9ac8-e689338e1a68|     drop table if exists concert cascade |     drop table if exists concert cascade 
+1776069381381|0|statement|connection 448|url jdbc:h2:mem:f76330c8-59a4-44ce-9ac8-e689338e1a68|     drop table if exists coupon cascade |     drop table if exists coupon cascade 
+1776069381381|0|statement|connection 448|url jdbc:h2:mem:f76330c8-59a4-44ce-9ac8-e689338e1a68|     drop table if exists coupon_issue cascade |     drop table if exists coupon_issue cascade 
+1776069381381|0|statement|connection 448|url jdbc:h2:mem:f76330c8-59a4-44ce-9ac8-e689338e1a68|     drop table if exists payment cascade |     drop table if exists payment cascade 
+1776069381381|0|statement|connection 448|url jdbc:h2:mem:f76330c8-59a4-44ce-9ac8-e689338e1a68|     drop table if exists payment_compensation_outbox cascade |     drop table if exists payment_compensation_outbox cascade 
+1776069381381|0|statement|connection 448|url jdbc:h2:mem:f76330c8-59a4-44ce-9ac8-e689338e1a68|     drop table if exists refresh_token cascade |     drop table if exists refresh_token cascade 
+1776069381381|0|statement|connection 448|url jdbc:h2:mem:f76330c8-59a4-44ce-9ac8-e689338e1a68|     drop table if exists users cascade |     drop table if exists users cascade 

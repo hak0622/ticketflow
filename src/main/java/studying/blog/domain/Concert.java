@@ -45,6 +45,12 @@ public class Concert {
     @Column
     private String genre;
 
+    @Column
+    private LocalDateTime bookingOpenAt;  // 예매 오픈 일시 (null = 이미 오픈)
+
+    @Column
+    private Integer discountRate;         // 할인율 0~100 (null = 할인 없음)
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

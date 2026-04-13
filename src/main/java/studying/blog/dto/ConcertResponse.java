@@ -40,10 +40,19 @@ public class ConcertResponse {
     @Schema(description = "티켓 가격 (원)", example = "99000")
     private Integer price;
 
-    @Schema(description = "장르", example = "POP")
+    @Schema(description = "장르", example = "K-POP")
     private String genre;
 
-    public static ConcertResponse from(Concert concert){
+    @Schema(description = "공연장명", example = "잠실올림픽주경기장")
+    private String venue;
+
+    @Schema(description = "예매 오픈 일시 (null이면 이미 오픈)", example = "2026-04-15T11:00:00")
+    private LocalDateTime bookingOpenAt;
+
+    @Schema(description = "할인율 0~100 (null이면 할인 없음)", example = "25")
+    private Integer discountRate;
+
+    public static ConcertResponse from(Concert concert) {
         return new ConcertResponse(
                 concert.getId(),
                 concert.getTitle(),
@@ -54,7 +63,10 @@ public class ConcertResponse {
                 concert.getPosterUrl(),
                 concert.getArtist(),
                 concert.getPrice(),
-                concert.getGenre()
+                concert.getGenre(),
+                concert.getVenue(),
+                concert.getBookingOpenAt(),
+                concert.getDiscountRate()
         );
     }
 }
