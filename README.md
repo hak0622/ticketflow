@@ -278,26 +278,64 @@ Outbox 패턴:    결제 실패 → Payment.fail()
 
 ## 📈 부하 테스트 및 성능
 
-### JMeter 부하 테스트
+동시 사용자 **100명**으로 예매 → 결제 전체 플로우를 부하 테스트했습니다.
+로컬 환경이므로 절대적인 응답 시간보다, 동시 요청 상황에서도 데이터 정합성이 깨지지 않는 것을 핵심 지표로 삼았습니다.
 
-| 항목 | 값 |
-|---|---|
-| 도구 | Apache JMeter |
-| 대상 API | 예매 API, 결제 API |
-| 동시 사용자 | 100명 |
-| 실행 환경 | Docker Compose (로컬) |
+<details>
+<summary><strong>부하 테스트 상세 보기</strong></summary>
+
+### 핵심 결과 요약
 
 | 지표 | 결과 |
 |---|---|
-| **평균 응답 시간** | **18~21ms** |
-| **에러율** | **0%** |
+| 동시 사용자 | **100명** |
+| 평균 응답 시간 | **18~21ms** |
+| 에러율 | **0%** |
 | 초과 예매 | **0건** |
 | 중복 결제 | **0건** |
 
-> 로컬 환경 특성상 절대 응답 시간보다 **에러율 0% + 정합성 0건 오류**가 핵심 지표입니다.
+---
 
-![JMeter Result](docs/assets/readme/jmeter-result.png)
-![Grafana Dashboard](docs/assets/readme/grafana-dashboard.png)
+<details>
+<summary><strong>JMeter — 성능 측정</strong></summary>
+
+![JMeter Summary](./docs/assets/readme/jmeter-summary.png)
+
+*100건 동시 요청 기준. 평균 18ms, 에러율 0%, 처리량 5.0 req/sec.*
+
+Pessimistic Lock과 Redis SETNX 기반 멱등성 제어가 동시 트래픽 하에서도 정상 작동했습니다.
+
+| 항목 | 값 |
+|---|---|
+| 도구 | Apache JMeter 5.6.3 |
+| 대상 API | 예매 API, 결제 API |
+| 평균 / 최소 / 최대 | 18ms / 10ms / 113ms |
+| 처리량 | 5.0 req/sec |
+| 실행 환경 | Docker Compose (로컬) |
+
+</details>
+
+<details>
+<summary><strong>Grafana — 정합성 모니터링</strong></summary>
+
+![Grafana Dashboard](./docs/assets/readme/grafana-dashboard.png)
+
+*예매 성공률 100%, 결제 성공률 100%. 결과 분포 기준으로 정합성 검증.*
+
+예매/결제 결과 분포에서 `ALREADY_BOOKED`와 `MOCK/CACHED`가 기록되었습니다.
+이는 중복 요청이 실제로 발생했음에도 시스템이 정상적으로 차단했다는 직접적인 근거입니다.
+
+| 분포 항목 | 의미 |
+|---|---|
+| `BOOKED` | 예매 성공 |
+| `ALREADY_BOOKED` | 중복 예매 시도 → 차단됨 |
+| `SOLD_OUT` | 잔여석 없음 |
+| `MOCK/COMPLETED` | 결제 성공 |
+| `MOCK/CACHED` | 멱등성 키로 재반환 (중복 결제 차단) |
+
+</details>
+
+</details>
 
 ---
 
