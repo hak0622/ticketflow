@@ -45,3 +45,4 @@ out/
 # JMeter
 *.jmx
 
+.DS_Store
