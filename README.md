@@ -1,6 +1,6 @@
 <div align="center">
 
-# TicketFlow
+# 🎊TicketFlow🎊
 
 **동시성 티켓팅 환경에서 초과 예매·중복 결제·보상 누락을 직접 재현하고, 각 문제를 독립적으로 해결한 백엔드 프로젝트입니다.**
 
@@ -95,9 +95,10 @@ ticketflow/
 
 ## 🔄 시스템 아키텍처 및 플로우
 
-### 서비스 구조
+### MVP 시스템 아키텍쳐
 
-> (작성 예정)
+<img width="1536" height="1024" alt="MVP 시스템 아키텍쳐" src="https://github.com/user-attachments/assets/3173c8d9-215b-4703-83ae-6ff5179d2584" />
+
 
 ### 예매 플로우
 
@@ -814,7 +815,7 @@ return ttl
 
 ---
 
-## 참조 문서
+## 📜참조 문서
 
 - [`docs/architecture.md`](docs/architecture.md) — 패키지 구조, Redis 키 명세, Lua Script, Scheduler 상세
 - [`docs/flow.md`](docs/flow.md) — 예매/보상/만료 시퀀스 다이어그램, 상태 전이
