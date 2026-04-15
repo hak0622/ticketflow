@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import studying.blog.domain.Concert;
 import studying.blog.domain.ConcertStatus;
@@ -17,8 +16,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static org.mockito.BDDMockito.given;
-import static org.mockito.ArgumentMatchers.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
@@ -35,7 +32,7 @@ public class EnrollConcurrencyTest {
     @Autowired
     private BookingRepository bookingRepository;
 
-    @MockBean
+    @Autowired
     private QueueService queueService;
 
     private Concert concert;
@@ -54,6 +51,14 @@ public class EnrollConcurrencyTest {
                 .build();
 
         concertRepository.save(concert);
+
+        // Redis 좌석 카운터 초기화 (totalSeats=1)
+        queueService.initSeatCount(concert.getId(), concert.getTotalSeats());
+
+        // 10개 userId 모두 입장권 발급 (각 스레드가 admitted 체크를 통과하도록)
+        for (int i = 0; i < 10; i++) {
+            queueService.restoreAdmitted(concert.getId(), (long) i, 600L);
+        }
     }
 
     @Test
@@ -63,9 +68,7 @@ public class EnrollConcurrencyTest {
         ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
         CountDownLatch latch = new CountDownLatch(threadCount);
 
-        //모든 요청은 claim 성공했다고 가정
-        given(queueService.claimAdmitted(anyLong(),anyLong())).willReturn(600L);
-
+        // admitted 토큰은 @BeforeEach에서 발급 완료 — mock 불필요
         for(int i=0; i<threadCount; i++){
             final Long userId = (long) i;
 

@@ -29,6 +29,9 @@ class ConcertServiceSearchTest {
     @Mock
     private BookingRepository bookingRepository;
 
+    @Mock
+    private QueueService queueService;
+
     @InjectMocks
     private ConcertService concertService;
 
@@ -51,6 +54,7 @@ class ConcertServiceSearchTest {
                 .build();
 
         given(concertRepository.search(condition)).willReturn(List.of(concert));
+        given(queueService.getRemainingSeat(1L)).willReturn(90L);
 
         List<ConcertResponse> result = concertService.search(condition);
 

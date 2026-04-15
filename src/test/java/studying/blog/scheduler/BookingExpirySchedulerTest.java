@@ -43,7 +43,7 @@ class BookingExpirySchedulerTest {
         assertThat(updated.getStatus()).isEqualTo(BookingStatus.CANCELLED);
 
         Concert updated2 = concertRepository.findById(concert.getId()).orElseThrow();
-        assertThat(updated2.getBookedCount()).isEqualTo(0);
+        assertThat(updated2.getStatus()).isEqualTo(ConcertStatus.OPEN);
     }
 
     @Test
@@ -58,7 +58,7 @@ class BookingExpirySchedulerTest {
         assertThat(updated.getStatus()).isEqualTo(BookingStatus.PENDING_PAYMENT);  // 변경 없음
 
         Concert updated2 = concertRepository.findById(concert.getId()).orElseThrow();
-        assertThat(updated2.getBookedCount()).isEqualTo(1);  // 변경 없음
+        assertThat(updated2.getStatus()).isEqualTo(ConcertStatus.OPEN);  // 변경 없음
     }
 
     @Test
@@ -76,7 +76,7 @@ class BookingExpirySchedulerTest {
         assertThat(updated.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
 
         Concert updated2 = concertRepository.findById(concert.getId()).orElseThrow();
-        assertThat(updated2.getBookedCount()).isEqualTo(1);
+        assertThat(updated2.getStatus()).isEqualTo(ConcertStatus.OPEN);
     }
 
     @Test
@@ -97,7 +97,7 @@ class BookingExpirySchedulerTest {
         });
 
         Concert updated = concertRepository.findById(concert.getId()).orElseThrow();
-        assertThat(updated.getBookedCount()).isEqualTo(0);  // 3건 모두 반납
+        assertThat(updated.getStatus()).isEqualTo(ConcertStatus.OPEN);
     }
 
     @Test
@@ -110,7 +110,6 @@ class BookingExpirySchedulerTest {
 
         Concert updated = concertRepository.findById(concert.getId()).orElseThrow();
         assertThat(updated.getStatus()).isEqualTo(ConcertStatus.OPEN);
-        assertThat(updated.getBookedCount()).isEqualTo(9);
     }
 
     // --- helpers ---

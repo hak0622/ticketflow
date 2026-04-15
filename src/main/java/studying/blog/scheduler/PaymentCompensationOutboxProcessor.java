@@ -11,12 +11,12 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import studying.blog.domain.Booking;
 import studying.blog.domain.BookingStatus;
-import studying.blog.domain.Concert;
 import studying.blog.domain.OutboxStatus;
 import studying.blog.domain.PaymentCompensationOutbox;
 import studying.blog.repository.BookingRepository;
 import studying.blog.repository.ConcertRepository;
 import studying.blog.repository.PaymentCompensationOutboxRepository;
+import studying.blog.service.QueueService;
 
 import java.util.Map;
 
@@ -33,6 +33,7 @@ public class PaymentCompensationOutboxProcessor {
     private final PaymentCompensationOutboxRepository outboxRepository;
     private final BookingRepository bookingRepository;
     private final ConcertRepository concertRepository;
+    private final QueueService queueService;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
 
@@ -72,15 +73,13 @@ public class PaymentCompensationOutboxProcessor {
             return;
         }
 
-        Concert concert = concertRepository.findByIdForUpdate(concertId)
-                .orElseThrow(() -> new IllegalArgumentException("Concert not found: " + concertId));
-
         booking.cancel();
-        concert.decreaseBooked();
+        queueService.restoreSeat(concertId);
+        concertRepository.reopenIfSoldOutById(concertId);
         outbox.markPublished();
 
-        log.info("[OUTBOX][PUBLISHED] outboxId={} bookingId={} concertId={} bookedCount={}",
-                outboxId, bookingId, concertId, concert.getBookedCount());
+        log.info("[OUTBOX][PUBLISHED] outboxId={} bookingId={} concertId={} reopenedIfSoldOut=true",
+                outboxId, bookingId, concertId);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

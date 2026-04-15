@@ -44,6 +44,10 @@ public class MyBookingResponse {
     private LocalDateTime bookedAt;
 
     public static MyBookingResponse from(Booking b){
+        return from(b, b.getConcert().getBookedCount());
+    }
+
+    public static MyBookingResponse from(Booking b, int bookedCount){
         Concert c = b.getConcert();
         return MyBookingResponse.builder()
                 .bookingId(b.getId())
@@ -51,7 +55,7 @@ public class MyBookingResponse {
                 .concertTitle(c.getTitle())
                 .eventAt(c.getEventAt())
                 .totalSeats(c.getTotalSeats())
-                .bookedCount(c.getBookedCount())
+                .bookedCount(bookedCount)
                 .status(c.getStatus().name())
                 .bookingStatus(b.getStatus().name())
                 .bookedAt(b.getCreatedAt())

@@ -8,9 +8,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import studying.blog.domain.Booking;
 import studying.blog.domain.BookingStatus;
-import studying.blog.domain.Concert;
 import studying.blog.repository.BookingRepository;
 import studying.blog.repository.ConcertRepository;
+import studying.blog.service.QueueService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +24,7 @@ public class BookingExpiryScheduler {
 
     private final BookingRepository bookingRepository;
     private final ConcertRepository concertRepository;
+    private final QueueService queueService;
 
     private static final int EXPIRY_MINUTES = 30;
 
@@ -48,17 +49,15 @@ public class BookingExpiryScheduler {
             Long concertId = entry.getKey();
             List<Booking> bookings = entry.getValue();
 
-            Concert concert = concertRepository.findByIdForUpdate(concertId)
-                    .orElseThrow(() -> new IllegalArgumentException("Concert not found: " + concertId));
-
             bookings.forEach(Booking::cancel);
 
             for (int i = 0; i < bookings.size(); i++) {
-                concert.decreaseBooked();
+                queueService.restoreSeat(concertId);
             }
+            concertRepository.reopenIfSoldOutById(concertId);
 
-            log.info("[EXPIRY][DONE] concertId={} cancelledCount={} bookedCount={}",
-                    concertId, bookings.size(), concert.getBookedCount());
+            log.info("[EXPIRY][DONE] concertId={} cancelledCount={} reopenedIfSoldOut=true",
+                    concertId, bookings.size());
         }
     }
 }

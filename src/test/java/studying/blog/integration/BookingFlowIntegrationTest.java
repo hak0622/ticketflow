@@ -38,14 +38,14 @@ class BookingFlowIntegrationTest extends IntegrationTestSupport {
 
         // Then
         List<Booking> bookings = bookingRepository.findAllByConcertId(concert.getId());
-        Concert reloadedConcert = concertRepository.findById(concert.getId()).orElseThrow();
+        Long remaining = queueService.getRemainingSeat(concert.getId());
 
         assertThat(result.getConcertId()).isEqualTo(concert.getId());
         assertThat(bookings).hasSize(1);
         assertThat(bookings.get(0).getUserId()).isEqualTo(userId);
         assertThat(bookings.get(0).getStatus()).isEqualTo(BookingStatus.PENDING_PAYMENT);
-        assertThat(reloadedConcert.getBookedCount()).isEqualTo(1);
-        assertThat(reloadedConcert.getStatus()).isEqualTo(ConcertStatus.OPEN);
+        assertThat(remaining).isEqualTo(9L);
+        assertThat(concertRepository.findById(concert.getId()).orElseThrow().getStatus()).isEqualTo(ConcertStatus.OPEN);
     }
 
     @Test
@@ -59,7 +59,7 @@ class BookingFlowIntegrationTest extends IntegrationTestSupport {
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(bookingRepository.findAllByConcertId(concert.getId())).isEmpty();
-        assertThat(concertRepository.findById(concert.getId()).orElseThrow().getBookedCount()).isZero();
+        assertThat(queueService.getRemainingSeat(concert.getId())).isEqualTo(10L);
     }
 
     @Test
@@ -99,12 +99,12 @@ class BookingFlowIntegrationTest extends IntegrationTestSupport {
 
         // Then
         List<Booking> bookings = bookingRepository.findAllByConcertId(concert.getId());
-        Concert reloadedConcert = concertRepository.findById(concert.getId()).orElseThrow();
+        Long remaining = queueService.getRemainingSeat(concert.getId());
 
         assertThat(outcomes).hasSize(threadCount);
         assertThat(bookings).hasSize(1);
         assertThat(bookings.get(0).getUserId()).isEqualTo(userId);
         assertThat(bookings.get(0).getStatus()).isEqualTo(BookingStatus.PENDING_PAYMENT);
-        assertThat(reloadedConcert.getBookedCount()).isEqualTo(1);
+        assertThat(remaining).isEqualTo(9L);
     }
 }

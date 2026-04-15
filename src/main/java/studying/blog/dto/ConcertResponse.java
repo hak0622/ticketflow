@@ -56,6 +56,10 @@ public class ConcertResponse {
     private Integer discountedPrice;
 
     public static ConcertResponse from(Concert concert) {
+        return from(concert, concert.getBookedCount());
+    }
+
+    public static ConcertResponse from(Concert concert, int bookedCount) {
         Integer discountedPrice = null;
         if (concert.getPrice() != null
                 && concert.getDiscountRate() != null
@@ -72,7 +76,7 @@ public class ConcertResponse {
                 concert.getEventAt(),
                 concert.getTotalSeats(),
                 concert.getStatus(),
-                concert.getBookedCount(),
+                bookedCount,
                 concert.getPosterUrl(),
                 concert.getArtist(),
                 concert.getPrice(),

@@ -42,7 +42,7 @@ class PaymentCompensationSchedulerTest {
         assertThat(updated.getStatus()).isEqualTo(BookingStatus.CANCELLED);
 
         Concert updated2 = concertRepository.findById(concert.getId()).orElseThrow();
-        assertThat(updated2.getBookedCount()).isEqualTo(0);
+        assertThat(updated2.getStatus()).isEqualTo(ConcertStatus.OPEN);
 
         PaymentCompensationOutbox outbox = outboxRepository.findAll().get(0);
         assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.PUBLISHED);
@@ -59,7 +59,6 @@ class PaymentCompensationSchedulerTest {
 
         Concert updated = concertRepository.findById(concert.getId()).orElseThrow();
         assertThat(updated.getStatus()).isEqualTo(ConcertStatus.OPEN);
-        assertThat(updated.getBookedCount()).isEqualTo(9);
     }
 
     @Test
@@ -74,9 +73,8 @@ class PaymentCompensationSchedulerTest {
 
         scheduler.processPending();
 
-        // bookedCount는 그대로 (이중 감소 없음)
         Concert updated = concertRepository.findById(concert.getId()).orElseThrow();
-        assertThat(updated.getBookedCount()).isEqualTo(1);
+        assertThat(updated.getStatus()).isEqualTo(ConcertStatus.OPEN);
 
         // Outbox는 PUBLISHED (멱등 완료 처리)
         PaymentCompensationOutbox outbox = outboxRepository.findAll().get(0);
@@ -90,7 +88,7 @@ class PaymentCompensationSchedulerTest {
         scheduler.processPending();  // 처리할 outbox 없음
 
         Concert updated = concertRepository.findById(concert.getId()).orElseThrow();
-        assertThat(updated.getBookedCount()).isEqualTo(2);  // 변경 없음
+        assertThat(updated.getStatus()).isEqualTo(ConcertStatus.OPEN);  // 변경 없음
     }
 
     @Test

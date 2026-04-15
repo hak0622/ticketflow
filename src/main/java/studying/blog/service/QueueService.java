@@ -236,6 +236,100 @@ public class QueueService {
         return Boolean.TRUE.equals(exists);
     }
 
+    // ─── 좌석 카운터 (seats:concert:{id}) ────────────────────────────────────
+
+    private String seatKey(Long concertId) {
+        return "seats:concert:" + concertId;
+    }
+
+    /**
+     * 콘서트 좌석 카운터 초기화.
+     * 콘서트 생성·수정·서버 기동 시 호출. TTL 없음(공연 삭제 시 명시적 DEL).
+     */
+    public void initSeatCount(Long concertId, int remaining) {
+        redisTemplate.opsForValue().set(seatKey(concertId), String.valueOf(Math.max(0, remaining)));
+    }
+
+    /**
+     * 좌석 원자적 차감 (Lua).
+     *
+     * 반환값:
+     *   >= 0 : 차감 성공, 남은 좌석 수
+     *     -1 : 좌석 없음 (SOLD_OUT)
+     *     -2 : 키 미존재 (초기화 누락 — 호출 측에서 오류 처리)
+     */
+    private static final String DECREMENT_SEAT_LUA = """
+            local key = KEYS[1]
+            if redis.call('EXISTS', key) == 0 then
+              return -2
+            end
+            local remaining = redis.call('DECRBY', key, 1)
+            if remaining < 0 then
+              redis.call('INCRBY', key, 1)
+              return -1
+            end
+            return remaining
+            """;
+
+    private final DefaultRedisScript<Long> decrementSeatScript =
+            new DefaultRedisScript<>(DECREMENT_SEAT_LUA, Long.class);
+
+    public long decrementSeat(Long concertId) {
+        long t0 = System.nanoTime();
+        Long result = redisTemplate.execute(
+                decrementSeatScript,
+                Collections.singletonList(seatKey(concertId))
+        );
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+
+        if (ms >= SLOW_REDIS_MS) {
+            org.slf4j.LoggerFactory.getLogger(QueueService.class)
+                    .warn("[SEAT][SLOW] op=decrement concertId={} tookMs={}", concertId, ms);
+        }
+
+        return result == null ? -2 : result;
+    }
+
+    /** 좌석 복구 (Booking 실패·취소 시 호출). */
+    public void restoreSeat(Long concertId) {
+        long t0 = System.nanoTime();
+        redisTemplate.opsForValue().increment(seatKey(concertId));
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+
+        if (ms >= SLOW_REDIS_MS) {
+            org.slf4j.LoggerFactory.getLogger(QueueService.class)
+                    .warn("[SEAT][SLOW] op=restore concertId={} tookMs={}", concertId, ms);
+        }
+    }
+
+    /** 현재 남은 좌석 수 조회. 키가 없으면 null 반환. */
+    public Long getRemainingSeat(Long concertId) {
+        long t0 = System.nanoTime();
+        String raw = redisTemplate.opsForValue().get(seatKey(concertId));
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+
+        if (ms >= SLOW_REDIS_MS) {
+            org.slf4j.LoggerFactory.getLogger(QueueService.class)
+                    .warn("[SEAT][SLOW] op=getRemaining concertId={} tookMs={}", concertId, ms);
+        }
+
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(raw);
+        } catch (NumberFormatException e) {
+            org.slf4j.LoggerFactory.getLogger(QueueService.class)
+                    .warn("[SEAT][INVALID] concertId={} value={}", concertId, raw);
+            return null;
+        }
+    }
+
+    /** 콘서트 삭제 시 Redis 좌석 키 제거. */
+    public void deleteSeatCount(Long concertId) {
+        redisTemplate.delete(seatKey(concertId));
+    }
+
     // 입장권 소모(현재는 claim에서 DEL하므로 보조용)
     public boolean consumeAdmitted(Long concertId, Long userId) {
         String key = admittedKey(concertId, userId);

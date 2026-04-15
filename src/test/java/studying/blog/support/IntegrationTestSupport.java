@@ -86,7 +86,7 @@ public abstract class IntegrationTestSupport {
     }
 
     protected Concert savedConcert(String title, int totalSeats, int bookedCount) {
-        return concertRepository.save(Concert.builder()
+        Concert concert = concertRepository.save(Concert.builder()
                 .title(title)
                 .totalSeats(totalSeats)
                 .bookedCount(bookedCount)
@@ -94,6 +94,8 @@ public abstract class IntegrationTestSupport {
                 .eventAt(LocalDateTime.now().plusDays(1))
                 .price(90000)
                 .build());
+        queueService.initSeatCount(concert.getId(), Math.max(0, totalSeats - bookedCount));
+        return concert;
     }
 
     protected Booking savedPendingBooking(Concert concert, Long userId) {
