@@ -4,6 +4,10 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 5000
 
   jpa:
     hibernate:
@@ -28,7 +32,7 @@ oauth2:
 app:
   test-support:
     enabled: false
-    user-count: 100
+    user-count: 500
     email-prefix: test
     email-domain: test.com
     default-password: password123!

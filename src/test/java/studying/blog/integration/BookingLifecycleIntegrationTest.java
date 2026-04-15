@@ -44,12 +44,12 @@ class BookingLifecycleIntegrationTest extends IntegrationTestSupport {
         // Then
         Booking reloadedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
         Payment reloadedPayment = paymentRepository.findById(payment.getId()).orElseThrow();
-        Concert reloadedConcert = concertRepository.findById(concert.getId()).orElseThrow();
         PaymentCompensationOutbox reloadedOutbox = outboxRepository.findById(outbox.getId()).orElseThrow();
+        Long remaining = queueService.getRemainingSeat(concert.getId());
 
         assertThat(reloadedBooking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
         assertThat(reloadedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-        assertThat(reloadedConcert.getBookedCount()).isEqualTo(0);
+        assertThat(remaining).isEqualTo(10L);
         assertThat(reloadedOutbox.getStatus()).isEqualTo(OutboxStatus.PUBLISHED);
         assertThat(reloadedOutbox.getProcessedAt()).isNotNull();
     }
@@ -67,10 +67,10 @@ class BookingLifecycleIntegrationTest extends IntegrationTestSupport {
 
         // Then
         Booking reloadedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
-        Concert reloadedConcert = concertRepository.findById(concert.getId()).orElseThrow();
+        Long remaining = queueService.getRemainingSeat(concert.getId());
 
         assertThat(reloadedBooking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
-        assertThat(reloadedConcert.getBookedCount()).isEqualTo(0);
+        assertThat(remaining).isEqualTo(10L);
         assertThat(paymentRepository.findByBookingId(booking.getId())).isEmpty();
         assertThat(outboxRepository.count()).isZero();
     }
@@ -92,11 +92,11 @@ class BookingLifecycleIntegrationTest extends IntegrationTestSupport {
         // Then
         Booking reloadedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
         Payment reloadedPayment = paymentRepository.findById(payment.getId()).orElseThrow();
-        Concert reloadedConcert = concertRepository.findById(concert.getId()).orElseThrow();
+        Long remaining = queueService.getRemainingSeat(concert.getId());
 
         assertThat(reloadedBooking.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
         assertThat(reloadedPayment.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
-        assertThat(reloadedConcert.getBookedCount()).isEqualTo(1);
+        assertThat(remaining).isEqualTo(9L);
         assertThat(outboxRepository.count()).isZero();
     }
 

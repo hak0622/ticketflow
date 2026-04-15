@@ -62,12 +62,12 @@ class BookingPaymentApiIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.concertTitle").value("API Booking Concert"));
 
         List<Booking> bookings = bookingRepository.findAllByConcertId(concert.getId());
-        Concert reloadedConcert = concertRepository.findById(concert.getId()).orElseThrow();
+        Long remaining = queueService.getRemainingSeat(concert.getId());
 
         assertThat(bookings).hasSize(1);
         assertThat(bookings.get(0).getUserId()).isEqualTo(user.getId());
         assertThat(bookings.get(0).getStatus()).isEqualTo(BookingStatus.PENDING_PAYMENT);
-        assertThat(reloadedConcert.getBookedCount()).isEqualTo(1);
+        assertThat(remaining).isEqualTo(9L);
     }
 
     @Test
@@ -84,10 +84,10 @@ class BookingPaymentApiIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.message").isNotEmpty());
 
         List<Booking> bookings = bookingRepository.findAllByConcertId(concert.getId());
-        Concert reloadedConcert = concertRepository.findById(concert.getId()).orElseThrow();
+        Long remaining = queueService.getRemainingSeat(concert.getId());
 
         assertThat(bookings).isEmpty();
-        assertThat(reloadedConcert.getBookedCount()).isZero();
+        assertThat(remaining).isEqualTo(10L);
     }
 
     @Test
@@ -114,11 +114,11 @@ class BookingPaymentApiIntegrationTest extends IntegrationTestSupport {
 
         Payment payment = paymentRepository.findByBookingId(booking.getId()).orElseThrow();
         Booking reloadedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
-        Concert reloadedConcert = concertRepository.findById(concert.getId()).orElseThrow();
+        Long remaining = queueService.getRemainingSeat(concert.getId());
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
         assertThat(reloadedBooking.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
-        assertThat(reloadedConcert.getBookedCount()).isEqualTo(1);
+        assertThat(remaining).isEqualTo(9L);
     }
 
     @Test
@@ -158,13 +158,13 @@ class BookingPaymentApiIntegrationTest extends IntegrationTestSupport {
 
         Payment payment = paymentRepository.findByBookingId(booking.getId()).orElseThrow();
         Booking reloadedBooking = bookingRepository.findById(booking.getId()).orElseThrow();
-        Concert reloadedConcert = concertRepository.findById(concert.getId()).orElseThrow();
+        Long remaining = queueService.getRemainingSeat(concert.getId());
 
         assertThat(firstPaymentId).isEqualTo(secondPaymentId);
         assertThat(paymentRepository.count()).isEqualTo(1);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
         assertThat(reloadedBooking.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
-        assertThat(reloadedConcert.getBookedCount()).isEqualTo(1);
+        assertThat(remaining).isEqualTo(9L);
     }
 
     @Test

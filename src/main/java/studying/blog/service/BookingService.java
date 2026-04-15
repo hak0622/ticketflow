@@ -3,6 +3,7 @@ package studying.blog.service;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import studying.blog.domain.Booking;
@@ -23,7 +24,7 @@ public class BookingService {
     private final QueueService queueService;
     private final MeterRegistry meterRegistry;
 
-    @Transactional
+    @Transactional(noRollbackFor = DataIntegrityViolationException.class)
     public BookingResult book(Long concertId, Long userId) {
 
         // (1)전체 처리 시간 측정 시작
@@ -59,80 +60,98 @@ public class BookingService {
         log.info("[BOOKING][CLAIM_OK] userId={} concertId={} ttlSec={} claimMs={}",
                 userId, concertId, ttl, claimMs);
 
+        boolean seatDecremented = false;
+        boolean admittedRestored = false;
         try {
-            // (3) DB row lock 구간 시간 측정
-            long tLockStart = System.nanoTime();
-            Concert concert = concertRepository.findByIdForUpdate(concertId)
-                    .orElseThrow(() -> new IllegalArgumentException("Concert not found :" + concertId));
-            long lockMs = (System.nanoTime() - tLockStart) / 1_000_000;
-
-            // 상태 체크
-            if (concert.getStatus() == ConcertStatus.CLOSED) {
-                log.info("[BOOKING][RESULT] userId={} concertId={} status=CLOSED lockMs={}", userId, concertId, lockMs);
-                meterRegistry.counter("booking.attempt", "result", "CLOSED").increment();
-                throw new IllegalStateException("마감된 콘서트입니다.");
-            }
-            if (concert.getStatus() == ConcertStatus.SOLD_OUT) {
-                log.info("[BOOKING][RESULT] userId={} concertId={} status=SOLD_OUT lockMs={}", userId, concertId, lockMs);
-                meterRegistry.counter("booking.attempt", "result", "SOLD_OUT").increment();
-                throw new IllegalStateException("정원이 마감되었습니다.");
-            }
-
-            // (4) 중복 예매 방지(멱등 처리)
+            // (3) 중복 예매 방지 (claimAdmitted 이후 체크, 락 불필요)
             long tExistsStart = System.nanoTime();
             boolean already = bookingRepository.existsByConcertIdAndUserId(concertId, userId);
             long existsMs = (System.nanoTime() - tExistsStart) / 1_000_000;
 
             if (already) {
-                log.info("[BOOKING][RESULT] userId={} concertId={} status=ALREADY_BOOKED lockMs={} existsMs={}",
-                        userId, concertId, lockMs, existsMs);
-
+                // 좌석 차감 전이므로 restoreSeat 불필요
+                queueService.restoreAdmitted(concertId, userId, ttl);
+                log.info("[BOOKING][RESULT] userId={} concertId={} status=ALREADY_BOOKED existsMs={}",
+                        userId, concertId, existsMs);
                 meterRegistry.counter("booking.attempt", "result", "ALREADY_BOOKED").increment();
-                return new BookingResult("ALREADY_BOOKED", concert.getId(), concert.getTitle());
+                return new BookingResult("ALREADY_BOOKED", concertId, null);
             }
 
-            // 정원 체크 + 차감
-            if (!concert.hasSeat()) {
-                concert.markSoldOut();
-                log.info("[BOOKING][RESULT] userId={} concertId={} status=SOLD_OUT lockMs={} existsMs={}",
-                        userId, concertId, lockMs, existsMs);
-
+            // (4) Redis 좌석 원자적 차감
+            long remaining = queueService.decrementSeat(concertId);
+            if (remaining == -1) {
+                // 좌석 차감 전이므로 restoreSeat 불필요
+                queueService.restoreAdmitted(concertId, userId, ttl);
+                admittedRestored = true;
+                log.info("[BOOKING][RESULT] userId={} concertId={} status=SOLD_OUT", userId, concertId);
                 meterRegistry.counter("booking.attempt", "result", "SOLD_OUT").increment();
                 throw new IllegalStateException("정원이 마감되었습니다.");
             }
+            if (remaining == -2) {
+                // 키 누락(일시적): admitted 반환해 재시도 허용
+                queueService.restoreAdmitted(concertId, userId, ttl);
+                admittedRestored = true;
+                log.warn("[BOOKING][SEAT_KEY_MISSING] userId={} concertId={}", userId, concertId);
+                throw new IllegalStateException("좌석 정보를 읽을 수 없습니다. 잠시 후 다시 시도해주세요.");
+            }
+            seatDecremented = true;
 
-            concert.increaseBooked();
-            if (!concert.hasSeat()) {
-                concert.markSoldOut();
+            // (5) DB 조회 (락 없음, 상태 확인 및 Booking 생성용)
+            long tFindStart = System.nanoTime();
+            Concert concert = concertRepository.findById(concertId)
+                    .orElseThrow(() -> new IllegalArgumentException("Concert not found :" + concertId));
+            long findMs = (System.nanoTime() - tFindStart) / 1_000_000;
+
+            // CLOSED 상태 체크 (SOLD_OUT은 Redis 카운터가 처리)
+            if (concert.getStatus() == ConcertStatus.CLOSED) {
+                queueService.restoreSeat(concertId);
+                seatDecremented = false;
+                queueService.restoreAdmitted(concertId, userId, ttl);
+                admittedRestored = true;
+                log.info("[BOOKING][RESULT] userId={} concertId={} status=CLOSED findMs={}", userId, concertId, findMs);
+                meterRegistry.counter("booking.attempt", "result", "CLOSED").increment();
+                throw new IllegalStateException("마감된 콘서트입니다.");
             }
 
-            // (5) save 시간 측정
+            // (6) Booking 저장
             long tSaveStart = System.nanoTime();
             Booking booking = Booking.builder()
                     .concert(concert)
                     .userId(userId)
                     .build();
-
             bookingRepository.save(booking);
             long saveMs = (System.nanoTime() - tSaveStart) / 1_000_000;
 
+            // (7) 마지막 좌석이면 SOLD_OUT 표기
+            if (remaining == 0) {
+                concertRepository.markSoldOutById(concertId);
+            }
+
             long totalMs = (System.nanoTime() - t0) / 1_000_000;
 
-            log.info("[BOOKING][RESULT] userId={} concertId={} status=BOOKED bookingId={} lockMs={} existsMs={} saveMs={} totalMs={}",
-                    userId, concertId, booking.getId(), lockMs, existsMs, saveMs, totalMs);
+            log.info("[BOOKING][RESULT] userId={} concertId={} status=BOOKED bookingId={} remaining={} existsMs={} findMs={} saveMs={} totalMs={}",
+                    userId, concertId, booking.getId(), remaining, existsMs, findMs, saveMs, totalMs);
 
             meterRegistry.counter("booking.attempt", "result", "BOOKED").increment();
             return new BookingResult("BOOKED", concert.getId(), concert.getTitle());
 
-        } catch (RuntimeException e) {
-            // DB처리 실패 시 admitted 복구 -> 재시도 가능하게
+        } catch (DataIntegrityViolationException e) {
+            // uk_booking_concert_user 위반: 동시 중복 예매. 좌석 + admitted 복구 후 ALREADY_BOOKED 반환
+            if (seatDecremented) queueService.restoreSeat(concertId);
             queueService.restoreAdmitted(concertId, userId, ttl);
-
             long totalMs = (System.nanoTime() - t0) / 1_000_000;
+            log.info("[BOOKING][RESULT] userId={} concertId={} status=ALREADY_BOOKED reason=duplicate_key totalMs={}",
+                    userId, concertId, totalMs);
+            meterRegistry.counter("booking.attempt", "result", "ALREADY_BOOKED").increment();
+            return new BookingResult("ALREADY_BOOKED", concertId, null);
 
+        } catch (RuntimeException e) {
+            // 그 외 예상치 못한 예외: 미복구 건만 정리
+            if (seatDecremented) queueService.restoreSeat(concertId);
+            if (!admittedRestored) queueService.restoreAdmitted(concertId, userId, ttl);
+            long totalMs = (System.nanoTime() - t0) / 1_000_000;
             log.warn("[BOOKING][RESTORE] userId={} concertId={} ttlSec={} errorType={} msg={} totalMs={}",
                     userId, concertId, ttl, e.getClass().getSimpleName(), e.getMessage(), totalMs);
-
             throw e;
         }
     }

@@ -82,6 +82,7 @@ class EnrollServiceTest {
     void 정상_신청이면_BOOKED_AND_DB에_저장된다(){
         //given
         given(queueService.claimAdmitted(anyLong(),anyLong())).willReturn(600L);
+        given(queueService.decrementSeat(anyLong())).willReturn(5L);
 
         //when
         BookingResult result = bookingService.book(concert.getId(), userId);
@@ -92,16 +93,17 @@ class EnrollServiceTest {
         //then 2) Booking이 1개 저장되었는지
         assertThat(bookingRepository.existsByConcertIdAndUserId(concert.getId(), userId)).isTrue();
 
-        //then 3) bookedCount가 1 증가했는지
+        //then 3) 1단계에서는 bookedCount 즉시 갱신 없이 booking 저장만 확인
         Concert reloaded = concertRepository.findById(concert.getId()).orElseThrow();
-        assertThat(reloaded.getBookedCount()).isEqualTo(1);
+        assertThat(reloaded.getBookedCount()).isEqualTo(0);
     }
 
     @Test
-    void DB_저장_실패하면_restoreAdmitted가_호출된다(){
+    void DB_저장_실패하면_restoreAdmitted와_restoreSeat가_호출된다(){
         long ttl = 600L;
 
         given(queueService.claimAdmitted(anyLong(),anyLong())).willReturn(ttl);
+        given(queueService.decrementSeat(anyLong())).willReturn(5L);
 
         doThrow(new RuntimeException("DB fail for test"))
                 .when(bookingRepository)
@@ -112,8 +114,8 @@ class EnrollServiceTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("DB fail for test");
 
-        // restoreAdmitted가 호출되었는지 확인
-        verify(queueService, times(1))
-                .restoreAdmitted(concert.getId(), userId, ttl);
+        // 좌석 차감 선행 후 save 실패 → restoreSeat + restoreAdmitted 모두 호출
+        verify(queueService, times(1)).restoreSeat(concert.getId());
+        verify(queueService, times(1)).restoreAdmitted(concert.getId(), userId, ttl);
     }
 }

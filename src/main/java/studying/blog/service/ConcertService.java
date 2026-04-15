@@ -21,6 +21,7 @@ import java.util.List;
 public class ConcertService {
     private final ConcertRepository concertRepository;
     private final BookingRepository bookingRepository;
+    private final QueueService queueService;
 
     @Transactional
     public ConcertResponse create(ConcertCreateRequest req){
@@ -33,7 +34,9 @@ public class ConcertService {
                 .posterUrl(req.getPosterUrl())
                 .build();
 
-        return ConcertResponse.from(concertRepository.save(concert));
+        Concert saved = concertRepository.save(concert);
+        queueService.initSeatCount(saved.getId(), saved.getTotalSeats());
+        return toConcertResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -41,7 +44,7 @@ public class ConcertService {
         Concert concert = concertRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Concert not found : " + id));
 
-        return ConcertResponse.from(concert);
+        return toConcertResponse(concert);
     }
 
     @Transactional(readOnly = true)
@@ -53,7 +56,7 @@ public class ConcertService {
         List<ConcertResponse> result = new ArrayList<>();
 
         for (Concert concert : concerts) {
-            result.add(ConcertResponse.from(concert));
+            result.add(toConcertResponse(concert));
         }
         return result;
     }
@@ -66,7 +69,7 @@ public class ConcertService {
     @Transactional(readOnly = true)
     public List<ConcertResponse> search(ConcertSearchCondition condition) {
         return concertRepository.search(condition).stream()
-                .map(ConcertResponse::from)
+                .map(this::toConcertResponse)
                 .toList();
     }
 
@@ -82,7 +85,10 @@ public class ConcertService {
                 .status(req.getStatus() == null ? ConcertStatus.OPEN : req.getStatus())
                 .posterUrl(req.getPosterUrl())
                 .build();
-        return ConcertResponse.from(concertRepository.save(concert));
+
+        Concert saved = concertRepository.save(concert);
+        queueService.initSeatCount(saved.getId(), saved.getTotalSeats());
+        return toConcertResponse(saved);
     }
 
     @Transactional
@@ -90,20 +96,28 @@ public class ConcertService {
         validateAdminUpsert(req);
 
         Concert concert = concertRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Concert not found : " + id));
+        int derivedBookedCount = resolveBookedCount(concert);
 
-        if(req.getTotalSeats() < concert.getBookedCount()){
-            throw new IllegalArgumentException("totalSeats는 현재 예매 인원(bookedCount)보다 작을 수 없습니다. 현재 예매 인원: " + concert.getBookedCount());
+        if(req.getTotalSeats() < derivedBookedCount){
+            throw new IllegalArgumentException("totalSeats는 현재 예매 인원(bookedCount)보다 작을 수 없습니다. 현재 예매 인원: " + derivedBookedCount);
         }
 
+        int prevTotalSeats = concert.getTotalSeats();
         concert.updateByAdmin(req.getTitle(), req.getEventAt(), req.getTotalSeats(), req.getStatus());
-        return ConcertResponse.from(concert);
+
+        if (req.getTotalSeats() != prevTotalSeats) {
+            int remaining = Math.max(0, req.getTotalSeats() - derivedBookedCount);
+            queueService.initSeatCount(id, remaining);
+        }
+
+        return toConcertResponse(concert);
     }
 
     @Transactional
     public ConcertResponse adminClose(Long id){
         Concert concert = concertRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Concert not found : " + id));
         concert.close();
-        return ConcertResponse.from(concert);
+        return toConcertResponse(concert);
     }
 
     @Transactional
@@ -111,6 +125,7 @@ public class ConcertService {
         Concert concert = concertRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Concert not found : " + id));
         bookingRepository.deleteByConcert(concert);
         concertRepository.delete(concert);
+        queueService.deleteSeatCount(id);
     }
 
     @Transactional(readOnly = true)
@@ -128,5 +143,31 @@ public class ConcertService {
         if(req.getTotalSeats() <= 0){
             throw new IllegalArgumentException("totalSeats는 1 이상이어야 합니다.");
         }
+    }
+
+    private ConcertResponse toConcertResponse(Concert concert) {
+        return ConcertResponse.from(concert, resolveBookedCount(concert));
+    }
+
+    private int resolveBookedCount(Concert concert) {
+        Long remaining = queueService.getRemainingSeat(concert.getId());
+        if (remaining == null) {
+            org.slf4j.LoggerFactory.getLogger(ConcertService.class)
+                    .warn("[BOOKED_COUNT][FALLBACK] concertId={} usingPersistedValue={}",
+                            concert.getId(), concert.getBookedCount());
+            return concert.getBookedCount();
+        }
+
+        long bookedCount = (long) concert.getTotalSeats() - remaining;
+        if (bookedCount < 0) {
+            org.slf4j.LoggerFactory.getLogger(ConcertService.class)
+                    .warn("[BOOKED_COUNT][NEGATIVE] concertId={} totalSeats={} remaining={} usingZero",
+                            concert.getId(), concert.getTotalSeats(), remaining);
+            return 0;
+        }
+        if (bookedCount > Integer.MAX_VALUE) {
+            return concert.getBookedCount();
+        }
+        return (int) bookedCount;
     }
 }

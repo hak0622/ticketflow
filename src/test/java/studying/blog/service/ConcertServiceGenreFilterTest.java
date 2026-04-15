@@ -27,6 +27,9 @@ class ConcertServiceGenreFilterTest {
     @Mock
     private BookingRepository bookingRepository;
 
+    @Mock
+    private QueueService queueService;
+
     @InjectMocks
     private ConcertService concertService;
 
@@ -35,6 +38,8 @@ class ConcertServiceGenreFilterTest {
         Concert kpopConcert = concert("K-POP Concert", "K-POP");
         Concert musicalConcert = concert("Musical Concert", "뮤지컬");
         given(concertRepository.findAll()).willReturn(List.of(kpopConcert, musicalConcert));
+        given(queueService.getRemainingSeat(kpopConcert.getId())).willReturn(100L);
+        given(queueService.getRemainingSeat(musicalConcert.getId())).willReturn(100L);
 
         List<ConcertResponse> result = concertService.findAll(null);
 
@@ -49,6 +54,7 @@ class ConcertServiceGenreFilterTest {
     void shouldFilterConcertsByGenreWhenGenreIsProvided() {
         Concert kpopConcert = concert("K-POP Concert", "K-POP");
         given(concertRepository.findByGenre("K-POP")).willReturn(List.of(kpopConcert));
+        given(queueService.getRemainingSeat(kpopConcert.getId())).willReturn(100L);
 
         List<ConcertResponse> result = concertService.findAll("K-POP");
 
@@ -63,6 +69,7 @@ class ConcertServiceGenreFilterTest {
     void shouldReturnAllConcertsWhenGenreIsBlank() {
         Concert kpopConcert = concert("K-POP Concert", "K-POP");
         given(concertRepository.findAll()).willReturn(List.of(kpopConcert));
+        given(queueService.getRemainingSeat(kpopConcert.getId())).willReturn(100L);
 
         List<ConcertResponse> result = concertService.findAll("   ");
 
@@ -75,6 +82,7 @@ class ConcertServiceGenreFilterTest {
     void shouldTrimGenreBeforeFiltering() {
         Concert kpopConcert = concert("K-POP Concert", "K-POP");
         given(concertRepository.findByGenre("K-POP")).willReturn(List.of(kpopConcert));
+        given(queueService.getRemainingSeat(kpopConcert.getId())).willReturn(100L);
 
         List<ConcertResponse> result = concertService.findAll("  K-POP  ");
 
