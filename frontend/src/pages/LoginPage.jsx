@@ -45,21 +45,6 @@ export default function LoginPage() {
             Google로 로그인
           </button>
 
-          <div className="mt-6 flex items-center gap-3 text-gray-200">
-            <div className="flex-1 h-px bg-gray-100" />
-            <span className="text-xs text-gray-300">또는</span>
-            <div className="flex-1 h-px bg-gray-100" />
-          </div>
-
-          <p className="mt-6 text-sm text-center text-gray-500">
-            아직 계정이 없으신가요?{" "}
-            <Link
-              to="/register"
-              className="text-primary-600 font-semibold hover:underline"
-            >
-              회원가입
-            </Link>
-          </p>
         </div>
 
         <p className="mt-4 text-xs text-center text-gray-300">
