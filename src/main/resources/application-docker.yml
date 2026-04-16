@@ -18,6 +18,9 @@ spring:
       host: redis
       port: 6379
 
+server:
+  forward-headers-strategy: framework
+
 oauth2:
   redirect-url: ${FRONTEND_URL:http://localhost:8080}
 
