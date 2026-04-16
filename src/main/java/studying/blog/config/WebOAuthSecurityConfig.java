@@ -40,7 +40,7 @@ public class WebOAuthSecurityConfig {
     @Value("${oauth2.redirect-url}")
     private String oauth2RedirectUrl;
 
-    @Value("${app.frontend-url:http://localhost:5173}")
+    @Value("${FRONTEND_URL:http://localhost:5173}")
     private String frontendUrl;
 
     @Bean
