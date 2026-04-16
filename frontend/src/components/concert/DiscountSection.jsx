@@ -1,17 +1,13 @@
 import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getPosterByConcert } from '../../constants/posterMap'
+import ConcertPrice from './ConcertPrice'
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return ''
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
-}
-
-function formatPrice(price) {
-  if (price == null) return '가격 미정'
-  return `₩${Number(price).toLocaleString('ko-KR')}`
 }
 
 function DiscountCard({ concert }) {
@@ -58,16 +54,11 @@ function DiscountCard({ concert }) {
       </p>
 
       {/* 가격 */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {discountedPrice != null ? (
-          <>
-            <span className="text-gray-400 line-through text-xs">{formatPrice(price)}</span>
-            <span className="text-red-500 font-bold text-sm">{formatPrice(discountedPrice)}</span>
-          </>
-        ) : (
-          <span className="text-gray-900 font-bold text-sm">{formatPrice(price)}</span>
-        )}
-      </div>
+      <ConcertPrice
+        price={price}
+        discountedPrice={discountedPrice}
+        discountRate={discountRate}
+      />
     </div>
   )
 }
