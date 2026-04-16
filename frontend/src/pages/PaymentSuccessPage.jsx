@@ -39,7 +39,7 @@ export default function PaymentSuccessPage() {
       .catch((err) => {
         setStatus('error')
         const httpStatus = err.response?.status
-        const msg        = err.response?.data?.message
+        const msg        = err.response?.data?.message ?? err.response?.data?.error
         if (!err.response) {
           setErrorMsg('네트워크 연결을 확인해주세요.')
         } else if (httpStatus === 409) {
