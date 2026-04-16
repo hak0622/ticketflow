@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import ConcertPrice from './ConcertPrice'
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -8,11 +9,6 @@ function formatDate(dateStr) {
   })
 }
 
-function formatPrice(price) {
-  if (price == null) return '가격 미정'
-  return `₩${Number(price).toLocaleString('ko-KR')}`
-}
-
 /**
  * ConcertCard — Trending 그리드용 카드
  *
@@ -20,7 +16,7 @@ function formatPrice(price) {
  */
 export default function ConcertCard({ concert, rank, fallbackImage }) {
   const navigate = useNavigate()
-  const { id, title, artist, eventAt, price, status, posterUrl } = concert
+  const { id, title, artist, eventAt, price, status, posterUrl, discountRate, discountedPrice } = concert
   const imageSrc       = posterUrl ?? fallbackImage
   const isPast         = eventAt && new Date(eventAt) < new Date()
   const effectiveStatus = isPast && status === 'OPEN' ? 'CLOSED' : status
@@ -67,7 +63,12 @@ export default function ConcertCard({ concert, rank, fallbackImage }) {
       <p className="text-[10px] text-gray-400 font-medium tracking-wide mb-1.5">
         {formatDate(eventAt)}
       </p>
-      <p className="text-sm font-bold text-gray-900">{formatPrice(price)}</p>
+      <ConcertPrice
+        price={price}
+        discountedPrice={discountedPrice}
+        discountRate={discountRate}
+        showDiscountRate
+      />
     </div>
   )
 }
