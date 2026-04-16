@@ -30,6 +30,7 @@ oauth2:
   redirect-url: http://localhost:5173
 
 app:
+  frontend-url: http://localhost:5173
   test-support:
     enabled: false
     user-count: 500
