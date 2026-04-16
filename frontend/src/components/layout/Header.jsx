@@ -111,16 +111,6 @@ export default function Header() {
               <span className="text-[10px] font-medium hidden md:block">내 예약</span>
             </Link>
 
-            {/* 회원가입 (비로그인 데스크탑) */}
-            {!token && (
-              <Link
-                to="/register"
-                className="hidden md:flex items-center gap-1.5 text-sm font-semibold bg-primary-500 text-white px-4 py-1.5 rounded-full hover:bg-primary-600 transition-colors ml-1"
-              >
-                <HiOutlineUser className="w-4 h-4" />
-                회원가입
-              </Link>
-            )}
           </div>
         </div>
       </div>
