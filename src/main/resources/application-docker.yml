@@ -19,7 +19,10 @@ spring:
       port: 6379
 
 oauth2:
-  redirect-url: http://localhost:8080
+  redirect-url: ${FRONTEND_URL:http://localhost:8080}
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
 
 management:
   endpoints:

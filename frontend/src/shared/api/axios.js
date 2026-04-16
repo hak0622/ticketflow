@@ -4,8 +4,9 @@ let getAccessToken = () => null
 let onUnauthorized = () => {}
 
 const axiosInstance = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 10000,
+  withCredentials: true,
 })
 
 export function configureApiAuth(config = {}) {
@@ -18,7 +19,6 @@ export function configureApiAuth(config = {}) {
     : () => {}
 }
 
-// 요청 인터셉터 — 외부에서 주입된 인증 토큰 조회기로 헤더에 주입
 axiosInstance.interceptors.request.use((config) => {
   const token = getAccessToken()
   if (token) {
@@ -27,7 +27,6 @@ axiosInstance.interceptors.request.use((config) => {
   return config
 })
 
-// 응답 인터셉터 — 401 시 외부에서 주입된 인증 실패 핸들러 실행
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
