@@ -43,6 +43,10 @@
 
 > Google OAuth 로그인 후 예매 → 결제 흐름을 직접 확인할 수 있습니다.
 
+### 📹 데모 영상
+
+<video src="https://github.com/user-attachments/assets/ea70e348-7d5c-41cd-af44-f2d95484a94a" controls width="100%"></video>
+
 ---
 
 ## 🛠️ 기술 스택
