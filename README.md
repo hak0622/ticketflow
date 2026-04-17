@@ -2,7 +2,7 @@
 
 # TicketFlow
 
-**티켓팅 환경에서 발생하는 초과 예매·중복 결제·보상 누락·방치 예약 문제를 직접 재현하고 단계적으로 해결한 백엔드 프로젝트입니다.**
+**티켓팅 환경에서 발생하는 초과 예매·중복 결제·보상 누락·방치 예약 문제를 직접 재현하고 단계적으로 해결한 프로젝트입니다.<br>백엔드 동시성 제어가 핵심이며, React 프론트엔드와 EC2 + Vercel 배포 환경까지 포함합니다.**
 
 </div>
 
@@ -12,6 +12,7 @@
 
 - [프로젝트 소개](#프로젝트-소개)
 - [기술 스택](#기술-스택)
+- [배포 구조](#배포-구조)
 - [해결한 문제](#해결한-문제)
 - [예매 플로우](#예매-플로우)
 - [핵심 기술 선택 이유](#핵심-기술-선택-이유)
@@ -35,6 +36,12 @@
 - **정합성 vs 처리량** — Lock 범위를 어디까지 잡아야 초과 예매를 막으면서도 응답 시간이 견딜 만한가
 - **멱등성의 범위** — "중복 요청 차단"과 "동일 결과 반환"은 같은 문제가 아니다. 정상 재시도와 동시 중복 클릭은 서로 다른 방어선이 필요하다
 - **보상의 완결성** — 결제 실패 사실을 DB에 기록하는 것과 보상 대상을 기록하는 것은 별개의 작업이다. 같은 트랜잭션에 묶이지 않으면 앱이 재시작할 때 보상 대상 정보가 사라진다
+
+### 🔗 라이브 데모
+
+👉 [https://ticketflow-git-main-hak0622s-projects.vercel.app/](https://ticketflow-git-main-hak0622s-projects.vercel.app/)
+
+> Google OAuth 로그인 후 예매 → 결제 흐름을 직접 확인할 수 있습니다.
 
 ---
 
@@ -61,14 +68,39 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
 
 ### Infra / Monitoring / Testing
+![AWS EC2](https://img.shields.io/badge/AWS_EC2-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
+![Nginx](https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white)
+![Cloudinary](https://img.shields.io/badge/Cloudinary-3448C5?style=for-the-badge&logo=cloudinary&logoColor=white)
 ![Docker Compose](https://img.shields.io/badge/Docker_Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![AWS Elastic Beanstalk](https://img.shields.io/badge/AWS_Elastic_Beanstalk-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
 ![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white)
 ![Grafana](https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white)
 ![JUnit5](https://img.shields.io/badge/JUnit5-25A162?style=for-the-badge&logo=junit5&logoColor=white)
 ![Apache JMeter](https://img.shields.io/badge/Apache_JMeter-D22128?style=for-the-badge&logo=apachejmeter&logoColor=white)
 ![ShedLock](https://img.shields.io/badge/ShedLock-4B5563?style=for-the-badge&logoColor=white)
+
+---
+
+## 배포 구조
+
+```
+사용자 브라우저
+    │
+    ▼
+Vercel (React 프론트엔드)
+    │  /api/* 요청 → Vercel rewrites로 EC2로 프록시 (CORS 해결)
+    ▼
+Nginx (EC2, 리버스 프록시)
+    │  80/443 → Spring Boot 8080 포트로 전달
+    ▼
+Spring Boot (EC2, Docker)
+    ├── MySQL (Docker)
+    └── Redis (Docker)
+```
+
+이미지(공연 포스터 등)는 Cloudinary CDN을 통해 제공됩니다.  
+CI/CD는 GitHub Actions → Docker 이미지 빌드 → EC2 배포 순으로 자동화되어 있습니다.
 
 ---
 
