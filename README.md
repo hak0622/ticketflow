@@ -1,6 +1,6 @@
 <div align="center">
 
-# TicketFlow
+# 🎊 TicketFlow 🎊
 
 **티켓팅 환경에서 발생하는 초과 예매·중복 결제·보상 누락·방치 예약 문제를 직접 재현하고 단계적으로 해결한 프로젝트입니다.<br>백엔드 동시성 제어가 핵심이며, React 프론트엔드와 EC2 + Vercel 배포 환경까지 포함합니다.**
 
@@ -8,7 +8,7 @@
 
 ---
 
-## 목차
+## 📜 목차
 
 - [프로젝트 소개](#프로젝트-소개)
 - [기술 스택](#기술-스택)
@@ -23,7 +23,7 @@
 
 ---
 
-## 프로젝트 소개
+## 🙋‍♂️ 프로젝트 소개
 
 티켓팅 서비스에서 "좌석이 1개 남았는데 2명이 예매됐다", "결제가 실패했는데 좌석이 돌아오지 않았다" 같은 문제는 왜 생기는 걸까. 이 프로젝트는 그 질문에서 출발했습니다.
 
@@ -45,7 +45,7 @@
 
 ---
 
-## 기술 스택
+## 🛠️ 기술 스택
 
 ### Backend
 ![Java](https://img.shields.io/badge/Java_17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
@@ -82,7 +82,7 @@
 
 ---
 
-## 배포 구조
+## 🌐 배포 구조
 
 ```
 사용자 브라우저
@@ -104,7 +104,7 @@ CI/CD는 GitHub Actions → Docker 이미지 빌드 → EC2 배포 순으로 자
 
 ---
 
-## 해결한 문제
+## 💡 해결한 문제
 
 | 문제 | 원인 | 해결 방향 |
 |---|---|---|
@@ -117,7 +117,7 @@ CI/CD는 GitHub Actions → Docker 이미지 빌드 → EC2 배포 순으로 자
 
 ---
 
-## 예매 플로우
+## 🔄 예매 플로우
 
 ### 시스템 아키텍처
 
@@ -197,7 +197,7 @@ sequenceDiagram
 
 ---
 
-## 핵심 기술 선택 이유
+## 🔥 핵심 기술 선택 이유
 
 <details>
 <summary><strong>Redis Sorted Set + Lua Script — 대기열을 왜 Redis로 옮겼고, 왜 Lua가 필요했나</strong></summary>
@@ -418,7 +418,7 @@ Outbox 패턴:
 
 ---
 
-## 성능 측정 결과
+## 📈 성능 측정 결과
 
 ### 서버를 늘려야 할까?
 
@@ -540,7 +540,7 @@ MySQLTransactionRollbackException: Deadlock found when trying to get lock; try r
 
 ---
 
-## 트러블슈팅
+## 🚨 트러블슈팅
 
 <details>
 <summary><strong>입장권 소비 중 TTL 만료 타이밍 충돌 — EXISTS와 DEL 사이의 틈</strong></summary>
@@ -764,7 +764,7 @@ CORS를 "설정으로 해결"하는 대신, 애초에 발생하지 않는 구조
 
 ---
 
-## DB 인덱스 최적화
+## ⚡️ DB 인덱스 최적화
 
 <details>
 <summary><strong>스케줄러 쿼리가 10만 건 기준 Full Table Scan — 복합 인덱스로 약 22배 개선</strong></summary>
@@ -834,7 +834,7 @@ CREATE INDEX idx_booking_status_created_at ON booking(status, created_at);
 
 ---
 
-## 참조 문서
+## 📂 참조 문서
 
 - [`docs/architecture.md`](docs/architecture.md) — 패키지 구조, Redis 키 명세, Lua Script, Scheduler 상세
 - [`docs/flow.md`](docs/flow.md) — 예매/보상/만료 시퀀스 다이어그램, 상태 전이
