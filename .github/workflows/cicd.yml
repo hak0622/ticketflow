@@ -70,9 +70,10 @@ jobs:
       - name: Docker Hub login
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      # Docker 이미지 빌드 + Docker Hub 푸시
+      # .dockerignore가 build/ 폴더를 제외하므로 JAR을 루트로 복사 후 빌드
       - name: Build & Push Docker image
         run: |
+          cp build/libs/*.jar app.jar
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ticketflow:latest .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/ticketflow:latest
 

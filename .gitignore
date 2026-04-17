@@ -39,6 +39,9 @@ out/
 ### Secrets ###
 .env
 
+# Docker build artifact (CI에서 임시 생성)
+app.jar
+
 # CSV test data
 *.csv
 
