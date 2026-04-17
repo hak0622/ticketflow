@@ -123,7 +123,9 @@ CI/CD는 GitHub Actions → Docker 이미지 빌드 → EC2 배포 순으로 자
 
 MVP에서는 DB row lock으로 좌석을 제어했으나, 부하 테스트에서 hot row 병목을 확인한 뒤 "실시간 제어는 Redis, 영속 상태 저장은 DB"로 역할을 분리했습니다.
 
-<img width="2528" height="1684" alt="현재 아키텍쳐" src="https://github.com/user-attachments/assets/e64920cc-9451-4a15-b2c1-26eb7f888e81" />
+<img width="2390" height="1792" alt="시스템 아키텍처" src="https://github.com/user-attachments/assets/596516a5-7c28-4df8-b70f-d372532fcc2a" />
+
+> 초기 배포는 AWS Elastic Beanstalk으로 시작했으나, 비용 절감과 직접 제어를 위해 EC2 + Docker + Nginx 구성으로 전환했습니다.
 
 ### 예매 플로우
 
