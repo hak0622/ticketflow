@@ -43,6 +43,7 @@ dependencies {
 
     //레디스
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.session:spring-session-data-redis'
 
     // ShedLock — 분산 스케줄러 락 (Redis provider)
     implementation 'net.javacrumbs.shedlock:shedlock-spring:5.16.0'
