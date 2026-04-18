@@ -2,7 +2,6 @@ package studying.blog.testsupport;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import studying.blog.domain.User;
 import studying.blog.dto.AddUserRequest;
@@ -13,7 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
-@Profile({"local", "test"})
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "app.test-support", name = "enabled", havingValue = "true")
 public class TestUserSeedService {

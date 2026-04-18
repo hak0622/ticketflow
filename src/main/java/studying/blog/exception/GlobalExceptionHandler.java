@@ -50,7 +50,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleIllegalArgument(IllegalArgumentException e) {
         return ResponseEntity.badRequest().body(Map.of(
                 "status", 400,
-                "error", e.getMessage()
+                "error", e.getMessage() == null ? "" : e.getMessage()
         ));
     }
 }

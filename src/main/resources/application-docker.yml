@@ -24,6 +24,9 @@ spring:
 
 server:
   forward-headers-strategy: framework
+  tomcat:
+    threads:
+      max: 400
 
 oauth2:
   redirect-url: ${FRONTEND_URL:http://localhost:8080}
