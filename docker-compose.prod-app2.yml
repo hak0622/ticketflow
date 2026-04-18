@@ -1,0 +1,18 @@
+services:
+  app:
+    image: hak0622/ticketflow:latest
+    restart: unless-stopped
+    mem_limit: 512m
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://172.31.41.244:3306/blog?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATA_REDIS_HOST: 172.31.41.244
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      TOSS_SECRET_KEY: ${TOSS_SECRET_KEY}
+      FRONTEND_URL: ${FRONTEND_URL}
