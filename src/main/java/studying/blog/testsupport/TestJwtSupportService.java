@@ -2,7 +2,6 @@ package studying.blog.testsupport;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import studying.blog.config.TokenProvider;
 import studying.blog.domain.User;
@@ -13,7 +12,6 @@ import studying.blog.testsupport.exception.TestSupportUserNotFoundException;
 import java.time.Duration;
 
 @Service
-@Profile({"local", "test"})
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "app.test-support", name = "enabled", havingValue = "true")
 public class TestJwtSupportService {
