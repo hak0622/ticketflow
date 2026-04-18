@@ -2,7 +2,6 @@ package studying.blog.testsupport;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,7 +12,6 @@ import studying.blog.testsupport.dto.TestJwtByUserIdRequest;
 import studying.blog.testsupport.dto.TestJwtIssueResponse;
 
 @RestController
-@Profile({"local", "test"})
 @RequiredArgsConstructor
 @RequestMapping("/api/test-support/jwt")
 @ConditionalOnProperty(prefix = "app.test-support", name = "enabled", havingValue = "true")

@@ -74,7 +74,7 @@ public class BookingService {
                 log.info("[BOOKING][RESULT] userId={} concertId={} status=ALREADY_BOOKED existsMs={}",
                         userId, concertId, existsMs);
                 meterRegistry.counter("booking.attempt", "result", "ALREADY_BOOKED").increment();
-                return new BookingResult("ALREADY_BOOKED", concertId, null);
+                return new BookingResult("ALREADY_BOOKED", concertId, "");
             }
 
             // (4) Redis 좌석 원자적 차감
@@ -143,7 +143,7 @@ public class BookingService {
             log.info("[BOOKING][RESULT] userId={} concertId={} status=ALREADY_BOOKED reason=duplicate_key totalMs={}",
                     userId, concertId, totalMs);
             meterRegistry.counter("booking.attempt", "result", "ALREADY_BOOKED").increment();
-            return new BookingResult("ALREADY_BOOKED", concertId, null);
+            return new BookingResult("ALREADY_BOOKED", concertId, "");
 
         } catch (RuntimeException e) {
             // 그 외 예상치 못한 예외: 미복구 건만 정리
@@ -160,7 +160,7 @@ public class BookingService {
     public BookingResult myBooking(Long concertId, Long userId) {
         return bookingRepository.findByConcertIdAndUserId(concertId, userId)
                 .map(b -> new BookingResult("BOOKED", concertId, b.getConcert().getTitle()))
-                .orElseGet(() -> new BookingResult("NOT_BOOKED", concertId, null));
+                .orElseGet(() -> new BookingResult("NOT_BOOKED", concertId, ""));
     }
 
     @Transactional(readOnly = true)
