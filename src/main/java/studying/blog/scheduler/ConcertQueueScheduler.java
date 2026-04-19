@@ -26,7 +26,7 @@ public class ConcertQueueScheduler {
 
     @Scheduled(fixedDelay = 5000)
     public void processQueue() {
-        int batchSize = 50;
+        int batchSize = 300;
         int ttlSeconds = 600; // 10분
 
         long t0 = System.nanoTime();
