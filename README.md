@@ -95,12 +95,17 @@
 Vercel (React 프론트엔드)
     │  /api/* 요청 → Vercel rewrites로 EC2로 프록시 (CORS 해결)
     ▼
-Nginx (EC2, 리버스 프록시)
-    │  80/443 → Spring Boot 8080 포트로 전달
-    ▼
-Spring Boot (EC2, Docker)
-    ├── MySQL (Docker)
-    └── Redis (Docker)
+Nginx (EC2 #1, 포트 80 — 로드 밸런서)
+    │  Round-Robin
+    ├──────────────────────────┐
+    ▼                          ▼
+Spring Boot app-1          Spring Boot app-2
+(EC2 #1, Docker)           (EC2 #2, Docker)
+    │                          │
+    └──────────┬───────────────┘
+               ▼
+          MySQL + Redis
+          (EC2 #1, Docker, 공유)
 ```
 
 이미지(공연 포스터 등)는 Cloudinary CDN을 통해 제공됩니다.  
@@ -434,7 +439,8 @@ Outbox 패턴:
 - Redis 좌석 차감으로 1차 개선한 뒤에는 deadlock 로그가 실제로 발생하는지 확인했습니다.
 - 마지막으로 `bookedCount` 동기 UPDATE를 제거한 뒤 같은 조건에서 다시 측정했습니다.
 
-결론적으로 병목은 서버 수보다 **DB row lock + hot row update** 에 더 가까웠습니다. 그래서 증설보다 구조 변경을 먼저 선택했습니다.
+구조 변경으로 단일 서버 기준 성능을 끌어올린 뒤, EC2 2대 환경에서 수평 확장 효과를 추가로 검증했습니다.
+결론적으로 **동시성 제어 구조를 먼저 정리하고, 그 다음 서버를 늘리는 순서**가 맞았습니다. 구조 개선 없이 서버만 늘렸다면 DB hot row 병목은 그대로 남았을 것입니다.
 
 <details>
 <summary><strong>부하 테스트 상세 보기</strong></summary>
@@ -511,6 +517,35 @@ MySQLTransactionRollbackException: Deadlock found when trying to get lock; try r
 | p95 | 6822ms | 2518ms | 약 63% 감소 |
 | TPS | 69.8/sec | 186.6/sec | 약 167% 증가 |
 | Error | 일부 500 + deadlock | 0% | 안정성 확보 |
+
+### 6. EC2 수평 확장 — 서버 1대 추가의 효과
+
+구조 개선 이후 실제 EC2 환경에서 단일 서버와 2서버 구성을 동일 조건(300명 동시 요청)으로 비교했습니다.
+
+**테스트 환경**
+- EC2 #1: Nginx(로드 밸런서) + app + MySQL + Redis (t3.micro)
+- EC2 #2: app only, EC2 #1의 MySQL·Redis 공유 (t3.micro)
+- JMeter: SyncTimer 300명 동시 출발, 300석 콘서트
+
+| 구성 | 평균 응답 시간 | p95 | TPS | 에러율 |
+|---|---:|---:|---:|---:|
+| EC2 1서버 | 13,822ms | 14,903ms | 20/sec | 0% |
+| EC2 2서버 (Nginx LB) | **1,525ms** | **2,341ms** | **110.7/sec** | **0%** |
+| 개선율 | **9배 빠름** | **6.4배 빠름** | **5.5배 향상** | 유지 |
+
+t3.micro 단일 서버는 300명 동시 요청에서 CPU 크레딧 소진과 JVM GC 압박이 겹쳐 13초대 응답이 발생했습니다. 서버를 1대 추가해 Nginx가 요청을 절반씩 분산하자 각 서버의 부하가 줄어 응답 시간이 9배 개선됐습니다.
+
+에러율은 두 구성 모두 0%입니다. Redis 원자적 좌석 차감이 2서버 환경에서도 중복 예매를 완전히 차단했습니다.
+
+#### EC2 1서버 JMeter 결과
+
+![JMeter EC2 1서버](./docs/assets/readme/jmeter-ec2-1server.png)
+
+#### EC2 2서버 JMeter 결과
+
+![JMeter EC2 2서버](./docs/assets/readme/jmeter-ec2-2server.png)
+
+> 단, MySQL은 여전히 EC2 #1 단일 인스턴스를 공유합니다. 요청이 더 늘어나면 DB가 다음 병목이 될 것으로 예상됩니다.
 
 ### 6. 이미지로 본 변화
 
