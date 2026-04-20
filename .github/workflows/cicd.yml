@@ -88,7 +88,7 @@ jobs:
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.GCP_HOST_SERVER1 }}
-          username: ubuntu
+          username: kimseounghak0622
           key: ${{ secrets.GCP_SSH_KEY }}
           script: |
             cd ~/ticketflow
@@ -108,7 +108,7 @@ jobs:
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.GCP_HOST_SERVER2 }}
-          username: ubuntu
+          username: kimseounghak0622
           key: ${{ secrets.GCP_SSH_KEY }}
           script: |
             cd ~/ticketflow
