@@ -144,10 +144,10 @@ public class ConcertService {
         Concert concert = concertRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Concert not found : " + id));
         bookingRepository.deleteByConcert(concert);
         concertRepository.delete(concert);
-        queueService.deleteSeatCount(id);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
+                queueService.deleteSeatCount(id);
                 queueService.deleteConcertStatus(id);
             }
         });
