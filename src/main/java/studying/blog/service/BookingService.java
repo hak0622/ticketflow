@@ -122,9 +122,9 @@ public class BookingService {
             bookingRepository.save(booking);
             long saveMs = (System.nanoTime() - tSaveStart) / 1_000_000;
 
-            // (7) 마지막 좌석이면 SOLD_OUT 표기
+            // (7) 마지막 좌석이면 SOLD_OUT 표기 (@Version 낙관적 락 체크 활성화)
             if (remaining == 0) {
-                concertRepository.markSoldOutById(concertId);
+                concert.markSoldOut();
             }
 
             long totalMs = (System.nanoTime() - t0) / 1_000_000;
