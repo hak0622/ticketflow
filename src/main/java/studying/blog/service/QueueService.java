@@ -330,6 +330,30 @@ public class QueueService {
         redisTemplate.delete(seatKey(concertId));
     }
 
+    // ─── 콘서트 상태 캐시 (concert:status:{id}, TTL 30s) ─────────────────────
+
+    private String concertStatusKey(Long concertId) {
+        return "concert:status:" + concertId;
+    }
+
+    /**
+     * Redis에서 콘서트 상태 조회. 키 없으면 null 반환 (캐시 미스 → 호출 측에서 DB fallback).
+     */
+    public ConcertStatus getConcertStatus(Long concertId) {
+        String val = redisTemplate.opsForValue().get(concertStatusKey(concertId));
+        if (val == null) return null;
+        try {
+            return ConcertStatus.valueOf(val);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** 콘서트 상태를 Redis에 캐시 (TTL 30초). 상태 변경 시 호출. */
+    public void setConcertStatus(Long concertId, ConcertStatus status) {
+        redisTemplate.opsForValue().set(concertStatusKey(concertId), status.name(), 30, TimeUnit.SECONDS);
+    }
+
     // 입장권 소모(현재는 claim에서 DEL하므로 보조용)
     public boolean consumeAdmitted(Long concertId, Long userId) {
         String key = admittedKey(concertId, userId);

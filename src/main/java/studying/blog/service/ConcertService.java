@@ -109,6 +109,9 @@ public class ConcertService {
             int remaining = Math.max(0, req.getTotalSeats() - derivedBookedCount);
             queueService.initSeatCount(id, remaining);
         }
+        if (req.getStatus() != null) {
+            queueService.setConcertStatus(id, concert.getStatus());
+        }
 
         return toConcertResponse(concert);
     }
@@ -117,6 +120,7 @@ public class ConcertService {
     public ConcertResponse adminClose(Long id){
         Concert concert = concertRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Concert not found : " + id));
         concert.close();
+        queueService.setConcertStatus(id, ConcertStatus.CLOSED);
         return toConcertResponse(concert);
     }
 
