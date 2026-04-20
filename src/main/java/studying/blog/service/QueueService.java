@@ -330,28 +330,47 @@ public class QueueService {
         redisTemplate.delete(seatKey(concertId));
     }
 
-    // ─── 콘서트 상태 캐시 (concert:status:{id}, TTL 30s) ─────────────────────
+    // ─── 콘서트 상태·타이틀 캐시 (concert:status:{id}, TTL 30s) ──────────────
+
+    /** 캐시에서 읽은 콘서트 정보. status + title을 함께 저장해 프록시 초기화 없이 반환 가능. */
+    public record ConcertInfo(ConcertStatus status, String title) {}
+
+    private static final String CACHE_SEP = "|";
 
     private String concertStatusKey(Long concertId) {
         return "concert:status:" + concertId;
     }
 
     /**
-     * Redis에서 콘서트 상태 조회. 키 없으면 null 반환 (캐시 미스 → 호출 측에서 DB fallback).
+     * Redis에서 콘서트 정보 조회.
+     * 키 없으면 null 반환(캐시 미스) → 호출 측에서 DB fallback 후 setConcertInfo() 호출.
      */
-    public ConcertStatus getConcertStatus(Long concertId) {
+    public ConcertInfo getConcertInfo(Long concertId) {
         String val = redisTemplate.opsForValue().get(concertStatusKey(concertId));
         if (val == null) return null;
+        int sep = val.indexOf(CACHE_SEP);
+        if (sep < 0) return null;
         try {
-            return ConcertStatus.valueOf(val);
+            ConcertStatus status = ConcertStatus.valueOf(val.substring(0, sep));
+            String title = val.substring(sep + 1);
+            return new ConcertInfo(status, title);
         } catch (IllegalArgumentException e) {
             return null;
         }
     }
 
-    /** 콘서트 상태를 Redis에 캐시 (TTL 30초). 상태 변경 시 호출. */
-    public void setConcertStatus(Long concertId, ConcertStatus status) {
-        redisTemplate.opsForValue().set(concertStatusKey(concertId), status.name(), 30, TimeUnit.SECONDS);
+    /**
+     * 콘서트 상태·타이틀을 Redis에 캐시 (TTL 30초).
+     * DB 커밋 이후 호출할 것 (트랜잭션 롤백 시 Redis 불일치 방지).
+     */
+    public void setConcertInfo(Long concertId, ConcertStatus status, String title) {
+        String val = status.name() + CACHE_SEP + (title != null ? title : "");
+        redisTemplate.opsForValue().set(concertStatusKey(concertId), val, 30, TimeUnit.SECONDS);
+    }
+
+    /** 콘서트 삭제 시 상태 캐시도 함께 제거. */
+    public void deleteConcertStatus(Long concertId) {
+        redisTemplate.delete(concertStatusKey(concertId));
     }
 
     // 입장권 소모(현재는 claim에서 DEL하므로 보조용)

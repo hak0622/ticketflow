@@ -3,6 +3,8 @@ package studying.blog.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import studying.blog.domain.Concert;
 import studying.blog.domain.ConcertStatus;
 import studying.blog.dto.BookingAdminResponse;
@@ -109,9 +111,16 @@ public class ConcertService {
             int remaining = Math.max(0, req.getTotalSeats() - derivedBookedCount);
             queueService.initSeatCount(id, remaining);
         }
-        if (req.getStatus() != null) {
-            queueService.setConcertStatus(id, concert.getStatus());
-        }
+
+        // 캐시 갱신은 커밋 이후 — 롤백 시 Redis/DB 불일치 방지
+        final ConcertStatus updatedStatus = concert.getStatus();
+        final String updatedTitle = concert.getTitle();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                queueService.setConcertInfo(id, updatedStatus, updatedTitle);
+            }
+        });
 
         return toConcertResponse(concert);
     }
@@ -120,7 +129,13 @@ public class ConcertService {
     public ConcertResponse adminClose(Long id){
         Concert concert = concertRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Concert not found : " + id));
         concert.close();
-        queueService.setConcertStatus(id, ConcertStatus.CLOSED);
+        final String title = concert.getTitle();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                queueService.setConcertInfo(id, ConcertStatus.CLOSED, title);
+            }
+        });
         return toConcertResponse(concert);
     }
 
@@ -130,6 +145,12 @@ public class ConcertService {
         bookingRepository.deleteByConcert(concert);
         concertRepository.delete(concert);
         queueService.deleteSeatCount(id);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                queueService.deleteConcertStatus(id);
+            }
+        });
     }
 
     @Transactional(readOnly = true)
