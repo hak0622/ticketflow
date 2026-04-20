@@ -51,6 +51,10 @@ public class Concert {
     @Column
     private Integer discountRate;         // 할인율 0~100 (null = 할인 없음)
 
+    @Version
+    @Column
+    private Long version;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
