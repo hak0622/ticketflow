@@ -13,7 +13,8 @@ services:
   mysql:
     image: mysql:8.0-debian
     restart: unless-stopped
-    mem_limit: 256m
+    mem_limit: 512m
+    tty: true
     ports:
       - "3306:3306"
     environment:
