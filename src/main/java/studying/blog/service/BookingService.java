@@ -96,14 +96,24 @@ public class BookingService {
             }
             seatDecremented = true;
 
-            // (5) DB 조회 (락 없음, 상태 확인 및 Booking 생성용)
+            // (5) CLOSED 상태 확인: Redis 캐시 우선, 캐시 미스 시 DB fallback
             long tFindStart = System.nanoTime();
-            Concert concert = concertRepository.findById(concertId)
-                    .orElseThrow(() -> new IllegalArgumentException("Concert not found :" + concertId));
+            ConcertStatus concertStatus = queueService.getConcertStatus(concertId);
+            Concert concert;
+            if (concertStatus == null) {
+                // 캐시 미스: DB 조회 후 캐시 갱신
+                concert = concertRepository.findById(concertId)
+                        .orElseThrow(() -> new IllegalArgumentException("Concert not found :" + concertId));
+                queueService.setConcertStatus(concertId, concert.getStatus());
+                concertStatus = concert.getStatus();
+            } else {
+                // 캐시 히트: DB SELECT 생략, FK 참조용 프록시만 생성
+                concert = concertRepository.getReferenceById(concertId);
+            }
             long findMs = (System.nanoTime() - tFindStart) / 1_000_000;
 
             // CLOSED 상태 체크 (SOLD_OUT은 Redis 카운터가 처리)
-            if (concert.getStatus() == ConcertStatus.CLOSED) {
+            if (concertStatus == ConcertStatus.CLOSED) {
                 queueService.restoreSeat(concertId);
                 seatDecremented = false;
                 queueService.restoreAdmitted(concertId, userId, ttl);
