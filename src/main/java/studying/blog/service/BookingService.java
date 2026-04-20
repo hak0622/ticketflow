@@ -98,17 +98,22 @@ public class BookingService {
 
             // (5) CLOSED 상태 확인: Redis 캐시 우선, 캐시 미스 시 DB fallback
             long tFindStart = System.nanoTime();
-            ConcertStatus concertStatus = queueService.getConcertStatus(concertId);
+            QueueService.ConcertInfo concertInfo = queueService.getConcertInfo(concertId);
             Concert concert;
-            if (concertStatus == null) {
+            ConcertStatus concertStatus;
+            String concertTitle;
+            if (concertInfo == null) {
                 // 캐시 미스: DB 조회 후 캐시 갱신
                 concert = concertRepository.findById(concertId)
                         .orElseThrow(() -> new IllegalArgumentException("Concert not found :" + concertId));
-                queueService.setConcertStatus(concertId, concert.getStatus());
+                queueService.setConcertInfo(concertId, concert.getStatus(), concert.getTitle());
                 concertStatus = concert.getStatus();
+                concertTitle = concert.getTitle();
             } else {
                 // 캐시 히트: DB SELECT 생략, FK 참조용 프록시만 생성
                 concert = concertRepository.getReferenceById(concertId);
+                concertStatus = concertInfo.status();
+                concertTitle = concertInfo.title();
             }
             long findMs = (System.nanoTime() - tFindStart) / 1_000_000;
 
@@ -143,7 +148,7 @@ public class BookingService {
                     userId, concertId, booking.getId(), remaining, existsMs, findMs, saveMs, totalMs);
 
             meterRegistry.counter("booking.attempt", "result", "BOOKED").increment();
-            return new BookingResult("BOOKED", concert.getId(), concert.getTitle());
+            return new BookingResult("BOOKED", concert.getId(), concertTitle);
 
         } catch (DataIntegrityViolationException e) {
             // uk_booking_concert_user 위반: 동시 중복 예매. 좌석 + admitted 복구 후 ALREADY_BOOKED 반환
