@@ -33,6 +33,13 @@ server:
     accept-count: 200
     max-connections: 400
 
+app:
+  test-support:
+    enabled: ${TEST_SUPPORT_ENABLED:false}
+    user-count: ${TEST_SUPPORT_USER_COUNT:10000}
+    token-expiration-minutes: 120
+    csv-output-path: booking-users.csv
+
 oauth2:
   redirect-url: ${FRONTEND_URL:http://localhost:8080}
 
