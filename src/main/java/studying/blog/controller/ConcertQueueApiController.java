@@ -8,8 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import studying.blog.config.CustomPrincipal;
-import studying.blog.dto.BookingResult;
-import studying.blog.service.BookingService;
 import studying.blog.service.QueueService;
 
 import java.util.Map;
@@ -20,7 +18,6 @@ import java.util.Map;
 @RequestMapping("/api/concerts")
 public class ConcertQueueApiController {
     private final QueueService queueService;
-    private final BookingService bookingService;
 
     @Operation(summary = "대기열 등록",
             description = "콘서트 대기열에 등록합니다. 이미 예매한 경우 BOOKED, 대기 중이면 QUEUED와 순번을 반환합니다.")
@@ -29,15 +26,6 @@ public class ConcertQueueApiController {
     public ResponseEntity<?> enqueue(@PathVariable Long concertId,
                                      @AuthenticationPrincipal CustomPrincipal principal) {
         Long userId = principal.getUserId();
-
-        BookingResult my = bookingService.myBooking(concertId, userId);
-        if("BOOKED".equals(my.getStatus())){
-            return ResponseEntity.ok(Map.of(
-                    "concertId", concertId,
-                    "status", "BOOKED",
-                    "message","이미 예매한 콘서트입니다."
-            ));
-        }
 
         Long position = queueService.enqueue(concertId, userId);
         Long total = queueService.getTotal(concertId);
@@ -57,15 +45,6 @@ public class ConcertQueueApiController {
     public ResponseEntity<?> myQueue(@PathVariable Long concertId,
                                      @AuthenticationPrincipal CustomPrincipal principal){
         Long userId = principal.getUserId();
-
-        BookingResult my = bookingService.myBooking(concertId, userId);
-        if ("BOOKED".equals(my.getStatus())) {
-            return ResponseEntity.ok(Map.of(
-                    "concertId", concertId,
-                    "status", "BOOKED",
-                    "message", "이미 예매한 콘서트입니다."
-            ));
-        }
 
         Long position = queueService.getPosition(concertId, userId);
         Long total = queueService.getTotal(concertId);

@@ -59,9 +59,20 @@ public class QueueService {
 
     //줄서기 등록
     public Long enqueue(Long concertId, Long userId) {
-        Concert concert = concertRepository.findById(concertId)
-                .orElseThrow(() -> new IllegalArgumentException("Concert not found : " + concertId));
-        validateQueueAvailable(concert);
+        ConcertInfo info = getConcertInfo(concertId);
+        if (info == null) {
+            Concert concert = concertRepository.findById(concertId)
+                    .orElseThrow(() -> new IllegalArgumentException("Concert not found : " + concertId));
+            validateQueueAvailable(concert);
+            setConcertInfo(concertId, concert.getStatus(), concert.getTitle(), concert.getEventAt());
+        } else {
+            if (info.status() == ConcertStatus.CLOSED)
+                throw new IllegalStateException("마감된 콘서트입니다.");
+            if (info.status() == ConcertStatus.SOLD_OUT)
+                throw new IllegalStateException("정원이 마감된 콘서트입니다.");
+            if (info.eventAt() != null && LocalDateTime.now().isAfter(info.eventAt()))
+                throw new IllegalStateException("이미 종료된 공연입니다.");
+        }
 
         long score = Instant.now().toEpochMilli();
         String m = member(userId);
@@ -332,8 +343,8 @@ public class QueueService {
 
     // ─── 콘서트 상태·타이틀 캐시 (concert:status:{id}, TTL 30s) ──────────────
 
-    /** 캐시에서 읽은 콘서트 정보. status + title을 함께 저장해 프록시 초기화 없이 반환 가능. */
-    public record ConcertInfo(ConcertStatus status, String title) {}
+    /** 캐시에서 읽은 콘서트 정보. status + title + eventAt을 함께 저장해 프록시 초기화 없이 반환 가능. */
+    public record ConcertInfo(ConcertStatus status, String title, LocalDateTime eventAt) {}
 
     private static final String CACHE_SEP = "|";
 
@@ -348,23 +359,27 @@ public class QueueService {
     public ConcertInfo getConcertInfo(Long concertId) {
         String val = redisTemplate.opsForValue().get(concertStatusKey(concertId));
         if (val == null) return null;
-        int sep = val.indexOf(CACHE_SEP);
-        if (sep < 0) return null;
+        String[] parts = val.split("\\|", 3);
+        if (parts.length < 2) return null;
         try {
-            ConcertStatus status = ConcertStatus.valueOf(val.substring(0, sep));
-            String title = val.substring(sep + 1);
-            return new ConcertInfo(status, title);
+            ConcertStatus status = ConcertStatus.valueOf(parts[0]);
+            String title = parts[1];
+            LocalDateTime eventAt = (parts.length == 3 && !parts[2].isEmpty())
+                    ? LocalDateTime.parse(parts[2])
+                    : null;
+            return new ConcertInfo(status, title, eventAt);
         } catch (IllegalArgumentException e) {
             return null;
         }
     }
 
     /**
-     * 콘서트 상태·타이틀을 Redis에 캐시 (TTL 30초).
+     * 콘서트 상태·타이틀·eventAt을 Redis에 캐시 (TTL 30초).
      * DB 커밋 이후 호출할 것 (트랜잭션 롤백 시 Redis 불일치 방지).
      */
-    public void setConcertInfo(Long concertId, ConcertStatus status, String title) {
-        String val = status.name() + CACHE_SEP + (title != null ? title : "");
+    public void setConcertInfo(Long concertId, ConcertStatus status, String title, LocalDateTime eventAt) {
+        String val = status.name() + CACHE_SEP + (title != null ? title : "") + CACHE_SEP
+                + (eventAt != null ? eventAt.toString() : "");
         redisTemplate.opsForValue().set(concertStatusKey(concertId), val, 30, TimeUnit.SECONDS);
     }
 

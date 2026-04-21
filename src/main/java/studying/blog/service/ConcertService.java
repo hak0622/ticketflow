@@ -115,10 +115,11 @@ public class ConcertService {
         // 캐시 갱신은 커밋 이후 — 롤백 시 Redis/DB 불일치 방지
         final ConcertStatus updatedStatus = concert.getStatus();
         final String updatedTitle = concert.getTitle();
+        final java.time.LocalDateTime updatedEventAt = concert.getEventAt();
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                queueService.setConcertInfo(id, updatedStatus, updatedTitle);
+                queueService.setConcertInfo(id, updatedStatus, updatedTitle, updatedEventAt);
             }
         });
 
@@ -130,10 +131,11 @@ public class ConcertService {
         Concert concert = concertRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Concert not found : " + id));
         concert.close();
         final String title = concert.getTitle();
+        final java.time.LocalDateTime eventAt = concert.getEventAt();
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                queueService.setConcertInfo(id, ConcertStatus.CLOSED, title);
+                queueService.setConcertInfo(id, ConcertStatus.CLOSED, title, eventAt);
             }
         });
         return toConcertResponse(concert);

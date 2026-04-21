@@ -106,7 +106,7 @@ public class BookingService {
                 // 캐시 미스: DB 조회 후 캐시 갱신
                 concert = concertRepository.findById(concertId)
                         .orElseThrow(() -> new IllegalArgumentException("Concert not found :" + concertId));
-                queueService.setConcertInfo(concertId, concert.getStatus(), concert.getTitle());
+                queueService.setConcertInfo(concertId, concert.getStatus(), concert.getTitle(), concert.getEventAt());
                 concertStatus = concert.getStatus();
                 concertTitle = concert.getTitle();
             } else {
