@@ -19,7 +19,7 @@ class ConcertServiceAdminDeleteIntegrationTest extends IntegrationTestSupport {
     @Test
     void adminDelete_committedTransaction_deletesSeatAndStatusCacheAfterCommit() {
         Concert concert = savedConcert("삭제 테스트", 100, 0);
-        queueService.setConcertInfo(concert.getId(), concert.getStatus(), concert.getTitle());
+        queueService.setConcertInfo(concert.getId(), concert.getStatus(), concert.getTitle(), concert.getEventAt());
 
         transactionTemplate.executeWithoutResult(status -> concertService.adminDelete(concert.getId()));
 
@@ -31,7 +31,7 @@ class ConcertServiceAdminDeleteIntegrationTest extends IntegrationTestSupport {
     @Test
     void adminDelete_rolledBackTransaction_keepsSeatAndStatusCache() {
         Concert concert = savedConcert("롤백 테스트", 80, 0);
-        queueService.setConcertInfo(concert.getId(), concert.getStatus(), concert.getTitle());
+        queueService.setConcertInfo(concert.getId(), concert.getStatus(), concert.getTitle(), concert.getEventAt());
         String expectedSeat = redisTemplate.opsForValue().get(seatKey(concert.getId()));
         String expectedStatus = redisTemplate.opsForValue().get(statusKey(concert.getId()));
 
@@ -49,7 +49,7 @@ class ConcertServiceAdminDeleteIntegrationTest extends IntegrationTestSupport {
     void adminDelete_withBookings_removesConcertAndRedisState() {
         Concert concert = savedConcert("예매 삭제 테스트", 50, 0);
         savedPendingBooking(concert, 101L);
-        queueService.setConcertInfo(concert.getId(), concert.getStatus(), concert.getTitle());
+        queueService.setConcertInfo(concert.getId(), concert.getStatus(), concert.getTitle(), concert.getEventAt());
 
         transactionTemplate.executeWithoutResult(status -> concertService.adminDelete(concert.getId()));
 
