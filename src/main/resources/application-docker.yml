@@ -34,6 +34,7 @@ server:
     max-connections: 400
 
 app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
   test-support:
     enabled: ${TEST_SUPPORT_ENABLED:false}
     user-count: ${TEST_SUPPORT_USER_COUNT:10000}
@@ -42,9 +43,6 @@ app:
 
 oauth2:
   redirect-url: ${FRONTEND_URL:http://localhost:8080}
-
-app:
-  frontend-url: ${FRONTEND_URL:http://localhost:5173}
 
 management:
   endpoints:
