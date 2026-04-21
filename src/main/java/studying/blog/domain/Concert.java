@@ -90,6 +90,17 @@ public class Concert {
         this.status = ConcertStatus.CLOSED;
     }
 
+    public void decreaseBookedBulk(int count) {
+        this.bookedCount = Math.max(0, this.bookedCount - count);
+        if (this.status == ConcertStatus.SOLD_OUT) {
+            this.status = ConcertStatus.OPEN;
+        }
+    }
+
+    public int getRemainingSeats() {
+        return this.totalSeats - this.bookedCount;
+    }
+
     public void updateByAdmin(String title, LocalDateTime eventAt, int totalSeats, ConcertStatus status){
         this.title = title;
         this.eventAt = eventAt;

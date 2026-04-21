@@ -1,6 +1,7 @@
 package studying.blog.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import studying.blog.domain.Booking;
@@ -38,6 +39,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<BookingAdminResponse> findAdminBookings(@Param("concertId") Long concertId);
 
     void deleteByConcert(Concert concert);
+
+    int countByConcertId(Long concertId);
+
+    @Modifying
+    @Query("DELETE FROM Booking b WHERE b.concert.id = :concertId")
+    void deleteAllByConcertId(@Param("concertId") Long concertId);
 
     @Query("""
         select b from Booking b

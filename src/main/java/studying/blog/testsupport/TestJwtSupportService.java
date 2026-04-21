@@ -10,6 +10,8 @@ import studying.blog.testsupport.dto.TestJwtIssueResponse;
 import studying.blog.testsupport.exception.TestSupportUserNotFoundException;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.StringJoiner;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +21,7 @@ public class TestJwtSupportService {
     private final UserRepository userRepository;
     private final TokenProvider tokenProvider;
     private final TestSupportProperties properties;
+    private final TestUserSeedService testUserSeedService;
 
     public TestJwtIssueResponse issueByEmail(String email) {
         User user = userRepository.findByEmail(email)
@@ -34,6 +37,17 @@ public class TestJwtSupportService {
                         "테스트 유저를 찾을 수 없습니다. userId=" + userId
                 ));
         return issue(user);
+    }
+
+    public String generateFreshCsvContent() {
+        List<User> users = testUserSeedService.seedUsers();
+        StringJoiner lines = new StringJoiner("\n", "", "\n");
+        lines.add("email,userId,token");
+        for (User user : users) {
+            String token = tokenProvider.generateToken(user, Duration.ofMinutes(properties.getTokenExpirationMinutes()));
+            lines.add(user.getEmail() + "," + user.getId() + "," + token);
+        }
+        return lines.toString();
     }
 
     private TestJwtIssueResponse issue(User user) {
