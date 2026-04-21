@@ -6,6 +6,7 @@ spring:
     password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: 20
+      connection-timeout: 3000
 
   jpa:
     hibernate:
@@ -28,7 +29,9 @@ server:
   forward-headers-strategy: framework
   tomcat:
     threads:
-      max: 400
+      max: 50
+    accept-count: 200
+    max-connections: 400
 
 oauth2:
   redirect-url: ${FRONTEND_URL:http://localhost:8080}
