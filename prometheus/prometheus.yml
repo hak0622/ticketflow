@@ -6,4 +6,4 @@ scrape_configs:
   - job_name: 'blog-concert-app'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['app-1:8080', 'app-2:8080']
+      - targets: ['app:8080', '10.178.0.3:8080']
