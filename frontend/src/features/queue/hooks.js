@@ -1,8 +1,23 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getQueueStatus } from './api'
 
+const FAST_POLL_INTERVAL_MS = 5000
+const DEFAULT_POLL_INTERVAL_MS = 10000
+
+function getNextPollInterval(status, position) {
+  if (status !== 'QUEUED') {
+    return null
+  }
+
+  if (typeof position !== 'number' || !Number.isFinite(position) || position <= 0) {
+    return DEFAULT_POLL_INTERVAL_MS
+  }
+
+  return position <= 1000 ? FAST_POLL_INTERVAL_MS : DEFAULT_POLL_INTERVAL_MS
+}
+
 /**
- * 대기열 서버 상태를 5초마다 폴링하는 훅
+ * 대기열 서버 상태를 순번에 따라 차등 폴링하는 훅
  *
  * 반환값:
  *  - data   : { concertId, status, position?, total?, message? }
@@ -15,7 +30,7 @@ import { getQueueStatus } from './api'
  *  BOOKED        - 이미 예매 완료
  *  NOT_IN_QUEUE  - 대기열 없음 또는 만료
  */
-export function useQueuePolling(concertId, { interval = 5000, onAdmitted } = {}) {
+export function useQueuePolling(concertId, { onAdmitted } = {}) {
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
@@ -29,8 +44,19 @@ export function useQueuePolling(concertId, { interval = 5000, onAdmitted } = {})
 
   const stopPolling = useCallback(() => {
     stoppedRef.current = true
-    clearInterval(timerRef.current)
+    clearTimeout(timerRef.current)
   }, [])
+
+  const scheduleNextPoll = useCallback((delay) => {
+    if (stoppedRef.current || delay == null) return
+
+    clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => {
+      pollRef.current?.()
+    }, delay)
+  }, [])
+
+  const pollRef = useRef(null)
 
   const poll = useCallback(async () => {
     if (stoppedRef.current) return
@@ -47,27 +73,37 @@ export function useQueuePolling(concertId, { interval = 5000, onAdmitted } = {})
         onAdmittedRef.current?.()
       } else if (resData.status === 'BOOKED' || resData.status === 'NOT_IN_QUEUE') {
         stopPolling()
+      } else {
+        scheduleNextPoll(getNextPollInterval(resData.status, resData.position))
       }
     } catch (err) {
       errorCountRef.current += 1
       if (errorCountRef.current >= MAX_ERRORS) {
         stopPolling()
+      } else {
+        scheduleNextPoll(DEFAULT_POLL_INTERVAL_MS)
       }
       setError(err)
     } finally {
       setLoading(false)
     }
-  }, [concertId, stopPolling])
+  }, [concertId, scheduleNextPoll, stopPolling])
+
+  useEffect(() => {
+    pollRef.current = poll
+  }, [poll])
 
   useEffect(() => {
     stoppedRef.current = false
+    setLoading(true)
+    setError(null)
+    errorCountRef.current = 0
     poll()
-    timerRef.current = setInterval(poll, interval)
     return () => {
       stoppedRef.current = true
-      clearInterval(timerRef.current)
+      clearTimeout(timerRef.current)
     }
-  }, [poll, interval])
+  }, [poll])
 
   return { data, loading, error }
 }
