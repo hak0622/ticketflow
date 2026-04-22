@@ -29,9 +29,9 @@ server:
   forward-headers-strategy: framework
   tomcat:
     threads:
-      max: 50
-    accept-count: 200
-    max-connections: 400
+      max: 100
+    accept-count: 500
+    max-connections: 2000
 
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
