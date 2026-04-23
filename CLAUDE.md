@@ -79,45 +79,10 @@ payment.mock.fail-rate=0   # Mock 결제 실패율 (정수 0~100, 기본 0)
 
 ## 아키텍처 요약
 
-### 예매 플로우
+Queue(Redis) → Scheduler 1s/100명 입장권 발급(Lua, TTL 10분) → Booking(Redis 좌석 차감 + 상태 캐시) → Payment(Redis 멱등성 + Outbox 보상)
+보안: `/api/**` JWT STATELESS / `/**` OAuth2 세션
 
-```
-[1] POST /api/concerts/{concertId}/queue        → Redis 대기열 등록
-[2] GET  /api/concerts/{concertId}/queue/me     → 대기 순번 폴링
-    ConcertQueueScheduler (5s)                  → 상위 50명 입장권 발급 (Lua)
-[3] POST /api/concerts/{concertId}/booking      → 입장권 소비 → Booking(PENDING_PAYMENT)
-[4] POST /api/concerts/{concertId}/payment      → 결제 → Booking(CONFIRMED)
-    실패 시: PaymentCompensationOutbox 생성
-             → PaymentCompensationScheduler (10s) 보상 처리
-    방치 시: BookingExpiryScheduler (60s) → 30분 초과 자동 취소
-```
-
-### 동시성 제어
-
-- Concert 잔여석: `PESSIMISTIC_WRITE` 락 (`findByIdWithLock`)
-- 결제 멱등성: Redis SETNX (30s TTL) + DB unique key (`uk_payment_idempotency_key`)
-- 대기열: Lua 스크립트 (원자적 ZADD / ZRANGE+ZREM+SETEX)
-
-### 보안 2-chain
-
-- `/api/**` → JWT Bearer (STATELESS)
-- `/**` → OAuth2/Google + 세션 (Thymeleaf Web UI)
-
-> 상세: [docs/architecture.md](docs/architecture.md)
-
----
-
-## 확장 방향
-
-현재 `PaymentCompensationOutbox`는 스케줄러 폴링 방식으로 처리되지만,
-향후 **Kafka 기반 이벤트 드리븐 아키텍처**로 전환 가능한 구조로 설계되어 있음.
-
-```
-현재: Outbox(DB) → PaymentCompensationScheduler (폴링, 10s)
-확장: Outbox(DB) → Kafka Producer → Topic → Consumer → 보상 처리
-```
-
-새 기능을 설계할 때 이벤트 확장 가능성을 고려해 서비스 간 결합도를 낮게 유지.
+→ 상세: [docs/architecture.md](docs/architecture.md), [docs/flow.md](docs/flow.md)
 
 ---
 
@@ -166,7 +131,7 @@ payment.mock.fail-rate=0   # Mock 결제 실패율 (정수 0~100, 기본 0)
 
 ## 참조 문서
 
-- [docs/architecture.md](docs/architecture.md) — 패키지 구조, Redis 키 명세, Scheduler, experiments/
+- [docs/architecture.md](docs/architecture.md) — 패키지 구조, Redis 키 명세, Lua 스크립트, Scheduler, 확장 방향
 - [docs/api.md](docs/api.md) — 전체 REST 엔드포인트 목록
 - [docs/flow.md](docs/flow.md) — 예매 플로우 시퀀스 다이어그램
 - [docs/testing.md](docs/testing.md) — 테스트 전략, 클래스별 설명, 실행 환경
