@@ -20,12 +20,13 @@ sequenceDiagram
         API-->>U: 현재 순번
     end
 
-    Note over Sched,Redis: ConcertQueueScheduler (5s 주기)
-    Sched->>Redis: Lua: ZRANGE(상위 50) + ZREM + SETEX admitted:...
+    Note over Sched,Redis: ConcertQueueScheduler (1s 주기)
+    Sched->>Redis: Lua: ZRANGE(상위 100) + ZREM + SETEX admitted:...
 
     U->>API: POST /api/concerts/{id}/booking
     API->>Redis: Lua CLAIM_ADMITTED (EXISTS → TTL → DEL)
-    API->>DB: SELECT ... FOR UPDATE (Concert, PESSIMISTIC_WRITE)
+    API->>Redis: Lua DECREMENT_SEAT (원자적 차감)
+    API->>Redis: GET concert:status:{id} (캐시 히트 시 DB 생략)
     API->>DB: INSERT Booking (PENDING_PAYMENT)
     API-->>U: 예매 완료 (PENDING_PAYMENT)
 
