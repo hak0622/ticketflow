@@ -37,6 +37,21 @@
 - **멱등성의 범위** — "중복 요청 차단"과 "동일 결과 반환"은 같은 문제가 아니다. 정상 재시도와 동시 중복 클릭은 서로 다른 방어선이 필요하다
 - **보상의 완결성** — 결제 실패 사실을 DB에 기록하는 것과 보상 대상을 기록하는 것은 별개의 작업이다. 같은 트랜잭션에 묶이지 않으면 앱이 재시작할 때 보상 대상 정보가 사라진다
 
+### 📊 예상 트래픽 및 인프라 설계 기준
+
+**시나리오 가정**: 저녁 8시 티켓 오픈, 5분 이내에 10,000명이 대기열에 진입합니다.
+
+이 시나리오를 기반으로 부하를 두 가지로 나눠서 접근했습니다.
+
+| 부하 유형 | 엔드포인트 | 계산 |
+|---|---|---|
+| 대기열 진입 spike | `POST /queue` | 10,000명 / 300초 ≈ **33 req/s** (단시간 집중) |
+| 대기열 polling 지속 부하 | `GET /queue/me` | 10,000명 × 1/5s = **2,000 req/s** (고정 polling 기준) |
+
+polling이 진짜 병목입니다. 대기열 진입은 33 req/s에 불과하지만, 진입 후 모두가 5초마다 순번을 조회하면 서버는 2,000 req/s를 계속 받습니다. Adaptive Polling(`position > 1,000`이면 10초 간격)을 적용하면 이론상 **1,100 req/s**로 줄어듭니다.
+
+이 수치를 목표 기준으로 잡고 AWS EC2 2대 → GCP 3대 + GCP LB로 단계적으로 검증했습니다.
+
 ### 🔗 라이브 데모
 
 👉 [https://ticketflow-git-main-hak0622s-projects.vercel.app/](https://ticketflow-git-main-hak0622s-projects.vercel.app/)
@@ -72,21 +87,50 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
 
 ### Infra / Monitoring / Testing
-![AWS EC2](https://img.shields.io/badge/AWS_EC2-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
+![GCP](https://img.shields.io/badge/GCP_Compute_Engine-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)
+![GCP LB](https://img.shields.io/badge/GCP_HTTPS_LB-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
-![Nginx](https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=nginx&logoColor=white)
 ![Cloudinary](https://img.shields.io/badge/Cloudinary-3448C5?style=for-the-badge&logo=cloudinary&logoColor=white)
 ![Docker Compose](https://img.shields.io/badge/Docker_Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
 ![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white)
 ![Grafana](https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white)
 ![JUnit5](https://img.shields.io/badge/JUnit5-25A162?style=for-the-badge&logo=junit5&logoColor=white)
-![Apache JMeter](https://img.shields.io/badge/Apache_JMeter-D22128?style=for-the-badge&logo=apachejmeter&logoColor=white)
+![k6](https://img.shields.io/badge/k6-7D64FF?style=for-the-badge&logo=k6&logoColor=white)
 ![ShedLock](https://img.shields.io/badge/ShedLock-4B5563?style=for-the-badge&logoColor=white)
 
 ---
 
 ## 🌐 배포 구조
+
+### 현재 측정 구조
+
+```
+사용자 브라우저
+    │
+    ▼
+Vercel (React 프론트엔드)
+    │
+    ▼
+GCP HTTP(S) Load Balancer
+    ├──────────────────────────┬──────────────────────────┐
+    ▼                          ▼                          ▼
+Spring Boot app-1          Spring Boot app-2          Spring Boot app-3
+(Server1)                  (Server2)                  (Server3)
+    │
+    ├── MySQL
+    ├── Redis
+    ├── Prometheus
+    └── Grafana
+```
+
+- **Server1**: Spring Boot app + MySQL + Redis + Prometheus + Grafana
+- **Server2/3**: Spring Boot app only
+- 대기열 성능 측정은 이 **GCP Load Balancer + app 3대** 구성을 기준으로 진행했습니다.
+
+### 초기 구조
+
+처음에는 AWS EC2 2대 + Nginx 로드밸런서로 시작했습니다. 프리티어와 작은 VM 스펙에서 어디까지 버틸 수 있는지 먼저 확인했고, 이후 더 큰 규모의 부하 실험과 스케일업/스케일아웃 비교를 위해 GCP로 이전했습니다.
 
 ```
 사용자 브라우저
@@ -121,6 +165,8 @@ CI/CD는 GitHub Actions → Docker 이미지 빌드 → EC2 배포 순으로 자
 | **중복 결제** | 정상 재시도와 동시 중복 요청은 서로 다른 실패 지점을 가짐 | DB 사전 조회 + Redis SETNX + DB unique key 3계층 분리 |
 | **보상 누락** | 결제 실패 후 보상 호출이 유실되면 좌석이 복구되지 않음 | Transactional Outbox로 보상 대상을 같은 트랜잭션에 기록 |
 | **방치 예약** | 미결제 예약이 좌석을 장기 점유 | 30분 초과 `PENDING_PAYMENT` 자동 취소 + Redis 좌석 복원 |
+| **대기열 진입 spike** | 티켓 오픈 순간 대량의 queue 등록 요청이 짧은 시간에 집중 | Redis 기반 enqueue 구조로 `10,000명` 채우기 시나리오까지 0% 에러로 처리 |
+| **대기열 polling 지속 부하** | 대기 인원이 많아질수록 `/queue/me` 요청 수가 선형 증가 | 3대 스케일아웃과 Adaptive Polling으로 평균 조회 부하를 낮추는 방향으로 개선 |
 
 각 문제를 `experiments/` 패키지에서 직접 재현하고, 로그와 부하 테스트 결과를 바탕으로 원인을 좁혀가며 구조를 바꿨습니다.
 
@@ -161,13 +207,14 @@ sequenceDiagram
         Redis-->>User: 현재 순번
     end
 
-    Note over Redis: ConcertQueueScheduler (5s)<br/>Lua: ZRANGE → ZREM → SETEX (입장권 발급, TTL 600s)<br/>대기열에서 제거되면 ZRANK = null → 입장 가능
+    Note over Redis: ConcertQueueScheduler (1s 주기)<br/>Lua: ZRANGE → ZREM → SETEX (상위 100명 입장권 발급, TTL 600s)<br/>대기열에서 제거되면 ZRANK = null → 입장 가능
 
     User->>BookingService: ② 예매 요청
     BookingService->>Redis: Lua CLAIM_ADMITTED (EXISTS → TTL → DEL, 원자적)
     BookingService->>Redis: DECR seats:concert:{id}
     Note over BookingService: 입장권 없으면 예매 거부
-    BookingService->>DB: SELECT Concert (상태 확인)
+    BookingService->>Redis: GET concert:status:{id} (캐시 히트 시 DB 생략)
+    BookingService->>DB: SELECT Concert (캐시 미스 시에만)
     BookingService->>DB: INSERT Booking (PENDING_PAYMENT)
     Note over BookingService: bookedCount는 Redis remaining 기반 파생값으로 조회 시 계산
     BookingService-->>User: 예매 완료
@@ -438,18 +485,13 @@ Outbox 패턴:
 
 ## 📈 성능 측정 결과
 
-### 서버를 늘려야 할까?
+동시성 제어 구조를 먼저 정리하고, 그 다음 서버를 늘리는 순서로 진행했습니다.
 
-처음에는 서버를 더 띄우면 해결될 수 있다고 생각했습니다. 하지만 증설 전에 먼저 확인하고 싶었던 건 "정말 서버 대수가 문제인가, 아니면 현재 동시성 제어 구조가 먼저 병목인가?"였습니다.
-
-그래서 예매 부하 테스트를 단계별로 진행했습니다.
-
-- 개선 전에는 DB row lock 기반 구조에서 응답 시간이 어떻게 변하는지 확인했습니다.
-- Redis 좌석 차감으로 1차 개선한 뒤에는 deadlock 로그가 실제로 발생하는지 확인했습니다.
-- 마지막으로 `bookedCount` 동기 UPDATE를 제거한 뒤 같은 조건에서 다시 측정했습니다.
-
-구조 변경으로 단일 서버 기준 성능을 끌어올린 뒤, EC2 2대 환경에서 수평 확장 효과를 추가로 검증했습니다.
-결론적으로 **동시성 제어 구조를 먼저 정리하고, 그 다음 서버를 늘리는 순서**가 맞았습니다. 구조 개선 없이 서버만 늘렸다면 DB hot row 병목은 그대로 남았을 것입니다.
+| 단계 | 환경 | 핵심 결과 |
+|---|---|---|
+| Phase 1 | 로컬 단일 서버 | DB Lock → Redis 개선. 응답시간 62% ↓, deadlock 제거 |
+| Phase 2 | AWS EC2 2대 + Nginx | 수평 확장으로 응답시간 9배 개선 (13.8s → 1.5s) |
+| Phase 3 | GCP e2-medium 3대 + GCP LB | 대기열 진입 10,000명 0% 에러. Tomcat/메모리/모니터링 설정 정리 후 1,000 req/s polling 안정화. Adaptive Polling으로 2,000 → 1,100 req/s |
 
 <details>
 <summary><strong>Phase 1 — 로컬 단일 서버: DB Lock → Redis 구조 개선 과정</strong></summary>
@@ -588,6 +630,67 @@ t3.micro 단일 서버는 300명 동시 요청에서 CPU 크레딧 소진과 JVM
 에러율은 두 구성 모두 0%입니다. Redis 원자적 좌석 차감이 2서버 환경에서도 중복 예매를 완전히 차단했습니다.
 
 > 단, MySQL은 여전히 EC2 #1 단일 인스턴스를 공유합니다. 요청이 더 늘어나면 DB가 다음 병목이 될 것으로 예상됩니다.
+
+</details>
+
+<details>
+<summary><strong>Phase 3 — GCP 환경: 설정 조정, 스케일아웃, polling 브레이크포인트 탐색</strong></summary>
+
+AWS EC2 2대에서는 VM 스펙 한계로 더 큰 실험이 어려웠습니다. GCP e2-medium으로 이전해 서버 수와 polling 정책을 단계적으로 바꾸며 측정했습니다.
+
+### 1. 대기열 진입 spike — POST /queue
+
+k6로 10,000명을 ramp-up 방식으로 대기열에 채웠습니다.
+
+| 시나리오 | 목표 유입 | 실제 TPS | 총 요청 수 | 평균 응답시간 | p95 | 에러율 |
+|---|---:|---:|---:|---:|---:|---:|
+| 1,000명 / 30초 | 약 `33 TPS` | `33.02` | `991` | `8.29ms` | `11.21ms` | `0.00%` |
+| 3,000명 / 30초 | 약 `100 TPS` | `99.99` | `3000` | `6.93ms` | `9.43ms` | `0.00%` |
+| 6,000명 / 60초 | 약 `100 TPS` | `100.00` | `6001` | `6.17ms` | `7.84ms` | `0.00%` |
+| **10,000명 / 300초** | **약 `33 TPS`** | **`33.00`** | **`9900`** | **`6.24ms`** | **`7.39ms`** | **`0.00%`** |
+
+대기열 진입 자체는 Redis Sorted Set 기반 enqueue 구조에서 충분히 처리됐습니다. 병목은 진입이 아닌 **진입 후 지속되는 polling** 쪽임을 확인했습니다.
+
+### 2. GCP 2대 환경에서 연결/메모리 설정을 먼저 정리했다
+
+GCP로 이전한 뒤에는 서버 수를 바로 늘리기보다, polling 부하에서 어떤 설정이 실제로 영향을 주는지 먼저 확인했습니다.
+
+- `threads.max=100`
+- `max-connections=2000`
+- `accept-count=500`
+- app 컨테이너 `mem_limit=1g`
+- `JAVA_OPTS=-Xms256m -Xmx800m`
+- Prometheus / Grafana를 붙여 인스턴스별 TPS, p95를 관찰 가능한 상태로 정리
+
+이 단계에서 확인한 건 "VM을 키우는 것"보다, **Tomcat 연결 수·대기열·JVM 메모리·관측 가능성**을 먼저 맞춰야 결과를 해석할 수 있다는 점이었습니다.
+
+### 3. app 2대 → 3대 스케일아웃
+
+| 구성 | 부하 | 실패율 | p95 | 결과 |
+|---|---:|---:|---:|---|
+| app 2대 | `500 req/s` | 0% | 209.87ms | 성공 |
+| app 2대 | `1000 req/s` | 41.77% | 4.5s | 실패 |
+| app 3대 | `500 req/s` | 0% | 19.2ms | 성공 |
+| app 3대 | `1000 req/s` | 0% | 91.86ms | **성공** |
+| app 3대 | `1500 req/s` | 5.61% ~ 21.91% | 1.06s ~ 1.2s | 실패 |
+
+![k6 app 3대 / 1000 req/s 성공](docs/assets/readme/k6-3app-1000req-s.png)
+
+![k6 app 3대 / 1500 req/s 실패](docs/assets/readme/k6-3app-1500req-s.png)
+
+3대로 늘린 뒤 1,000 req/s는 안정화됐지만 1,500 req/s는 여전히 실패. 현재 브레이크포인트는 **1,000 ~ 1,500 req/s 사이**입니다.
+
+### 4. Adaptive Polling 적용
+
+고정 5초 polling 기준으로 10,000명이 만들어내는 2,000 req/s를 줄이기 위해 서버가 `nextPollMs`를 반환하도록 변경했습니다.
+
+- `position <= 1,000` → `5,000ms` (앞순번: 빠른 조회)
+- `position > 1,000` → `10,000ms` (뒷순번: 느린 조회)
+- 기대 부하: 1,000 × 1/5s + 9,000 × 1/10s = **1,100 req/s** (45% 감소)
+
+<!-- 이미지: Adaptive Polling 적용 후 k6 req/s 그래프 (nextPollMs 반영 결과) -->
+
+정책 자체는 의도대로 동작했지만, 10,000 VU closed-model로 그대로 검증하려 하자 부하발생기의 thundering herd 문제가 먼저 드러났습니다. **"서버 한계 테스트(constant-arrival-rate)"와 "운영 정책 효과 검증(VU 기반)"은 분리해서 봐야 한다**는 점을 정리했습니다.
 
 </details>
 
@@ -814,6 +917,14 @@ CORS를 "설정으로 해결"하는 대신, 애초에 발생하지 않는 구조
 요청 흐름이 `브라우저 → Vercel(/api) → Vercel 서버 → EC2`로 바뀌어, 브라우저 기준 동일 출처 요청이 됩니다. CORS 에러 없이 로그인 전후 모두 정상 동작합니다. CORS 문제는 허용 설정을 맞추는 문제가 아니라 요청 구조 설계의 문제일 수 있습니다. Preflight가 발생하는 맥락(헤더 포함 여부)을 먼저 파악하면 원인을 빠르게 좁힐 수 있습니다.
 
 </details>
+
+---
+
+## 🚀 후속 개선 방향
+
+- **피크 시간 대응용 스케줄드 스케일링 / 오토스케일링**: 평상시에는 적은 서버 수로 운영하고, 티켓 오픈 시간대에는 app 인스턴스를 확장하는 전략 검토
+- **Polling 정책 추가 최적화**: 현재 Adaptive Polling을 더 세분화하거나, jitter와 구간 정책을 조정해 평균 조회 부하를 추가로 낮추는 방향 검토
+- **예매 정확성 동시성 검증 강화**: `100명/초 admitted -> POST /booking` 시나리오로 oversell 없이 정확히 예매가 처리되는지 별도 검증
 
 ---
 
