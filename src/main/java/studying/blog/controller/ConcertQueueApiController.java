@@ -50,11 +50,13 @@ public class ConcertQueueApiController {
         Long total = queueService.getTotal(concertId);
 
         if (position != null) {
+            int nextPollMs = position > 1000 ? 10_000 : 5_000;
             return ResponseEntity.ok(Map.of(
                     "concertId", concertId,
                     "status", "QUEUED",
                     "position", position,
-                    "total", total == null ? 0 : total
+                    "total", total == null ? 0 : total,
+                    "nextPollMs", nextPollMs
             ));
         }
 
