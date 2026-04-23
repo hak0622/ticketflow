@@ -4,16 +4,25 @@ import { getQueueStatus } from './api'
 const FAST_POLL_INTERVAL_MS = 5000
 const DEFAULT_POLL_INTERVAL_MS = 10000
 
-function getNextPollInterval(status, position) {
-  if (status !== 'QUEUED') {
+function withJitter(ms) {
+  return ms + Math.floor(Math.random() * 501) - 250
+}
+
+function getNextPollInterval(resData) {
+  if (resData.status !== 'QUEUED') {
     return null
   }
 
-  if (typeof position !== 'number' || !Number.isFinite(position) || position <= 0) {
-    return DEFAULT_POLL_INTERVAL_MS
+  if (Number.isFinite(resData.nextPollMs) && resData.nextPollMs > 0) {
+    return withJitter(resData.nextPollMs)
   }
 
-  return position <= 1000 ? FAST_POLL_INTERVAL_MS : DEFAULT_POLL_INTERVAL_MS
+  const position = resData.position
+  if (typeof position !== 'number' || !Number.isFinite(position) || position <= 0) {
+    return withJitter(DEFAULT_POLL_INTERVAL_MS)
+  }
+
+  return withJitter(position <= 1000 ? FAST_POLL_INTERVAL_MS : DEFAULT_POLL_INTERVAL_MS)
 }
 
 /**
@@ -74,14 +83,14 @@ export function useQueuePolling(concertId, { onAdmitted } = {}) {
       } else if (resData.status === 'BOOKED' || resData.status === 'NOT_IN_QUEUE') {
         stopPolling()
       } else {
-        scheduleNextPoll(getNextPollInterval(resData.status, resData.position))
+        scheduleNextPoll(getNextPollInterval(resData))
       }
     } catch (err) {
       errorCountRef.current += 1
       if (errorCountRef.current >= MAX_ERRORS) {
         stopPolling()
       } else {
-        scheduleNextPoll(DEFAULT_POLL_INTERVAL_MS)
+        scheduleNextPoll(withJitter(DEFAULT_POLL_INTERVAL_MS))
       }
       setError(err)
     } finally {

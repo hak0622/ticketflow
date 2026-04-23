@@ -9,7 +9,19 @@
 | Method | Path | 인증 | 설명 |
 |--------|------|------|------|
 | POST | `/api/concerts/{concertId}/queue` | JWT | 대기열 등록 |
-| GET | `/api/concerts/{concertId}/queue/me` | JWT | 내 대기 순번 조회 |
+| GET | `/api/concerts/{concertId}/queue/me` | JWT | 내 대기 순번 조회 (`QUEUED`일 때 `nextPollMs` 포함) |
+
+`GET /api/concerts/{concertId}/queue/me` 응답 예시:
+
+```json
+{
+  "concertId": 10,
+  "status": "QUEUED",
+  "position": 8234,
+  "total": 10000,
+  "nextPollMs": 10000
+}
+```
 
 ---
 
