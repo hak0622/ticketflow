@@ -13,6 +13,7 @@ import PaymentSuccessPage from './pages/PaymentSuccessPage'
 import PaymentFailPage from './pages/PaymentFailPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import AdminConcertPage from './pages/AdminConcertPage'
 import { applyOAuthToken } from './features/auth/auth-actions'
 
 /** OAuth2 콜백 처리: URL에 ?token= 이 있으면 저장 후 제거 */
@@ -36,13 +37,16 @@ function OAuthCallback() {
 }
 
 function Layout() {
+  const { pathname } = useLocation()
+  const isAdmin = pathname.startsWith('/admin')
+
   return (
     <div className="font-sans min-h-screen bg-gray-50">
       <OAuthCallback />
       <Header />
       <Routes>
         <Route path="/"                     element={<HomePage />} />
-        <Route path="/concerts"            element={<ConcertListPage />} />
+        <Route path="/concerts"             element={<ConcertListPage />} />
         <Route path="/concerts/:id"         element={<ConcertDetailPage />} />
         <Route path="/concerts/:id/queue"   element={<QueuePage />} />
         <Route path="/concerts/:id/booking" element={<BookingPage />} />
@@ -52,8 +56,9 @@ function Layout() {
         <Route path="/payment/fail"         element={<PaymentFailPage />} />
         <Route path="/login"                element={<LoginPage />} />
         <Route path="/register"             element={<RegisterPage />} />
+        <Route path="/admin/concerts"       element={<AdminConcertPage />} />
       </Routes>
-      <BottomNav />
+      {!isAdmin && <BottomNav />}
     </div>
   )
 }

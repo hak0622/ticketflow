@@ -10,8 +10,15 @@ import java.time.LocalDateTime;
 @Setter
 public class ConcertAdminUpsertRequest {
     private String title;
+    private String artist;
+    private String venue;
+    private String genre;
     private LocalDateTime eventAt;
+    private LocalDateTime bookingOpenAt;
     private int totalSeats;
-    private ConcertStatus status;
+    private Integer price;
+    private Integer discountRate;
     private String posterUrl;
+    private String zone;
+    private ConcertStatus status;
 }

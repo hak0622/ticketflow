@@ -52,6 +52,9 @@ public class ConcertResponse {
     @Schema(description = "할인율 0~100 (null이면 할인 없음)", example = "25")
     private Integer discountRate;
 
+    @Schema(description = "구역 (Zone)", example = "A구역")
+    private String zone;
+
     @Schema(description = "할인 적용 가격 (null이면 할인 없음)", example = "99000")
     private Integer discountedPrice;
 
@@ -84,6 +87,7 @@ public class ConcertResponse {
                 concert.getVenue(),
                 concert.getBookingOpenAt(),
                 concert.getDiscountRate(),
+                concert.getZone(),
                 discountedPrice
         );
     }

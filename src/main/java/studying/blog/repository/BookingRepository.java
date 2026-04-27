@@ -29,6 +29,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         u.nickname,
         b.concert.id,
         b.concert.title,
+        b.status,
         b.createdAt
     )
     from Booking b

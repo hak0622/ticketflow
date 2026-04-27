@@ -101,12 +101,21 @@ public class Concert {
         return this.totalSeats - this.bookedCount;
     }
 
-    public void updateByAdmin(String title, LocalDateTime eventAt, int totalSeats, ConcertStatus status){
+    public void updateByAdmin(String title, String artist, String venue, String genre,
+                              LocalDateTime eventAt, LocalDateTime bookingOpenAt,
+                              int totalSeats, Integer price, Integer discountRate,
+                              String posterUrl, String zone, ConcertStatus status) {
         this.title = title;
+        this.artist = artist;
+        this.venue = venue;
+        this.genre = genre;
         this.eventAt = eventAt;
+        this.bookingOpenAt = bookingOpenAt;
         this.totalSeats = totalSeats;
-        if(status != null){
-            this.status = status;
-        }
+        this.price = price;
+        this.discountRate = discountRate;
+        this.posterUrl = posterUrl;
+        this.zone = zone;
+        if (status != null) this.status = status;
     }
 }

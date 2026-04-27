@@ -117,13 +117,13 @@ public class WebOAuthSecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .logout(logout -> logout
                         .logoutUrl("/logout")
-                        .logoutSuccessUrl("/lectures")
+                        .logoutSuccessUrl("/login")
                 );
 
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
-                .requestMatchers("/", "/lectures", "/login", "/oauth2/**").permitAll()
-                .requestMatchers("/admin/**").authenticated()
+                .requestMatchers("/", "/login", "/oauth2/**").permitAll()
+                .requestMatchers("/admin/**").hasRole("ADMIN")
                 .anyRequest().permitAll()
         );
 
