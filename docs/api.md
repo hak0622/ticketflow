@@ -66,14 +66,6 @@
 
 ---
 
-## 쿠폰 (Coupon)
-
-| Method | Path | 인증 | 설명 |
-|--------|------|------|------|
-| POST | `/api/coupons/{code}/issue` | JWT | 쿠폰 발급 |
-
----
-
 ## 인증 (Auth)
 
 | Method | Path | 인증 | 설명 |

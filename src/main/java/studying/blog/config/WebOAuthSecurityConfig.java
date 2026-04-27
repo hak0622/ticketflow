@@ -88,7 +88,6 @@ public class WebOAuthSecurityConfig {
                 .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/concerts").authenticated()
-                .requestMatchers("/api/coupons/**").authenticated()
                 .requestMatchers("/api/me/**").authenticated()
                 .requestMatchers("/api/concerts/*/queue", "/api/concerts/*/queue/me").authenticated()
                 .requestMatchers("/api/concerts/*/booking", "/api/concerts/*/booking/me", "/api/concerts/*/booking/detail").authenticated()

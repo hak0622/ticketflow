@@ -66,7 +66,6 @@ studying.blog/
 | `seats:concert:{concertId}` | String (int) | 없음 | 잔여 좌석 수 — BookingService Lua 원자적 차감 |
 | `concert:status:{concertId}` | String (JSON) | 30s | 콘서트 상태/제목/일시 캐시 — BookingService DB 조회 생략용 |
 | `payment:idempotency:{idempotencyKey}` | String | 30s | 결제 중복 처리 방지 락 |
-| `coupon:stock:{couponId}` | String (int) | 없음 | 쿠폰 잔여 재고 |
 
 ---
 
