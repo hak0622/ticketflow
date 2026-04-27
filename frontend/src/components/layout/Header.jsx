@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { HiOutlineTicket } from 'react-icons/hi2'
-import { HiOutlineUser, HiOutlineArrowRightOnRectangle, HiOutlineArrowLeftOnRectangle } from 'react-icons/hi2'
+import { HiOutlineArrowRightOnRectangle, HiOutlineArrowLeftOnRectangle, HiOutlineCog6Tooth } from 'react-icons/hi2'
 import useAuthStore from '../../features/auth/store'
 import { performLogout } from '../../features/auth/auth-actions'
 import { CONCERT_CATEGORIES } from '../../constants/concertCategories'
 
 export default function Header() {
-  const { token } = useAuthStore()
+  const { token, user } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
   const currentKeyword = new URLSearchParams(location.search).get('keyword') || ''
@@ -110,6 +110,17 @@ export default function Header() {
               <HiOutlineTicket className="w-5 h-5" />
               <span className="text-[10px] font-medium hidden md:block">내 예약</span>
             </Link>
+
+            {/* 관리자 (ADMIN만 표시) */}
+            {user?.role === 'ADMIN' && (
+              <Link
+                to="/admin/concerts"
+                className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+              >
+                <HiOutlineCog6Tooth className="w-5 h-5" />
+                <span className="text-[10px] font-medium hidden md:block">관리자</span>
+              </Link>
+            )}
 
           </div>
         </div>

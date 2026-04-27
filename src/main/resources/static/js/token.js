@@ -29,7 +29,7 @@
     try {
       await fetch("/logout", { method: "POST" });
     } catch (e) {}
-    location.href = redirectTo || "/lectures";
+    location.href = redirectTo || "/login";
   }
 
   function authHeaders(extraHeaders) {

@@ -14,6 +14,8 @@ import studying.blog.dto.ConcertResponse;
 import studying.blog.dto.ConcertSearchCondition;
 import studying.blog.repository.BookingRepository;
 import studying.blog.repository.ConcertRepository;
+import studying.blog.repository.PaymentCompensationOutboxRepository;
+import studying.blog.repository.PaymentRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +25,8 @@ import java.util.List;
 public class ConcertService {
     private final ConcertRepository concertRepository;
     private final BookingRepository bookingRepository;
+    private final PaymentRepository paymentRepository;
+    private final PaymentCompensationOutboxRepository outboxRepository;
     private final QueueService queueService;
 
     @Transactional
@@ -81,11 +85,18 @@ public class ConcertService {
 
         Concert concert = Concert.builder()
                 .title(req.getTitle())
+                .artist(req.getArtist())
+                .venue(req.getVenue())
+                .genre(req.getGenre())
                 .eventAt(req.getEventAt())
+                .bookingOpenAt(req.getBookingOpenAt())
                 .totalSeats(req.getTotalSeats())
                 .bookedCount(0)
-                .status(req.getStatus() == null ? ConcertStatus.OPEN : req.getStatus())
+                .price(req.getPrice())
+                .discountRate(req.getDiscountRate())
                 .posterUrl(req.getPosterUrl())
+                .zone(req.getZone())
+                .status(req.getStatus() == null ? ConcertStatus.OPEN : req.getStatus())
                 .build();
 
         Concert saved = concertRepository.save(concert);
@@ -105,7 +116,10 @@ public class ConcertService {
         }
 
         int prevTotalSeats = concert.getTotalSeats();
-        concert.updateByAdmin(req.getTitle(), req.getEventAt(), req.getTotalSeats(), req.getStatus());
+        concert.updateByAdmin(req.getTitle(), req.getArtist(), req.getVenue(), req.getGenre(),
+                req.getEventAt(), req.getBookingOpenAt(),
+                req.getTotalSeats(), req.getPrice(), req.getDiscountRate(),
+                req.getPosterUrl(), req.getZone(), req.getStatus());
 
         if (req.getTotalSeats() != prevTotalSeats) {
             int remaining = Math.max(0, req.getTotalSeats() - derivedBookedCount);
@@ -144,6 +158,8 @@ public class ConcertService {
     @Transactional
     public void adminDelete(Long id){
         Concert concert = concertRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Concert not found : " + id));
+        outboxRepository.deleteAllByConcertId(id);
+        paymentRepository.deleteAllByConcertId(id);
         bookingRepository.deleteByConcert(concert);
         concertRepository.delete(concert);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -169,6 +185,12 @@ public class ConcertService {
         }
         if(req.getTotalSeats() <= 0){
             throw new IllegalArgumentException("totalSeats는 1 이상이어야 합니다.");
+        }
+        if(req.getPrice() != null && req.getPrice() < 0){
+            throw new IllegalArgumentException("price는 0 이상이어야 합니다.");
+        }
+        if(req.getDiscountRate() != null && (req.getDiscountRate() < 0 || req.getDiscountRate() > 100)){
+            throw new IllegalArgumentException("discountRate는 0~100 사이여야 합니다.");
         }
     }
 
