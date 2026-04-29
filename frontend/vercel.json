@@ -1,11 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/api/:path*",          "destination": "https://acornpost.cloud/api/:path*" },
-    { "source": "/oauth2/:path*",       "destination": "https://acornpost.cloud/oauth2/:path*" },
-    { "source": "/login/oauth2/:path*", "destination": "https://acornpost.cloud/login/oauth2/:path*" },
-    { "source": "/logout",              "destination": "https://acornpost.cloud/logout" },
-    { "source": "/user",                "destination": "https://acornpost.cloud/user" },
+    { "source": "/api/:path*",          "destination": "http://acornpost.cloud/api/:path*" },
+    { "source": "/oauth2/:path*",       "destination": "http://acornpost.cloud/oauth2/:path*" },
+    { "source": "/login/oauth2/:path*", "destination": "http://acornpost.cloud/login/oauth2/:path*" },
+    { "source": "/logout",              "destination": "http://acornpost.cloud/logout" },
+    { "source": "/user",                "destination": "http://acornpost.cloud/user" },
     { "source": "/(.*)",                "destination": "/index.html" }
   ]
 }
