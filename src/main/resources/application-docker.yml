@@ -25,6 +25,13 @@ spring:
     store-type: redis
     timeout: 30m
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            redirect-uri: "${FRONTEND_URL:http://localhost:8080}/login/oauth2/code/google"
+
 server:
   forward-headers-strategy: framework
   tomcat:
@@ -32,14 +39,6 @@ server:
       max: 100
     accept-count: 500
     max-connections: 2000
-
-spring:
-  security:
-    oauth2:
-      client:
-        registration:
-          google:
-            redirect-uri: "${FRONTEND_URL:http://localhost:8080}/login/oauth2/code/google"
 
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
