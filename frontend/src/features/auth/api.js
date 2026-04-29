@@ -1,7 +1,5 @@
 import axios from 'axios'
 
-const BACKEND = import.meta.env.VITE_BACKEND_URL || ''
-
 /**
  * 회원가입 - POST /user (form-encoded)
  */
@@ -10,24 +8,24 @@ export const register = (email, password) => {
   params.append('email', email)
   params.append('password', password)
 
-  return axios.post(`${BACKEND}/user`, params, {
+  return axios.post('/user', params, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     withCredentials: true,
   })
 }
 
 /**
- * 로그인 - OAuth2 redirect
+ * 로그인 - OAuth2 redirect (Vercel 프록시 경유)
  */
 export const loginWithGoogle = () => {
-  window.location.href = `${BACKEND}/oauth2/authorization/google`
+  window.location.href = '/oauth2/authorization/google'
 }
 
 /**
  * 로그아웃 - GET /logout
  */
 export const serverLogout = () =>
-  axios.get(`${BACKEND}/logout`, {
+  axios.get('/logout', {
     maxRedirects: 0,
     withCredentials: true,
   }).catch(() => {})
