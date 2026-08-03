@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.context.ActiveProfiles;
@@ -17,6 +18,12 @@ import studying.blog.repository.*;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -124,6 +131,81 @@ class PaymentServiceFailRateTest {
 
         assertThat(second.getPaymentId()).isEqualTo(first.getPaymentId());
         assertThat(second.getStatus()).isEqualTo(first.getStatus());
+    }
+
+    @Test
+    void Redis_SETNX_획득_실패시_처리중_예외_Payment_생성안됨() {
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, String> valueOps = redisTemplate.opsForValue();
+        given(valueOps.setIfAbsent(anyString(), anyString(), any(Duration.class))).willReturn(false);
+
+        assertThatThrownBy(() -> paymentService.pay(concert.getId(), USER_ID, request()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("결제가 처리 중입니다");
+
+        assertThat(paymentRepository.count()).isZero();
+    }
+
+    @Test
+    void 동일_idempotencyKey_Payment_중복저장은_DB_unique_key로_차단() {
+        String iKey = UUID.randomUUID().toString();
+
+        paymentRepository.saveAndFlush(Payment.create(
+                booking, USER_ID, concert.getId(), 90000, "CARD", iKey
+        ));
+
+        assertThatThrownBy(() -> paymentRepository.saveAndFlush(Payment.create(
+                booking, USER_ID, concert.getId(), 90000, "CARD", iKey
+        )))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThat(paymentRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void 동일_idempotencyKey_동시요청시_하나만_처리되고_나머지는_Redis_SETNX로_차단() throws InterruptedException {
+        int threadCount = 20;
+        String iKey = UUID.randomUUID().toString();
+        AtomicBoolean lockAcquired = new AtomicBoolean(false);
+        AtomicInteger successCount = new AtomicInteger();
+        AtomicInteger processingCount = new AtomicInteger();
+        CountDownLatch ready = new CountDownLatch(threadCount);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threadCount);
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, String> valueOps = redisTemplate.opsForValue();
+        given(valueOps.setIfAbsent(anyString(), anyString(), any(Duration.class)))
+                .willAnswer(invocation -> lockAcquired.compareAndSet(false, true));
+
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                ready.countDown();
+                try {
+                    start.await();
+                    paymentService.pay(concert.getId(), USER_ID, request(iKey));
+                    successCount.incrementAndGet();
+                } catch (IllegalStateException e) {
+                    if (e.getMessage().contains("결제가 처리 중입니다")) {
+                        processingCount.incrementAndGet();
+                    }
+                } catch (Exception ignored) {
+                    // 다른 예외는 아래 검증에서 성공/차단 카운트 불일치로 드러난다.
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+
+        assertThat(ready.await(3, TimeUnit.SECONDS)).isTrue();
+        start.countDown();
+        assertThat(done.await(5, TimeUnit.SECONDS)).isTrue();
+        executor.shutdownNow();
+
+        assertThat(successCount.get()).isEqualTo(1);
+        assertThat(processingCount.get()).isEqualTo(threadCount - 1);
+        assertThat(paymentRepository.count()).isEqualTo(1);
     }
 
     @Test
