@@ -5,9 +5,11 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.test.context.ActiveProfiles;
 import studying.blog.domain.*;
 import studying.blog.repository.*;
+import studying.blog.service.QueueService;
 
 import java.time.LocalDateTime;
 
@@ -22,12 +24,15 @@ class PaymentCompensationSchedulerTest {
     @Autowired private ConcertRepository concertRepository;
     @Autowired private BookingRepository bookingRepository;
     @Autowired private PaymentCompensationOutboxRepository outboxRepository;
+    @Autowired private QueueService queueService;
+    @Autowired private RedisConnectionFactory redisConnectionFactory;
 
     @BeforeEach
     void setUp() {
         outboxRepository.deleteAll();
         bookingRepository.deleteAll();
         concertRepository.deleteAll();
+        redisConnectionFactory.getConnection().serverCommands().flushDb();
     }
 
     @Test
@@ -43,6 +48,7 @@ class PaymentCompensationSchedulerTest {
 
         Concert updated2 = concertRepository.findById(concert.getId()).orElseThrow();
         assertThat(updated2.getStatus()).isEqualTo(ConcertStatus.OPEN);
+        assertThat(queueService.getRemainingSeat(concert.getId())).isEqualTo(10L);
 
         PaymentCompensationOutbox outbox = outboxRepository.findAll().get(0);
         assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.PUBLISHED);
@@ -59,6 +65,7 @@ class PaymentCompensationSchedulerTest {
 
         Concert updated = concertRepository.findById(concert.getId()).orElseThrow();
         assertThat(updated.getStatus()).isEqualTo(ConcertStatus.OPEN);
+        assertThat(queueService.getRemainingSeat(concert.getId())).isEqualTo(1L);
     }
 
     @Test
@@ -75,6 +82,7 @@ class PaymentCompensationSchedulerTest {
 
         Concert updated = concertRepository.findById(concert.getId()).orElseThrow();
         assertThat(updated.getStatus()).isEqualTo(ConcertStatus.OPEN);
+        assertThat(queueService.getRemainingSeat(concert.getId())).isEqualTo(9L);
 
         // Outbox는 PUBLISHED (멱등 완료 처리)
         PaymentCompensationOutbox outbox = outboxRepository.findAll().get(0);
@@ -104,12 +112,14 @@ class PaymentCompensationSchedulerTest {
         PaymentCompensationOutbox outbox = outboxRepository.findAll().get(0);
         assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.FAILED);
         assertThat(outbox.getRetryCount()).isEqualTo(3);
+        assertThat(outbox.getLastError()).contains("Booking not found");
+        assertThat(outbox.getFailedAt()).isNotNull();
     }
 
     // --- helpers ---
 
     private Concert savedConcert(int bookedCount, ConcertStatus status) {
-        return concertRepository.save(Concert.builder()
+        Concert concert = concertRepository.save(Concert.builder()
                 .title("테스트 콘서트")
                 .totalSeats(10)
                 .bookedCount(bookedCount)
@@ -117,6 +127,8 @@ class PaymentCompensationSchedulerTest {
                 .eventAt(LocalDateTime.now().minusMinutes(1))
                 .price(90000)
                 .build());
+        queueService.initSeatCount(concert.getId(), Math.max(0, concert.getTotalSeats() - bookedCount));
+        return concert;
     }
 
     private Booking pendingBooking(Concert concert, Long userId) {

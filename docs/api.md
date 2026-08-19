@@ -66,6 +66,17 @@
 
 ---
 
+## 어드민 - 결제 보상 (Admin Payment Compensation)
+
+| Method | Path | 인증 | 설명 |
+|--------|------|------|------|
+| GET | `/api/admin/payment-compensations?status=FAILED` | ADMIN | 상태별 결제 보상 Outbox 조회 |
+| POST | `/api/admin/payment-compensations/{outboxId}/retry` | ADMIN | FAILED Outbox를 PENDING으로 전환해 수동 재시도 |
+
+수동 재시도는 `FAILED` 상태에서만 가능하며, 동일 Outbox에 대한 동시 요청 중 한 건만 성공한다.
+
+---
+
 ## 인증 (Auth)
 
 | Method | Path | 인증 | 설명 |

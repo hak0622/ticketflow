@@ -253,6 +253,10 @@ public class QueueService {
         return "seats:concert:" + concertId;
     }
 
+    private String compensatedOutboxKey(Long concertId) {
+        return "seats:restored-outboxes:concert:" + concertId;
+    }
+
     /**
      * 콘서트 좌석 카운터 초기화.
      * 콘서트 생성·수정·서버 기동 시 호출. TTL 없음(공연 삭제 시 명시적 DEL).
@@ -313,6 +317,56 @@ public class QueueService {
         }
     }
 
+    /**
+     * 결제 보상 Outbox용 좌석 복구 (Lua).
+     *
+     * 좌석 증가와 처리된 Outbox ID 기록을 하나의 원자 연산으로 묶어,
+     * 동일한 Outbox가 재시도되거나 동시에 실행돼도 좌석은 한 번만 복구한다.
+     * Redis 좌석 키가 없으면 처리 기록을 남기지 않고 예외를 발생시켜 재시도할 수 있게 한다.
+     *
+     * @return 이번 호출에서 좌석을 복구했으면 true, 이미 처리된 Outbox면 false
+     */
+    private static final String RESTORE_SEAT_ONCE_LUA = """
+            local seatKey = KEYS[1]
+            local processedKey = KEYS[2]
+            local outboxId = ARGV[1]
+
+            if redis.call('EXISTS', seatKey) == 0 then
+              return -1
+            end
+            if redis.call('SISMEMBER', processedKey, outboxId) == 1 then
+              return 0
+            end
+
+            redis.call('INCRBY', seatKey, 1)
+            redis.call('SADD', processedKey, outboxId)
+            return 1
+            """;
+
+    private final DefaultRedisScript<Long> restoreSeatOnceScript =
+            new DefaultRedisScript<>(RESTORE_SEAT_ONCE_LUA, Long.class);
+
+    public boolean restoreSeatOnceForCompensation(Long concertId, Long outboxId) {
+        long t0 = System.nanoTime();
+        Long result = redisTemplate.execute(
+                restoreSeatOnceScript,
+                List.of(seatKey(concertId), compensatedOutboxKey(concertId)),
+                String.valueOf(outboxId)
+        );
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+
+        if (ms >= SLOW_REDIS_MS) {
+            org.slf4j.LoggerFactory.getLogger(QueueService.class)
+                    .warn("[SEAT][SLOW] op=restoreOnce concertId={} outboxId={} tookMs={}",
+                            concertId, outboxId, ms);
+        }
+
+        if (result == null || result == -1L) {
+            throw new IllegalStateException("Redis seat count not initialized: concertId=" + concertId);
+        }
+        return result == 1L;
+    }
+
     /** 현재 남은 좌석 수 조회. 키가 없으면 null 반환. */
     public Long getRemainingSeat(Long concertId) {
         long t0 = System.nanoTime();
@@ -338,7 +392,7 @@ public class QueueService {
 
     /** 콘서트 삭제 시 Redis 좌석 키 제거. */
     public void deleteSeatCount(Long concertId) {
-        redisTemplate.delete(seatKey(concertId));
+        redisTemplate.delete(List.of(seatKey(concertId), compensatedOutboxKey(concertId)));
     }
 
     // ─── 콘서트 상태·타이틀 캐시 (concert:status:{id}, TTL 30s) ──────────────

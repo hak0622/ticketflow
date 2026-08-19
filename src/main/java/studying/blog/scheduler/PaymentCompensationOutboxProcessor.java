@@ -74,12 +74,12 @@ public class PaymentCompensationOutboxProcessor {
         }
 
         booking.cancel();
-        queueService.restoreSeat(concertId);
+        boolean seatRestored = queueService.restoreSeatOnceForCompensation(concertId, outboxId);
         concertRepository.reopenIfSoldOutById(concertId);
         outbox.markPublished();
 
-        log.info("[OUTBOX][PUBLISHED] outboxId={} bookingId={} concertId={} reopenedIfSoldOut=true",
-                outboxId, bookingId, concertId);
+        log.info("[OUTBOX][PUBLISHED] outboxId={} bookingId={} concertId={} seatRestored={} reopenedIfSoldOut=true",
+                outboxId, bookingId, concertId, seatRestored);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -87,11 +87,14 @@ public class PaymentCompensationOutboxProcessor {
         PaymentCompensationOutbox outbox = outboxRepository.findById(outboxId)
                 .orElseThrow(() -> new IllegalArgumentException("Outbox not found: " + outboxId));
 
-        outbox.incrementRetry(MAX_RETRY);
+        String errorMessage = cause.getMessage() == null
+                ? cause.getClass().getSimpleName()
+                : cause.getMessage();
+        outbox.incrementRetry(MAX_RETRY, errorMessage);
         boolean isFinal = outbox.getStatus() == OutboxStatus.FAILED;
         log.warn("[OUTBOX][{}] outboxId={} retryCount={} error={}",
                 isFinal ? "FAILED" : "RETRY",
-                outboxId, outbox.getRetryCount(), cause.getMessage());
+                outboxId, outbox.getRetryCount(), errorMessage);
 
         // 재시도 소진 → 최종 FAILED 확정 시에만 증가
         if (isFinal) {

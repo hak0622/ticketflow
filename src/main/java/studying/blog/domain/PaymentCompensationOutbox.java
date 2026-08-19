@@ -38,6 +38,12 @@ public class PaymentCompensationOutbox {
     @Column(name = "processed_at")
     private LocalDateTime processedAt;
 
+    @Column(name = "last_error", length = 1000)
+    private String lastError;
+
+    @Column(name = "failed_at")
+    private LocalDateTime failedAt;
+
     @PrePersist
     void prePersist() {
         this.createdAt = LocalDateTime.now();
@@ -57,10 +63,19 @@ public class PaymentCompensationOutbox {
         this.processedAt = LocalDateTime.now();
     }
 
-    public void incrementRetry(int maxRetry) {
+    public void incrementRetry(int maxRetry, String errorMessage) {
         this.retryCount++;
+        this.lastError = truncate(errorMessage, 1000);
         if (this.retryCount >= maxRetry) {
             this.status = OutboxStatus.FAILED;
+            this.failedAt = LocalDateTime.now();
         }
+    }
+
+    private static String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 }
