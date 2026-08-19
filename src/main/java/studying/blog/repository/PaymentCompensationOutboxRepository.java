@@ -14,6 +14,8 @@ public interface PaymentCompensationOutboxRepository extends JpaRepository<Payme
 
     List<PaymentCompensationOutbox> findByStatusOrderByCreatedAtDesc(OutboxStatus status);
 
+    long countByStatus(OutboxStatus status);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
         UPDATE PaymentCompensationOutbox o

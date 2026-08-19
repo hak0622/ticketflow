@@ -1,5 +1,6 @@
 package studying.blog.scheduler;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ class PaymentCompensationSchedulerTest {
     @Autowired private PaymentCompensationOutboxRepository outboxRepository;
     @Autowired private QueueService queueService;
     @Autowired private RedisConnectionFactory redisConnectionFactory;
+    @Autowired private MeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
@@ -114,6 +116,7 @@ class PaymentCompensationSchedulerTest {
         assertThat(outbox.getRetryCount()).isEqualTo(3);
         assertThat(outbox.getLastError()).contains("Booking not found");
         assertThat(outbox.getFailedAt()).isNotNull();
+        assertThat(meterRegistry.get("outbox.failed.current").gauge().value()).isEqualTo(1.0);
     }
 
     // --- helpers ---

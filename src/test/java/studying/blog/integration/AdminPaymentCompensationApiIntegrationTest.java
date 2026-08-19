@@ -1,5 +1,6 @@
 package studying.blog.integration;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,7 @@ class AdminPaymentCompensationApiIntegrationTest extends IntegrationTestSupport 
     @Autowired private UserRepository userRepository;
     @Autowired private TokenProvider tokenProvider;
     @Autowired private PaymentCompensationAdminService adminService;
+    @Autowired private MeterRegistry meterRegistry;
 
     @Test
     void ADMIN은_FAILED_Outbox와_실패원인을_조회할_수_있다() throws Exception {
@@ -80,6 +82,7 @@ class AdminPaymentCompensationApiIntegrationTest extends IntegrationTestSupport 
         assertThat(retried.getRetryCount()).isZero();
         assertThat(retried.getLastError()).isNull();
         assertThat(retried.getFailedAt()).isNull();
+        assertThat(meterRegistry.get("outbox.failed.current").gauge().value()).isZero();
     }
 
     @Test

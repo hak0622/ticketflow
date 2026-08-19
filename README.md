@@ -482,7 +482,7 @@ Outbox 패턴:
 
 ### 결과
 
-동일한 실패율을 주입했을 때, Outbox 방식은 스케줄러 재처리를 통해 최종 100% 보상 성공을 확인했습니다. 각 Outbox는 `REQUIRES_NEW` 트랜잭션으로 독립 처리되며, 최대 3회 재시도 후 `FAILED`로 전환되어 Grafana 알림을 발송합니다.
+동일한 실패율을 주입했을 때, Outbox 방식은 스케줄러 재처리를 통해 최종 100% 보상 성공을 확인했습니다. 각 Outbox는 `REQUIRES_NEW` 트랜잭션으로 독립 처리되며, 최대 3회 재시도 후 `FAILED`로 전환됩니다. 현재 남아 있는 `FAILED` 건수는 Prometheus가 감지하고 Alertmanager를 통해 Slack으로 알리며, 운영자는 관리자 API에서 원인을 확인하고 수동 재시도할 수 있습니다. 설정 방법은 [결제 보상 실패 Slack 알림](docs/payment-compensation-alerting.md)에 정리했습니다.
 
 </details>
 

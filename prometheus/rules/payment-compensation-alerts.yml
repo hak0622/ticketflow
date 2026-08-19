@@ -1,0 +1,13 @@
+groups:
+  - name: payment-compensation
+    rules:
+      - alert: PaymentCompensationOutboxFailed
+        expr: max(outbox_failed_current) > 0
+        for: 30s
+        labels:
+          severity: critical
+          service: ticketflow
+        annotations:
+          summary: "결제 보상에 운영자 확인이 필요합니다"
+          description: "3회 재시도 후에도 실패한 결제 보상 Outbox가 {{ $value }}건 남아 있습니다."
+          action: "GET /api/admin/payment-compensations?status=FAILED에서 원인을 확인한 뒤 수동 재시도하세요."

@@ -1,0 +1,37 @@
+# 결제 보상 실패 Slack 알림
+
+결제 보상 Outbox가 3회 재시도 후 `FAILED`가 되면 다음 흐름으로 운영자에게 알립니다.
+
+```
+FAILED Outbox → outbox_failed_current → Prometheus 규칙 → Alertmanager → Slack
+```
+
+누적 실패 횟수가 아니라 DB에 현재 남아 있는 `FAILED` 건수를 감시합니다. 따라서 앱이 재시작돼도 실패 건을 놓치지 않으며, 운영자가 수동 재시도해 `PENDING`으로 바꾸면 알림이 자동으로 해제됩니다.
+
+## 최초 설정
+
+1. Slack에서 Incoming Webhook을 만들고 URL을 발급합니다.
+2. 예시 파일을 복사하고 실제 URL 한 줄만 저장합니다.
+
+```bash
+mkdir -p secrets
+cp secrets/slack_webhook_url.example secrets/slack_webhook_url
+```
+
+`secrets/slack_webhook_url`은 Git에서 제외됩니다. 이 파일을 열어 예시 URL을 실제 Webhook URL로 교체합니다.
+
+3. 알림 기능을 포함해 로컬 스택을 실행합니다.
+
+```bash
+docker compose --profile alerting up -d
+```
+
+Prometheus는 `http://localhost:9090/alerts`, Alertmanager는 `http://localhost:9093`에서 상태를 확인할 수 있습니다.
+
+## 알림 수신 후 조치
+
+1. `GET /api/admin/payment-compensations?status=FAILED`로 실패 원인과 Outbox ID를 확인합니다.
+2. 원인을 해결합니다.
+3. `POST /api/admin/payment-compensations/{outboxId}/retry`로 다시 처리합니다.
+
+실패 건이 없어지면 Slack에 `RESOLVED` 알림이 전송됩니다.
