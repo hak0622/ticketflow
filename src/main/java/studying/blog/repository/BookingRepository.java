@@ -43,6 +43,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     int countByConcertId(Long concertId);
 
+    long countByConcertIdAndStatusIn(Long concertId, List<BookingStatus> statuses);
+
     @Modifying
     @Query("DELETE FROM Booking b WHERE b.concert.id = :concertId")
     void deleteAllByConcertId(@Param("concertId") Long concertId);

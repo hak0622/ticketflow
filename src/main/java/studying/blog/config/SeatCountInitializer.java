@@ -7,18 +7,20 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import studying.blog.domain.Concert;
+import studying.blog.domain.BookingStatus;
 import studying.blog.domain.ConcertStatus;
+import studying.blog.repository.BookingRepository;
 import studying.blog.repository.ConcertRepository;
 import studying.blog.service.QueueService;
 
 import java.util.List;
 
 /**
- * 서버 기동 완료 시 전체 콘서트의 Redis 좌석 카운터를 재초기화한다.
+ * 서버 기동 완료 시 누락된 Redis 좌석 카운터만 초기화한다.
  *
- * 목적: Redis 장애 복구, 서버 재기동 후 seats:concert:{id} 키 누락 방지.
+ * 기존 키는 보존한다. Redis/DB 전체 정합성을 자동 보정하는 기능은 아니다.
  * 대상: CLOSED 제외한 모든 콘서트 (OPEN, SOLD_OUT).
- * 공식: remaining = max(0, totalSeats - bookedCount)
+ * 공식: remaining = max(0, totalSeats - 실제 유효 Booking 수)
  */
 @Slf4j
 @Component
@@ -26,6 +28,7 @@ import java.util.List;
 public class SeatCountInitializer implements ApplicationListener<ApplicationReadyEvent> {
 
     private final ConcertRepository concertRepository;
+    private final BookingRepository bookingRepository;
     private final QueueService queueService;
 
     @Override
@@ -36,11 +39,20 @@ public class SeatCountInitializer implements ApplicationListener<ApplicationRead
 
         int count = 0;
         for (Concert concert : targets) {
-            int remaining = Math.max(0, concert.getTotalSeats() - concert.getBookedCount());
-            queueService.initSeatCount(concert.getId(), remaining);
-            count++;
+            // 아직 취소되지 않은 결제 대기는 만료 시간이 지났더라도 수량을 점유한다.
+            long activeBookings = bookingRepository.countByConcertIdAndStatusIn(
+                    concert.getId(), List.of(BookingStatus.PENDING_PAYMENT, BookingStatus.CONFIRMED));
+            if (activeBookings > concert.getTotalSeats()) {
+                log.error("[SEAT_INIT][OVER_CAPACITY] concertId={} totalSeats={} activeBookings={} fallbackRemaining=0",
+                        concert.getId(), concert.getTotalSeats(), activeBookings);
+            }
+            int remaining = (int) Math.max(0L, (long) concert.getTotalSeats() - activeBookings);
+            if (queueService.initSeatCountIfAbsent(concert.getId(), remaining)) {
+                count++;
+            }
         }
 
-        log.info("[SEAT_INIT] 콘서트 좌석 카운터 초기화 완료. count={}", count);
+        log.info("[SEAT_INIT] 누락된 콘서트 좌석 카운터 초기화 완료. initialized={} preserved={}",
+                count, targets.size() - count);
     }
 }

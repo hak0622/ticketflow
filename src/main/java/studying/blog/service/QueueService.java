@@ -259,10 +259,16 @@ public class QueueService {
 
     /**
      * 콘서트 좌석 카운터 초기화.
-     * 콘서트 생성·수정·서버 기동 시 호출. TTL 없음(공연 삭제 시 명시적 DEL).
+     * 콘서트 생성·수정 시 호출. TTL 없음(공연 삭제 시 명시적 DEL).
      */
     public void initSeatCount(Long concertId, int remaining) {
         redisTemplate.opsForValue().set(seatKey(concertId), String.valueOf(Math.max(0, remaining)));
+    }
+
+    /** 서버 시작 시 누락된 좌석 키만 SET NX로 생성한다. 기존 수량과 TTL은 보존한다. */
+    public boolean initSeatCountIfAbsent(Long concertId, int remaining) {
+        return Boolean.TRUE.equals(redisTemplate.opsForValue()
+                .setIfAbsent(seatKey(concertId), String.valueOf(Math.max(0, remaining))));
     }
 
     /**
