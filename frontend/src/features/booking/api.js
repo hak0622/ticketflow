@@ -29,3 +29,6 @@ export const getMyBookings = () =>
 /** Toss 결제 승인 - POST /api/concerts/:id/payment/toss-confirm */
 export const tossConfirm = (concertId, data) =>
   axiosInstance.post(`/concerts/${concertId}/payment/toss-confirm`, data)
+
+/** 결제 결과 조회 */
+export const getMyPayment = (concertId) => axiosInstance.get(`/concerts/${concertId}/payment/me`)

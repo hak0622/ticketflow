@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { loadTossPayments, ANONYMOUS } from '@tosspayments/tosspayments-sdk'
 import { getConcert } from '../features/concert/api'
-import { getBookingDetail } from '../features/booking/api'
+import { getBookingDetail, getMyPayment } from '../features/booking/api'
 import useAuthStore from '../features/auth/store'
 import LoadingSpinner from '../shared/ui/LoadingSpinner'
 
@@ -52,7 +52,7 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(!location.state?.concert)
   const [error, setError]     = useState(null)
   const [submitting, setSubmitting] = useState(false)
-  const [orderId, setOrderId]       = useState(() => generateOrderId(concertId))
+  const [orderId]       = useState(() => generateOrderId(concertId))
   const submittingRef               = useRef(false)   // 이중 클릭 방지
 
   /* ── 비로그인 리다이렉트 ── */
@@ -110,6 +110,20 @@ export default function PaymentPage() {
     const payOrderName = IS_DEV ? `[TEST] ${concert.title}` : concert.title
 
     try {
+      // Existing uncertain or terminal payment must be resolved before opening another order.
+      try {
+        const existing = await getMyPayment(concertId)
+        if (existing.data?.status) {
+          setError('기존 결제 내역이 있습니다. 내 예매 목록에서 결제 상태를 확인해주세요.')
+          submittingRef.current = false
+          setSubmitting(false)
+          return
+        }
+      } catch (lookupError) {
+        const code = lookupError.response?.status
+        const message = lookupError.response?.data?.message ?? lookupError.response?.data?.error
+        if (code !== 400 || message !== '결제 내역이 없습니다.') throw lookupError
+      }
       const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY)
       const payment = tossPayments.payment({ customerKey: ANONYMOUS })
 
@@ -130,8 +144,7 @@ export default function PaymentPage() {
       if (err?.code !== 'USER_CANCEL') {
         setError(err?.message || '결제 요청 중 오류가 발생했습니다.')
       }
-      // 다음 시도를 위해 새 orderId 발급
-      setOrderId(generateOrderId(concertId))
+      // Keep the order identity on an uncertain SDK result.
       submittingRef.current = false
       setSubmitting(false)
     }

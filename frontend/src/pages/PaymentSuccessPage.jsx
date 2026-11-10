@@ -35,13 +35,29 @@ export default function PaymentSuccessPage() {
     }
 
     tossConfirm(concertId, { paymentKey, orderId, amount })
-      .then(() => setStatus('success'))
+      .then(({ data }) => {
+        if (data?.status === 'COMPLETED') {
+          setStatus('success')
+        } else if (data?.status === 'CANCELED') {
+          setStatus('canceled')
+          setErrorMsg('결제가 취소되었습니다. 내 예매 목록에서 예약 상태를 확인해주세요.')
+        } else if (data?.status === 'FAILED') {
+          setStatus('error')
+          setErrorMsg('결제가 실패했습니다. 내 예매 목록에서 현재 상태를 확인해주세요.')
+        } else {
+          setStatus('unresolved')
+          setErrorMsg(data?.status === 'PENDING'
+            ? (data?.recoveryPhase?.startsWith('CANCEL') ? '결제 취소 결과를 확인 중입니다. 아직 취소가 완료되지 않았습니다.' : '결제가 처리 중입니다. 아직 예매가 확정되지 않았습니다.')
+            : '결제 결과를 확인하지 못했습니다. 내 예매 목록에서 확인해주세요.')
+        }
+      })
       .catch((err) => {
         setStatus('error')
         const httpStatus = err.response?.status
         const msg        = err.response?.data?.message ?? err.response?.data?.error
         if (!err.response) {
-          setErrorMsg('네트워크 연결을 확인해주세요.')
+          setStatus('unresolved')
+          setErrorMsg('연결 오류로 결제 결과를 확인하지 못했습니다. 내 예매 목록에서 확인해주세요.')
         } else if (httpStatus === 409) {
           setErrorMsg('이미 처리된 결제입니다. 내 예매 목록을 확인해주세요.')
         } else if (httpStatus === 400) {
@@ -49,7 +65,8 @@ export default function PaymentSuccessPage() {
         } else if (httpStatus === 403) {
           setErrorMsg(msg || '결제 권한이 없습니다.')
         } else {
-          setErrorMsg(msg || '결제 승인에 실패했습니다. 잠시 후 다시 시도해주세요.')
+          setStatus('unresolved')
+          setErrorMsg('결제 결과를 확인하지 못했습니다. 내 예매 목록에서 확인해주세요.')
         }
       })
   }, []) // eslint-disable-line
@@ -103,11 +120,12 @@ export default function PaymentSuccessPage() {
         ⚠️
       </div>
       <div>
-        <p className="text-xl font-bold text-red-600 mb-2">결제 승인에 실패했습니다</p>
+        <p className="text-xl font-bold text-red-600 mb-2">{status === 'canceled' ? '결제가 취소되었습니다' : status === 'unresolved' ? '결제 결과 확인이 필요합니다' : '결제 승인에 실패했습니다'}</p>
         <p className="text-sm text-gray-400 leading-relaxed">{errorMsg}</p>
       </div>
       <div className="flex flex-col gap-3 w-full max-w-xs">
-        {concertId && (
+        <Link to="/my-bookings" className="px-6 py-3 bg-primary-500 text-white font-semibold rounded-xl text-center">내 예매 상태 확인</Link>
+        {concertId && status === 'error' && (
           <Link
             to={`/concerts/${concertId}/payment`}
             className="w-full py-3.5 bg-primary-500 hover:bg-primary-600 text-white font-bold text-center rounded-xl transition-colors"
