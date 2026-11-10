@@ -46,6 +46,24 @@ class BookingPaymentApiIntegrationTest extends IntegrationTestSupport {
     @Autowired
     private TokenProvider tokenProvider;
 
+    @Autowired org.springframework.context.ApplicationContext applicationContext;
+    @Test
+    void bookingDetailsAndMyPageSerializeLazyConcertWithoutOsiv() throws Exception {
+        assertThat(applicationContext.containsBean("openEntityManagerInViewInterceptor")).isFalse();
+        assertThat(applicationContext.getEnvironment().getProperty("spring.jpa.open-in-view", Boolean.class)).isFalse();
+        User user = savedUser("osiv-disabled", Role.USER);
+        Concert concert = savedConcert("OSIV disabled concert", 10, 0);
+        grantAdmitted(concert.getId(), user.getId());
+        mockMvc.perform(post("/api/concerts/{concertId}/booking", concert.getId())
+                        .header("Authorization", authorizationHeader(user)))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/concerts/{concertId}/booking/detail", concert.getId())
+                        .header("Authorization", authorizationHeader(user)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.concertTitle").value("OSIV disabled concert"));
+        mockMvc.perform(get("/api/me/bookings").header("Authorization", authorizationHeader(user)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].concertTitle").value("OSIV disabled concert"));
+    }
+
     @Test
     void soldOutReplayKeeps409AndRejectsAnotherOwnerWithoutAcquiringNewStock() throws Exception {
         User user = savedUser("soldout-owner", Role.USER);
