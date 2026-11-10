@@ -47,6 +47,31 @@ class BookingPaymentApiIntegrationTest extends IntegrationTestSupport {
     private TokenProvider tokenProvider;
 
     @Test
+    void soldOutReplayKeeps409AndRejectsAnotherOwnerWithoutAcquiringNewStock() throws Exception {
+        User user = savedUser("soldout-owner", Role.USER);
+        User other = savedUser("soldout-other", Role.USER);
+        Concert concert = savedConcert("Sold Out API", 10, 0);
+        queueService.initSeatCount(concert.getId(), 0);
+        grantAdmitted(concert.getId(), user.getId());
+        String id = UUID.randomUUID().toString();
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(post("/api/concerts/{concertId}/booking", concert.getId())
+                            .header("Authorization", authorizationHeader(user)).header("Idempotency-Key", id))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.status").value(409))
+                    .andExpect(jsonPath("$.message").value("정원이 마감되었습니다."));
+            queueService.initSeatCount(concert.getId(), 5);
+        }
+        mockMvc.perform(post("/api/concerts/{concertId}/booking", concert.getId())
+                        .header("Authorization", authorizationHeader(other)).header("Idempotency-Key", id))
+                .andExpect(status().isBadRequest());
+        assertThat(queueService.getRemainingSeat(concert.getId())).isEqualTo(5);
+        assertThat(bookingRepository.findAllByConcertId(concert.getId())).isEmpty();
+        assertThat(attemptRepository.findById(id).orElseThrow().getResultStatus()).isEqualTo("SOLD_OUT");
+        assertThat(queueService.isAdmitted(concert.getId(), user.getId())).isTrue();
+    }
+
+    @Test
     void shouldReturn200AndCreateBookingWhenAdmittedUserCallsBookingApi() throws Exception {
         // Given
         User user = savedUser("booking-admitted", Role.USER);

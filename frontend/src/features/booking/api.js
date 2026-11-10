@@ -5,8 +5,10 @@ export const registerQueue = (concertId) =>
   axiosInstance.post(`/concerts/${concertId}/queue`)
 
 /** 예매 생성 - POST /api/concerts/:id/booking */
-export const createBooking = (concertId, data) =>
-  axiosInstance.post(`/concerts/${concertId}/booking`, data)
+export const createBooking = (concertId, data, requestId) =>
+  axiosInstance.post(`/concerts/${concertId}/booking`, data, {
+    headers: requestId ? { 'Idempotency-Key': requestId } : {},
+  })
 
 /** 예매 상태 조회 - GET /api/concerts/:id/booking/me */
 export const getBookingStatus = (concertId) =>

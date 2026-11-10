@@ -37,7 +37,7 @@ function InfoRow({ label, value, highlight }) {
 export default function BookingPage() {
   const { id: concertId } = useParams()
   const navigate           = useNavigate()
-  const { token }          = useAuthStore()
+  const { token, user }    = useAuthStore()
 
   const [concert, setConcert]     = useState(null)
   const [loading, setLoading]     = useState(true)
@@ -61,13 +61,27 @@ export default function BookingPage() {
       .finally(() => setLoading(false))
   }, [concertId, token])
 
+  // Keep the same ID across uncertain responses, reloads, and retries for this login/concert.
+  const requestStorageKey = `booking-request:${user?.sub}:${concertId}`
   const handleBook = async () => {
     if (submittingRef.current) return
     submittingRef.current = true
     setSubmitting(true)
     setError(null)
     try {
-      const res = await createBooking(concertId)
+      let requestId = sessionStorage.getItem(requestStorageKey)
+      if (!requestId) {
+        requestId = crypto.randomUUID()
+        sessionStorage.setItem(requestStorageKey, requestId)
+      }
+      const res = await createBooking(concertId, undefined, requestId)
+      if (res.status === 202) {
+        setError('예매 결과를 확인 중입니다. 잠시 후 같은 요청으로 다시 확인해주세요.')
+        submittingRef.current = false
+        setSubmitting(false)
+        return
+      }
+      sessionStorage.removeItem(requestStorageKey)
       navigate(`/concerts/${concertId}/payment`, {
         state: { concert, booking: res.data },
         replace: true,
@@ -76,7 +90,10 @@ export default function BookingPage() {
       const status    = err.response?.status
       const serverMsg = err.response?.data?.message ?? ''
 
-      if (status === 409) {
+      if (status === 409 && err.response?.data?.status === 'BOOKING_FAILED') {
+        sessionStorage.removeItem(requestStorageKey)
+        setError('이 요청은 종료되었습니다. 예매 버튼을 눌러 새 요청으로 다시 시도해주세요.')
+      } else if (status === 409) {
         if (serverMsg.includes('정원') || serverMsg.includes('SOLD_OUT')) {
           // 매진
           setError('매진된 공연입니다. 예매가 불가합니다.')
@@ -84,9 +101,7 @@ export default function BookingPage() {
           // 입장권 없음 / 만료
           setError('입장권이 만료되었습니다. 대기열에 다시 등록해주세요.')
         } else {
-          // 이미 PENDING_PAYMENT 상태 → 결제 페이지로
-          navigate(`/concerts/${concertId}/payment`, { state: { concert }, replace: true })
-          return
+          setError(serverMsg || '예매 요청을 처리할 수 없습니다.')
         }
       } else if (status === 403) {
         setError(serverMsg || '예매가 불가능한 공연입니다.')
