@@ -1,0 +1,48 @@
+# Disposable local three-JVM environment. Uses the same fixtures/images as compose.yml.
+x-app: &app
+  extends:
+    file: compose.yml
+    service: app
+  cpus: 1
+  mem_limit: 768m
+  entrypoint: ["java", "-Xms256m", "-Xmx384m", "-jar", "/app/app.jar"]
+
+services:
+  mysql:
+    extends:
+      file: compose.yml
+      service: mysql
+  redis:
+    extends:
+      file: compose.yml
+      service: redis
+    cpus: 0.5
+  app:
+    <<: *app
+  app-2:
+    <<: *app
+    environment:
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+  app-3:
+    <<: *app
+    environment:
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+  gateway:
+    image: nginx:alpine
+    cpus: 0.25
+    mem_limit: 64m
+    ports:
+      - "127.0.0.1::8080"
+    volumes:
+      - ./nginx.local-three.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+      - app-2
+      - app-3
+  k6:
+    extends:
+      file: compose.yml
+      service: k6
+
+volumes:
+  perf_mysql:

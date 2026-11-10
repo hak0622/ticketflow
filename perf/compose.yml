@@ -1,0 +1,68 @@
+# Used only by run.py with a unique project name and disposable volumes.
+services:
+  mysql:
+    image: mysql:8.4
+    cpus: 2
+    mem_limit: 1g
+    environment:
+      MYSQL_ROOT_PASSWORD: perf-only-password
+      MYSQL_DATABASE: ticketflow_perf
+    volumes:
+      - perf_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pperf-only-password"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+  redis:
+    image: redis:7-alpine
+    cpus: 1
+    mem_limit: 256m
+    command: ["redis-server", "--maxmemory", "192mb", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  app:
+    image: eclipse-temurin:17-jre-jammy
+    cpus: 2
+    mem_limit: 1g
+    entrypoint: ["java", "-Xms512m", "-Xmx512m", "-jar", "/app/app.jar"]
+    volumes:
+      - ${PERF_APP_JAR:?set by run.py}:/app/app.jar:ro
+    ports:
+      - "127.0.0.1::8080"
+      - "127.0.0.1::8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      MANAGEMENT_SERVER_PORT: "8081"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ticketflow_perf?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      DB_USERNAME: root
+      DB_PASSWORD: perf-only-password
+      JWT_SECRET_KEY: dGVzdC1zZWNyZXQta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLW9ubHk=
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID: perf-client
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET: perf-secret
+      TOSS_SECRET_KEY: perf-unused
+      TEST_SUPPORT_ENABLED: "true"
+      TEST_SUPPORT_USER_COUNT: "500"
+      APP_TEST_SUPPORT_CSV_OUTPUT_PATH: /tmp/booking-users.csv
+      LOGGING_LEVEL_P6SPY: "OFF"
+      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "20"
+      SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: "3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  k6:
+    image: grafana/k6:1.0.0
+    profiles: ["load"]
+    cpus: 2
+    mem_limit: 2g
+    volumes:
+      - ./booking.js:/scripts/booking.js:ro
+      - ${PERF_RESULTS:?set by run.py}:/results
+volumes:
+  perf_mysql:
