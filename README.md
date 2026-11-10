@@ -1,3 +1,5 @@
+> **현재 구현 안내 (2026-11-10):** 실행 환경은 로컬입니다. 현재 예매·PG 복구 흐름은 [문서 안내](docs/README.md)에서 확인하세요. 아래 개발 과정·클라우드 구성·측정값은 각 검증 당시의 기록이며 현재 가동 환경이나 현재 버전의 성능을 뜻하지 않습니다.
+
 <div align="center">
 
 # 🎊 TicketFlow 🎊
@@ -174,7 +176,7 @@ CI/CD는 GitHub Actions → Docker 이미지 빌드 → EC2 배포 순으로 자
 
 MVP에서는 DB row lock으로 좌석을 제어했으나, 부하 테스트에서 hot row 병목을 확인한 뒤 "실시간 제어는 Redis, 영속 상태 저장은 DB"로 역할을 분리했습니다.
 
-![시스템 아키텍처 (GCP 3서버 — 현재)](docs/assets/readme/finally-architecture.png)
+![시스템 아키텍처 (과거 GCP 3서버 검증 구성)](docs/assets/readme/finally-architecture.png)
 
 <details>
 <summary>이전 아키텍처 — AWS EC2 2서버 + Nginx</summary>

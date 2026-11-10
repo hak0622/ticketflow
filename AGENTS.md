@@ -21,7 +21,7 @@
 
 - Redis 대기열 → 입장권 발급 → 예매(Booking) → 결제(Payment)
 - 결제 실패 시 Outbox 기반 보상 처리
-- PENDING_PAYMENT 방치 시 30분 후 자동 만료
+- PENDING_PAYMENT 방치 시 30분 후 자동 만료. 미확정/완료 결제가 있으면 잠금 안에서 반환 보류
 
 ---
 
@@ -32,8 +32,8 @@
 | Backend | Spring Boot 3, JPA, MySQL |
 | Cache/Queue | Redis (Sorted Set, Lua 스크립트) |
 | Auth | JWT (API 전용), OAuth2/Google (Web UI) |
-| Frontend (예정) | React + Vite |
-| Test DB | H2 in-memory |
+| Frontend | React + Vite |
+| Test DB | H2 in-memory / 핵심 장애 테스트는 MySQL·Redis Testcontainers |
 
 ---
 
@@ -84,9 +84,11 @@ payment.mock.fail-rate=0   # Mock 결제 실패율 (정수 0~100, 기본 0)
 ```
 [1] POST /api/concerts/{concertId}/queue        → Redis 대기열 등록
 [2] GET  /api/concerts/{concertId}/queue/me     → 대기 순번 폴링
-    ConcertQueueScheduler (5s)                  → 상위 50명 입장권 발급 (Lua)
-[3] POST /api/concerts/{concertId}/booking      → 입장권 소비 → Booking(PENDING_PAYMENT)
-[4] POST /api/concerts/{concertId}/payment      → 결제 → Booking(CONFIRMED)
+    ConcertQueueScheduler (1s, 인스턴스별)      → 상위 100명 입장권 발급 (Lua)
+[3] POST /api/concerts/{concertId}/booking      → REQUESTED 선커밋 → 요청 잠금/Lua 선점 → Booking + BOOKED 커밋
+[4] POST /api/concerts/{concertId}/payment/toss-confirm → Payment 선커밋/최초 호출 선점 → PG → Booking(CONFIRMED)
+    PaymentRecoveryWorker (5s)                  → 승인/취소 결과 재조회
+    POST /payment는 설정으로 허용하는 별도 Mock 경로
     실패 시: PaymentCompensationOutbox 생성
              → PaymentCompensationScheduler (10s) 보상 처리
     방치 시: BookingExpiryScheduler (60s) → 30분 초과 자동 취소
@@ -94,14 +96,18 @@ payment.mock.fail-rate=0   # Mock 결제 실패율 (정수 0~100, 기본 0)
 
 ### 동시성 제어
 
-- Concert 잔여석: `PESSIMISTIC_WRITE` 락 (`findByIdWithLock`)
-- 결제 멱등성: Redis SETNX (30s TTL) + DB unique key (`uk_payment_idempotency_key`)
+- Concert 잔여석: BookingSeatStore의 요청별 Redis Lua. 공연 행 비관적 락·매 예매 bookedCount UPDATE 없음
+- 예매: booking_attempt 요청 행 잠금·Booking 유니크 제약·공통 멱등 반환. 복구 Worker 5초
+- PG 결제: Booking→Payment 잠금·DB 주문 유니크·저장된 승인/취소 멱등키. PG HTTP는 트랜잭션 밖
+- Mock 결제: Redis SETNX (30s TTL) + DB unique key (`uk_payment_idempotency_key`)
 - 대기열: Lua 스크립트 (원자적 ZADD / ZRANGE+ZREM+SETEX)
 
 ### 보안 2-chain
 
 - `/api/**` → JWT Bearer (STATELESS)
 - `/**` → OAuth2/Google + 세션 (Thymeleaf Web UI)
+
+> 현재 환경은 로컬이며 GCP/AWS 구성은 과거 기록이다.
 
 > 상세: [docs/architecture.md](docs/architecture.md)
 
@@ -142,7 +148,7 @@ payment.mock.fail-rate=0   # Mock 결제 실패율 (정수 0~100, 기본 0)
 |----------|----|----------|------|
 | local | MySQL | update | SQL 로그 ON |
 | prod | MySQL | none | 스키마 수동 관리 |
-| test | H2 in-memory | create-drop | Redis는 localhost:6379 필요 |
+| test | 기본 H2 / 핵심 장애 테스트 MySQL Testcontainers | create-drop | 기존 H2 Scheduler 테스트는 전용 localhost:6379, RedisTestSupport는 Redis Testcontainers |
 
 ---
 
