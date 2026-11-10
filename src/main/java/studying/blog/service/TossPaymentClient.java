@@ -2,7 +2,6 @@ package studying.blog.service;
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -17,7 +16,8 @@ import java.util.Map;
  * Toss Payments API 클라이언트.
  * - connectTimeout / readTimeout : RestClient 레벨에서 처리
  * - Circuit Breaker              : @CircuitBreaker(name = "toss")
- *   CB가 예외를 그대로 전파 → PaymentService.tossConfirm() catch 블록에서 Outbox 생성
+ *   호출 예외는 PaymentSaga가 PENDING 재확인 대상으로 보관한다.
+ *   최종 실패/취소가 확인됐을 때만 반환 Outbox를 생성한다.
  */
 @Component
 public class TossPaymentClient {
@@ -37,22 +37,37 @@ public class TossPaymentClient {
         this.restClient = RestClient.builder().requestFactory(factory).build();
     }
 
-    @CircuitBreaker(name = "toss")
-    public String confirm(String paymentKey, String orderId, Integer amount) {
-        String credentials = Base64.getEncoder()
-                .encodeToString((secretKey + ":").getBytes(StandardCharsets.UTF_8));
+    public record PgResult(String paymentKey, String orderId, Integer totalAmount,
+                           Integer balanceAmount, String status, String method) {}
 
-        Map<String, Object> responseBody = restClient.post()
-                .uri(CONFIRM_URL)
-                .header(HttpHeaders.AUTHORIZATION, "Basic " + credentials)
+    private String auth() {
+        return "Basic " + Base64.getEncoder().encodeToString((secretKey + ":").getBytes(StandardCharsets.UTF_8));
+    }
+
+    @CircuitBreaker(name = "toss")
+    public PgResult approve(String paymentKey, String orderId, Integer amount, String idempotencyKey) {
+        return restClient.post().uri(CONFIRM_URL)
+                .header(HttpHeaders.AUTHORIZATION, auth())
+                .header("Idempotency-Key", idempotencyKey)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("paymentKey", paymentKey, "orderId", orderId, "amount", amount))
-                .retrieve()
-                .body(new ParameterizedTypeReference<>() {});
+                .retrieve().body(PgResult.class);
+    }
 
-        if (responseBody == null) {
-            throw new IllegalStateException("Toss 결제 승인 응답이 비어 있습니다.");
-        }
-        return String.valueOf(responseBody.getOrDefault("method", "TOSS"));
+    @CircuitBreaker(name = "toss")
+    public PgResult lookup(String paymentKey) {
+        return restClient.get().uri("https://api.tosspayments.com/v1/payments/{key}", paymentKey)
+                .header(HttpHeaders.AUTHORIZATION, auth())
+                .retrieve().body(PgResult.class);
+    }
+
+    @CircuitBreaker(name = "toss")
+    public PgResult cancel(String paymentKey, String reason, Integer amount, String idempotencyKey) {
+        return restClient.post().uri("https://api.tosspayments.com/v1/payments/{key}/cancel", paymentKey)
+                .header(HttpHeaders.AUTHORIZATION, auth())
+                .header("Idempotency-Key", idempotencyKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("cancelReason", reason, "cancelAmount", amount))
+                .retrieve().body(PgResult.class);
     }
 }

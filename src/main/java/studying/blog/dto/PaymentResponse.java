@@ -28,7 +28,7 @@ public class PaymentResponse {
     @Schema(description = "결제 금액 (원)", example = "99000")
     private Integer amount;
 
-    @Schema(description = "결제 상태", example = "COMPLETED", allowableValues = {"PENDING", "COMPLETED", "FAILED"})
+    @Schema(description = "결제 상태", example = "COMPLETED", allowableValues = {"PENDING", "COMPLETED", "FAILED", "CANCELED"})
     private PaymentStatus status;
 
     @Schema(description = "결제 수단", example = "MOCK", allowableValues = {"MOCK", "TOSS"})
@@ -43,6 +43,8 @@ public class PaymentResponse {
     @Schema(description = "결제 완료 시각", example = "2025-04-11T10:00:01")
     private LocalDateTime completedAt;
 
+    private String recoveryPhase;
+
     public static PaymentResponse from(Payment payment) {
         return new PaymentResponse(
                 payment.getId(),
@@ -54,7 +56,8 @@ public class PaymentResponse {
                 payment.getPaymentMethod(),
                 payment.getIdempotencyKey(),
                 payment.getCreatedAt(),
-                payment.getCompletedAt()
+                payment.getCompletedAt(),
+                payment.getRecoveryPhase()==null ? "NONE" : payment.getRecoveryPhase().name()
         );
     }
 }

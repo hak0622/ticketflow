@@ -1,3 +1,7 @@
+payment:
+  mock:
+    enabled: true
+
 spring:
   jpa:
     hibernate:

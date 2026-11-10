@@ -163,7 +163,7 @@ class PaymentServiceFailRateTest {
     }
 
     @Test
-    void 동일_idempotencyKey_동시요청시_하나만_처리되고_나머지는_Redis_SETNX로_차단() throws InterruptedException {
+    void 동일_idempotencyKey_동시요청은_처리중_또는_캐시결과를_반환하고_Payment는_1건() throws InterruptedException {
         int threadCount = 20;
         String iKey = UUID.randomUUID().toString();
         AtomicBoolean lockAcquired = new AtomicBoolean(false);
@@ -203,8 +203,9 @@ class PaymentServiceFailRateTest {
         assertThat(done.await(5, TimeUnit.SECONDS)).isTrue();
         executor.shutdownNow();
 
-        assertThat(successCount.get()).isEqualTo(1);
-        assertThat(processingCount.get()).isEqualTo(threadCount - 1);
+        // Threads arriving after commit legitimately return the DB-cached success.
+        assertThat(successCount.get()).isGreaterThanOrEqualTo(1);
+        assertThat(successCount.get() + processingCount.get()).isEqualTo(threadCount);
         assertThat(paymentRepository.count()).isEqualTo(1);
     }
 

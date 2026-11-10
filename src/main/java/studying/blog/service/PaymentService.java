@@ -8,6 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
+import studying.blog.exception.MockPaymentDisabledException;
 import org.springframework.transaction.annotation.Transactional;
 import studying.blog.domain.*;
 import studying.blog.dto.PaymentRequest;
@@ -36,6 +39,18 @@ public class PaymentService {
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
     private final TossPaymentClient tossPaymentClient;
+    private final Environment environment;
+    private final PaymentSaga paymentSaga;
+
+    @Value("${payment.mock.enabled:false}")
+    private boolean mockEnabled;
+
+    private void validateOwner(Payment payment, Long concertId, Long userId) {
+        if (!java.util.Objects.equals(payment.getUserId(), userId)
+                || !java.util.Objects.equals(payment.getConcertId(), concertId)) {
+            throw new IllegalArgumentException("결제 키를 현재 요청에 사용할 수 없습니다.");
+        }
+    }
 
     @Value("${payment.mock.fail-rate:0}")
     private int failRate;
@@ -56,11 +71,15 @@ public class PaymentService {
      */
     @Transactional
     public PaymentResponse pay(Long concertId, Long userId, PaymentRequest request) {
+        if (!mockEnabled || environment.acceptsProfiles(Profiles.of("prod"))) {
+            throw new MockPaymentDisabledException();
+        }
         String iKey = request.getIdempotencyKey();
 
         // Step 1: DB 선조회
         Optional<Payment> existing = paymentRepository.findByIdempotencyKey(iKey);
         if (existing.isPresent()) {
+            validateOwner(existing.get(), concertId, userId);
             log.info("[PAYMENT][CACHED] userId={} concertId={} idempotencyKey={} status={}",
                     userId, concertId, iKey, existing.get().getStatus());
             meterRegistry.counter("payment.attempt", "method", "MOCK", "result", "CACHED").increment();
@@ -86,13 +105,15 @@ public class PaymentService {
     }
 
     private PaymentResponse doProcess(Long concertId, Long userId, PaymentRequest request, String iKey) {
-        Booking booking = bookingRepository.findByConcertIdAndUserId(concertId, userId)
+        Booking booking = bookingRepository.findLockedByConcertIdAndUserId(concertId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("예매 내역이 없습니다."));
 
         if (booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
             throw new IllegalStateException("결제할 수 없는 상태입니다. 현재 예매 상태: " + booking.getStatus());
         }
 
+        if(!paymentRepository.findAllLockedByBookingId(booking.getId()).isEmpty())
+            throw new IllegalStateException("기존 결제를 먼저 확인해주세요.");
         Concert concert = concertRepository.findById(concertId)
                 .orElseThrow(() -> new IllegalArgumentException("Concert not found: " + concertId));
 
@@ -150,9 +171,14 @@ public class PaymentService {
         Booking booking = bookingRepository.findByConcertIdAndUserId(concertId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("예매 내역이 없습니다."));
 
-        return paymentRepository.findByBookingId(booking.getId())
-                .map(PaymentResponse::from)
-                .orElseThrow(() -> new IllegalArgumentException("결제 내역이 없습니다."));
+        var history=paymentRepository.findAllByBookingIdOrderByIdAsc(booking.getId());
+        var successes=history.stream().filter(p -> p.getStatus()==PaymentStatus.COMPLETED).toList();
+        var pending=history.stream().filter(Payment::unresolved).toList();
+        if(successes.size()>1 || pending.size()>1) throw new IllegalStateException("결제 이력 점검이 필요합니다.");
+        if(!successes.isEmpty()) return PaymentResponse.from(successes.get(0));
+        if(!pending.isEmpty()) return PaymentResponse.from(pending.get(0));
+        if(history.isEmpty()) throw new IllegalArgumentException("결제 내역이 없습니다.");
+        return PaymentResponse.from(history.get(history.size()-1));
     }
 
     // ─── Toss Payments 승인 ─────────────────────────────────────────
@@ -162,75 +188,7 @@ public class PaymentService {
      * orderId 를 idempotencyKey 로 사용해 중복 승인을 방지한다.
      * API 호출은 TossPaymentClient (Circuit Breaker + timeout) 에 위임한다.
      */
-    @Transactional
     public PaymentResponse tossConfirm(Long concertId, Long userId, TossConfirmRequest request) {
-        String orderId = request.getOrderId();
-
-        // 1. 멱등성 — 이미 처리된 orderId 면 캐시된 결과 반환
-        Optional<Payment> existing = paymentRepository.findByIdempotencyKey(orderId);
-        if (existing.isPresent()) {
-            log.info("[TOSS][CACHED] userId={} concertId={} orderId={} status={}",
-                    userId, concertId, orderId, existing.get().getStatus());
-            meterRegistry.counter("payment.attempt", "method", "TOSS", "result", "CACHED").increment();
-            return PaymentResponse.from(existing.get());
-        }
-
-        // 2. 예매 검증
-        Booking booking = bookingRepository.findByConcertIdAndUserId(concertId, userId)
-                .orElseThrow(() -> new IllegalArgumentException("예매 내역이 없습니다."));
-
-        if (booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
-            throw new IllegalStateException("결제할 수 없는 상태입니다. 현재 예매 상태: " + booking.getStatus());
-        }
-
-        Concert concert = concertRepository.findById(concertId)
-                .orElseThrow(() -> new IllegalArgumentException("Concert not found: " + concertId));
-
-        // 3. 금액 위변조 검증 (할인 적용 시 discountedPrice 기준으로 비교)
-        Integer expectedAmount = concert.getPrice();
-        if (concert.getDiscountRate() != null
-                && concert.getDiscountRate() > 0
-                && concert.getDiscountRate() <= 100
-                && concert.getPrice() != null) {
-            expectedAmount = (int) (Math.round(
-                    concert.getPrice() * (1 - concert.getDiscountRate() / 100.0) / 100.0
-            ) * 100);
-        }
-        if (!request.getAmount().equals(expectedAmount)) {
-            throw new IllegalArgumentException("결제 금액이 일치하지 않습니다.");
-        }
-
-        // 4. Payment PENDING으로 먼저 저장 — API 실패 시에도 보상 처리 진입점 확보
-        Payment payment = Payment.create(booking, userId, concertId,
-                request.getAmount(), "TOSS", orderId);
-        paymentRepository.save(payment);
-
-        // 5. Toss 결제 승인 API 호출 (Circuit Breaker 적용, timeout 3s)
-        String paymentMethod;
-        try {
-            paymentMethod = tossPaymentClient.confirm(request.getPaymentKey(), orderId, request.getAmount());
-        } catch (Exception e) {
-            // API 실패 시 Mock과 동일하게 Outbox 생성 (같은 트랜잭션에 원자적으로 커밋)
-            payment.fail("Toss API 실패: " + e.getMessage());
-            String payload = buildPayload(booking.getId(), concertId, userId, payment.getId());
-            outboxRepository.save(PaymentCompensationOutbox.create(payload));
-
-            log.warn("[TOSS][FAILED] userId={} concertId={} bookingId={} paymentId={} orderId={} error={}",
-                    userId, concertId, booking.getId(), payment.getId(), orderId, e.getMessage());
-            meterRegistry.counter("payment.attempt", "method", "TOSS", "result", "FAILED").increment();
-            return PaymentResponse.from(payment);
-        }
-
-        // 6. 승인 성공
-        payment.updatePaymentMethod(paymentMethod);
-        payment.complete();
-        booking.confirm();
-
-        log.info("[TOSS][CONFIRMED] userId={} concertId={} bookingId={} amount={} orderId={}",
-                userId, concertId, booking.getId(), request.getAmount(), orderId);
-
-        meterRegistry.counter("payment.attempt", "method", "TOSS", "result", "COMPLETED").increment();
-        return PaymentResponse.from(payment);
+        return paymentSaga.confirm(concertId,userId,request);
     }
-
 }

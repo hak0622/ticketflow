@@ -23,6 +23,7 @@ jwt:
 
 payment:
   mock:
+    enabled: false
     fail-rate: 0   # 0=항상 성공, 30=30% 실패, 100=항상 실패
 
 toss:
