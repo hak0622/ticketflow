@@ -57,6 +57,7 @@ public abstract class IntegrationTestSupport {
 
     @Autowired
     protected BookingRepository bookingRepository;
+    @Autowired protected studying.blog.repository.BookingAttemptRepository attemptRepository;
 
     @Autowired
     protected PaymentRepository paymentRepository;
@@ -80,6 +81,7 @@ public abstract class IntegrationTestSupport {
     void clearIntegrationState() {
         outboxRepository.deleteAll();
         paymentRepository.deleteAll();
+        attemptRepository.deleteAll();
         bookingRepository.deleteAll();
         concertRepository.deleteAll();
         redisConnectionFactory.getConnection().serverCommands().flushDb();
@@ -99,10 +101,9 @@ public abstract class IntegrationTestSupport {
     }
 
     protected Booking savedPendingBooking(Concert concert, Long userId) {
-        return bookingRepository.save(Booking.builder()
-                .concert(concert)
-                .userId(userId)
-                .build());
+        Booking b = bookingRepository.save(Booking.builder().concert(concert).userId(userId).build());
+        BookingAttemptFixtures.seed(b, attemptRepository, redisTemplate);
+        return b;
     }
 
     protected void grantAdmitted(Long concertId, Long userId) {

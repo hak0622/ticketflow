@@ -165,6 +165,7 @@ public class QueueService {
     private final DefaultRedisScript<Long> claimAdmittedScript =
             new DefaultRedisScript<>(CLAIM_ADMITTED_LUA, Long.class);
 
+    // 과거 테스트용 API. 운영 예매는 BookingSeatStore.reserve의 요청별 Lua를 사용한다.
     // admitted를 원자적으로 선점한다. 키가 있으면 TTL(초) 반환 + 키 삭제(소비), 없으면 -1
     public long claimAdmitted(Long concertId, Long userId) {
         String key = admittedKey(concertId, userId);
@@ -186,7 +187,7 @@ public class QueueService {
         return ttl == null ? -1 : ttl;
     }
 
-    // 선점 후 DB실패 등으로 롤백이 필요할 때 admitted 복구
+    // 테스트 입장권 준비/옛 동작 검증용. 운영 실패 복구는 BookingSeatStore.release를 사용한다.
     public void restoreAdmitted(Long concertId, Long userId, long ttlSeconds) {
         if (ttlSeconds <= 0) {
             ttlSeconds = 600; // 기본 10분
@@ -272,59 +273,8 @@ public class QueueService {
     }
 
     /**
-     * 좌석 원자적 차감 (Lua).
-     *
-     * 반환값:
-     *   >= 0 : 차감 성공, 남은 좌석 수
-     *     -1 : 좌석 없음 (SOLD_OUT)
-     *     -2 : 키 미존재 (초기화 누락 — 호출 측에서 오류 처리)
-     */
-    private static final String DECREMENT_SEAT_LUA = """
-            local key = KEYS[1]
-            if redis.call('EXISTS', key) == 0 then
-              return -2
-            end
-            local remaining = redis.call('DECRBY', key, 1)
-            if remaining < 0 then
-              redis.call('INCRBY', key, 1)
-              return -1
-            end
-            return remaining
-            """;
-
-    private final DefaultRedisScript<Long> decrementSeatScript =
-            new DefaultRedisScript<>(DECREMENT_SEAT_LUA, Long.class);
-
-    public long decrementSeat(Long concertId) {
-        long t0 = System.nanoTime();
-        Long result = redisTemplate.execute(
-                decrementSeatScript,
-                Collections.singletonList(seatKey(concertId))
-        );
-        long ms = (System.nanoTime() - t0) / 1_000_000;
-
-        if (ms >= SLOW_REDIS_MS) {
-            org.slf4j.LoggerFactory.getLogger(QueueService.class)
-                    .warn("[SEAT][SLOW] op=decrement concertId={} tookMs={}", concertId, ms);
-        }
-
-        return result == null ? -2 : result;
-    }
-
-    /** 좌석 복구 (Booking 실패·취소 시 호출). */
-    public void restoreSeat(Long concertId) {
-        long t0 = System.nanoTime();
-        redisTemplate.opsForValue().increment(seatKey(concertId));
-        long ms = (System.nanoTime() - t0) / 1_000_000;
-
-        if (ms >= SLOW_REDIS_MS) {
-            org.slf4j.LoggerFactory.getLogger(QueueService.class)
-                    .warn("[SEAT][SLOW] op=restore concertId={} tookMs={}", concertId, ms);
-        }
-    }
-
-    /**
-     * 결제 보상 Outbox용 좌석 복구 (Lua).
+     * 과거 테스트용 Outbox ID 기반 반환. 운영 반환은 BookingSeatReleaseService를 거쳐
+     * BookingSeatStore.release의 요청 ID 기반 Lua를 사용한다.
      *
      * 좌석 증가와 처리된 Outbox ID 기록을 하나의 원자 연산으로 묶어,
      * 동일한 Outbox가 재시도되거나 동시에 실행돼도 좌석은 한 번만 복구한다.

@@ -28,6 +28,7 @@ public class TestConcertSupportService {
     private final TestUserSeedService testUserSeedService;
     private final ConcertRepository concertRepository;
     private final BookingRepository bookingRepository;
+    private final studying.blog.repository.BookingAttemptRepository attemptRepository;
     private final PaymentRepository paymentRepository;
     private final PaymentCompensationOutboxRepository outboxRepository;
     private final StringRedisTemplate redisTemplate;
@@ -77,6 +78,11 @@ public class TestConcertSupportService {
         outboxRepository.deleteAllByConcertId(concertId);
         paymentRepository.deleteAllByConcertId(concertId);
 
+        for (var attempt : attemptRepository.findAllByConcertId(concertId)) {
+            redisTemplate.delete("booking:attempt:" + attempt.getId());
+            redisTemplate.delete("booking:active:concert:" + concertId + ":user:" + attempt.getUserId());
+        }
+        attemptRepository.deleteAllByConcertId(concertId);
         int deletedCount = bookingRepository.countByConcertId(concertId);
         bookingRepository.deleteAllByConcertId(concertId);
 

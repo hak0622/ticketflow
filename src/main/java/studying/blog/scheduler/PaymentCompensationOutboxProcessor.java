@@ -9,14 +9,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import studying.blog.domain.Booking;
-import studying.blog.domain.BookingStatus;
 import studying.blog.domain.OutboxStatus;
 import studying.blog.domain.PaymentCompensationOutbox;
-import studying.blog.repository.BookingRepository;
-import studying.blog.repository.ConcertRepository;
 import studying.blog.repository.PaymentCompensationOutboxRepository;
-import studying.blog.service.QueueService;
+import studying.blog.service.BookingSeatReleaseService;
 
 import java.util.Map;
 
@@ -31,9 +27,7 @@ import java.util.Map;
 public class PaymentCompensationOutboxProcessor {
 
     private final PaymentCompensationOutboxRepository outboxRepository;
-    private final BookingRepository bookingRepository;
-    private final ConcertRepository concertRepository;
-    private final QueueService queueService;
+    private final BookingSeatReleaseService releaseService;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
 
@@ -56,30 +50,19 @@ public class PaymentCompensationOutboxProcessor {
         PaymentCompensationOutbox outbox = outboxRepository.findById(outboxId)
                 .orElseThrow(() -> new IllegalArgumentException("Outbox not found: " + outboxId));
 
+        if(outbox.getStatus()!=OutboxStatus.PENDING) return;
         Map<String, Object> payload = objectMapper.readValue(
                 outbox.getPayload(), new TypeReference<>() {}
         );
         Long bookingId = ((Number) payload.get("bookingId")).longValue();
         Long concertId = ((Number) payload.get("concertId")).longValue();
 
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new IllegalArgumentException("Booking not found: " + bookingId));
-
-        // 멱등: 이미 취소된 예약이면 좌석 반납 없이 outbox만 완료 처리
-        if (booking.getStatus() == BookingStatus.CANCELLED) {
-            outbox.markPublished();
-            log.info("[OUTBOX][SKIP] outboxId={} bookingId={} reason=already_cancelled",
-                    outboxId, bookingId);
-            return;
-        }
-
-        booking.cancel();
-        boolean seatRestored = queueService.restoreSeatOnceForCompensation(concertId, outboxId);
-        concertRepository.reopenIfSoldOutById(concertId);
+        // Cancellation + RELEASE_PENDING commit first. Replays (including already CANCELLED)
+        // use the booking's canonical request id, never the outbox id.
+        if(payload.get("paymentId") instanceof Number paymentId) releaseService.compensate(bookingId,paymentId.longValue());
+        else releaseService.cancelAndRelease(bookingId,null); // Legacy events still pass the locked Payment guard.
         outbox.markPublished();
-
-        log.info("[OUTBOX][PUBLISHED] outboxId={} bookingId={} concertId={} seatRestored={} reopenedIfSoldOut=true",
-                outboxId, bookingId, concertId, seatRestored);
+        log.info("[OUTBOX][PUBLISHED] outboxId={} bookingId={} concertId={}", outboxId, bookingId, concertId);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -87,6 +70,7 @@ public class PaymentCompensationOutboxProcessor {
         PaymentCompensationOutbox outbox = outboxRepository.findById(outboxId)
                 .orElseThrow(() -> new IllegalArgumentException("Outbox not found: " + outboxId));
 
+        if (outbox.getStatus() != OutboxStatus.PENDING) return;
         String errorMessage = cause.getMessage() == null
                 ? cause.getClass().getSimpleName()
                 : cause.getMessage();

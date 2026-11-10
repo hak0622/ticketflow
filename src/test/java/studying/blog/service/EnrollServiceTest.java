@@ -38,6 +38,7 @@ class EnrollServiceTest {
 
     @MockBean
     private QueueService queueService;
+    @MockBean private BookingSeatStore seatStore;
 
     private Concert concert;
     private Long userId = 1L;
@@ -63,7 +64,7 @@ class EnrollServiceTest {
                 .build();
         bookingRepository.save(booking);
 
-        given(queueService.claimAdmitted(anyLong(),anyLong())).willReturn(-1L);
+        given(seatStore.reserve(any())).willReturn(-3L);
 
         BookingResult result = bookingService.book(concert.getId(), userId);
         assertThat(result.getStatus()).isEqualTo("ALREADY_BOOKED");
@@ -71,7 +72,7 @@ class EnrollServiceTest {
 
     @Test
     void 입장권_없으면_예외발생(){
-        given(queueService.claimAdmitted(anyLong(),anyLong())).willReturn(-1L);
+        given(seatStore.reserve(any())).willReturn(-3L);
 
         assertThatThrownBy(()->bookingService.book(concert.getId(),userId))
                 .isInstanceOf(IllegalStateException.class)
@@ -81,8 +82,7 @@ class EnrollServiceTest {
     @Test
     void 정상_신청이면_BOOKED_AND_DB에_저장된다(){
         //given
-        given(queueService.claimAdmitted(anyLong(),anyLong())).willReturn(600L);
-        given(queueService.decrementSeat(anyLong())).willReturn(5L);
+        given(seatStore.reserve(any())).willReturn(5L);
 
         //when
         BookingResult result = bookingService.book(concert.getId(), userId);
@@ -102,20 +102,18 @@ class EnrollServiceTest {
     void DB_저장_실패하면_restoreAdmitted와_restoreSeat가_호출된다(){
         long ttl = 600L;
 
-        given(queueService.claimAdmitted(anyLong(),anyLong())).willReturn(ttl);
-        given(queueService.decrementSeat(anyLong())).willReturn(5L);
+        given(seatStore.reserve(any())).willReturn(5L);
 
         doThrow(new RuntimeException("DB fail for test"))
                 .when(bookingRepository)
-                .save(any(Booking.class));
+                .saveAndFlush(any(Booking.class));
 
         // when & then
         assertThatThrownBy(() -> bookingService.book(concert.getId(), userId))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("DB fail for test");
 
-        // 좌석 차감 선행 후 save 실패 → restoreSeat + restoreAdmitted 모두 호출
-        verify(queueService, times(1)).restoreSeat(concert.getId());
-        verify(queueService, times(1)).restoreAdmitted(concert.getId(), userId, ttl);
+        // DB rollback is resolved before the common idempotent release is called.
+        verify(seatStore, times(1)).release(any());
     }
 }

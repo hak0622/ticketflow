@@ -7,168 +7,64 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import studying.blog.domain.Booking;
-import studying.blog.domain.Concert;
-import studying.blog.domain.ConcertStatus;
 import studying.blog.dto.BookingResult;
 import studying.blog.dto.BookingResponse;
 import studying.blog.repository.BookingRepository;
-import studying.blog.repository.ConcertRepository;
+import studying.blog.repository.BookingAttemptRepository;
+import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class BookingService {
-
-    private final ConcertRepository concertRepository;
+    private final BookingAttemptTransactions transactions;
+    private final BookingSeatReleaseService releaseService;
+    private final BookingAttemptRepository attempts;
     private final BookingRepository bookingRepository;
-    private final QueueService queueService;
     private final MeterRegistry meterRegistry;
 
-    @Transactional(noRollbackFor = DataIntegrityViolationException.class)
     public BookingResult book(Long concertId, Long userId) {
+        return book(concertId, userId, UUID.randomUUID().toString());
+    }
 
-        // (1)전체 처리 시간 측정 시작
-        long t0 = System.nanoTime();
-
-        // (2) admitted 원자적 선점 (있으면 삭제 + ttl 반환, 없으면 -1)
-        long tClaimStart = System.nanoTime();
-        long ttl = queueService.claimAdmitted(concertId, userId);
-        long claimMs = (System.nanoTime() - tClaimStart) / 1_000_000;
-
-        if (ttl < 0) {
-            // 이미 예매되어 있으면 멱등 성공 처리
-            boolean already = bookingRepository.existsByConcertIdAndUserId(concertId, userId);
-            if (already) {
-                Concert concert = concertRepository.findById(concertId)
-                        .orElseThrow(() -> new IllegalArgumentException("Concert not found : " + concertId));
-
-                log.info("[BOOKING][RESULT] userId={} concertId={} status=ALREADY_BOOKED reason=already_in_db claimMs={}",
-                        userId, concertId, claimMs);
-
-                meterRegistry.counter("booking.attempt", "result", "ALREADY_BOOKED").increment();
-                return new BookingResult("ALREADY_BOOKED", concert.getId(), concert.getTitle());
-            }
-
-            log.info("[BOOKING][CLAIM_FAIL] userId={} concertId={} reason=no_admitted_or_expired claimMs={}",
-                    userId, concertId, claimMs);
-
-            meterRegistry.counter("booking.attempt", "result", "CLAIM_FAIL").increment();
-            throw new IllegalStateException("입장 권한이 없습니다. (입장권이 없거나 만료/이미 사용됨)");
-        }
-
-        // claim 성공
-        log.info("[BOOKING][CLAIM_OK] userId={} concertId={} ttlSec={} claimMs={}",
-                userId, concertId, ttl, claimMs);
-
-        boolean seatDecremented = false;
-        boolean admittedRestored = false;
+    // Deliberately no outer transaction: REQUESTED must commit before Redis is touched.
+    public BookingResult book(Long concertId, Long userId, String requestId) {
+        requestId = UUID.fromString(requestId).toString();
+        long start = System.nanoTime();
         try {
-            // (3) 중복 예매 방지 (claimAdmitted 이후 체크, 락 불필요)
-            long tExistsStart = System.nanoTime();
-            boolean already = bookingRepository.existsByConcertIdAndUserId(concertId, userId);
-            long existsMs = (System.nanoTime() - tExistsStart) / 1_000_000;
-
-            if (already) {
-                // 좌석 차감 전이므로 restoreSeat 불필요
-                queueService.restoreAdmitted(concertId, userId, ttl);
-                log.info("[BOOKING][RESULT] userId={} concertId={} status=ALREADY_BOOKED existsMs={}",
-                        userId, concertId, existsMs);
-                meterRegistry.counter("booking.attempt", "result", "ALREADY_BOOKED").increment();
-                return new BookingResult("ALREADY_BOOKED", concertId, "");
-            }
-
-            // (4) Redis 좌석 원자적 차감
-            long remaining = queueService.decrementSeat(concertId);
-            if (remaining == -1) {
-                // 좌석 차감 전이므로 restoreSeat 불필요
-                queueService.restoreAdmitted(concertId, userId, ttl);
-                admittedRestored = true;
-                log.info("[BOOKING][RESULT] userId={} concertId={} status=SOLD_OUT", userId, concertId);
-                meterRegistry.counter("booking.attempt", "result", "SOLD_OUT").increment();
-                throw new IllegalStateException("정원이 마감되었습니다.");
-            }
-            if (remaining == -2) {
-                // 키 누락(일시적): admitted 반환해 재시도 허용
-                queueService.restoreAdmitted(concertId, userId, ttl);
-                admittedRestored = true;
-                log.warn("[BOOKING][SEAT_KEY_MISSING] userId={} concertId={}", userId, concertId);
-                throw new IllegalStateException("좌석 정보를 읽을 수 없습니다. 잠시 후 다시 시도해주세요.");
-            }
-            seatDecremented = true;
-
-            // (5) CLOSED 상태 확인: Redis 캐시 우선, 캐시 미스 시 DB fallback
-            long tFindStart = System.nanoTime();
-            QueueService.ConcertInfo concertInfo = queueService.getConcertInfo(concertId);
-            Concert concert;
-            ConcertStatus concertStatus;
-            String concertTitle;
-            if (concertInfo == null) {
-                // 캐시 미스: DB 조회 후 캐시 갱신
-                concert = concertRepository.findById(concertId)
-                        .orElseThrow(() -> new IllegalArgumentException("Concert not found :" + concertId));
-                queueService.setConcertInfo(concertId, concert.getStatus(), concert.getTitle(), concert.getEventAt());
-                concertStatus = concert.getStatus();
-                concertTitle = concert.getTitle();
-            } else {
-                // 캐시 히트: DB SELECT 생략, FK 참조용 프록시만 생성
-                concert = concertRepository.getReferenceById(concertId);
-                concertStatus = concertInfo.status();
-                concertTitle = concertInfo.title();
-            }
-            long findMs = (System.nanoTime() - tFindStart) / 1_000_000;
-
-            // CLOSED 상태 체크 (SOLD_OUT은 Redis 카운터가 처리)
-            if (concertStatus == ConcertStatus.CLOSED) {
-                queueService.restoreSeat(concertId);
-                seatDecremented = false;
-                queueService.restoreAdmitted(concertId, userId, ttl);
-                admittedRestored = true;
-                log.info("[BOOKING][RESULT] userId={} concertId={} status=CLOSED findMs={}", userId, concertId, findMs);
-                meterRegistry.counter("booking.attempt", "result", "CLOSED").increment();
-                throw new IllegalStateException("마감된 콘서트입니다.");
-            }
-
-            // (6) Booking 저장
-            long tSaveStart = System.nanoTime();
-            Booking booking = Booking.builder()
-                    .concert(concert)
-                    .userId(userId)
-                    .build();
-            bookingRepository.save(booking);
-            long saveMs = (System.nanoTime() - tSaveStart) / 1_000_000;
-
-            // (7) 마지막 좌석이면 SOLD_OUT 표기 (@Version 낙관적 락 체크 활성화)
-            if (remaining == 0) {
-                concert.markSoldOut();
-            }
-
-            long totalMs = (System.nanoTime() - t0) / 1_000_000;
-
-            log.info("[BOOKING][RESULT] userId={} concertId={} status=BOOKED bookingId={} remaining={} existsMs={} findMs={} saveMs={} totalMs={}",
-                    userId, concertId, booking.getId(), remaining, existsMs, findMs, saveMs, totalMs);
-
-            meterRegistry.counter("booking.attempt", "result", "BOOKED").increment();
-            return new BookingResult("BOOKED", concert.getId(), concertTitle);
-
-        } catch (DataIntegrityViolationException e) {
-            // uk_booking_concert_user 위반: 동시 중복 예매. 좌석 + admitted 복구 후 ALREADY_BOOKED 반환
-            if (seatDecremented) queueService.restoreSeat(concertId);
-            queueService.restoreAdmitted(concertId, userId, ttl);
-            long totalMs = (System.nanoTime() - t0) / 1_000_000;
-            log.info("[BOOKING][RESULT] userId={} concertId={} status=ALREADY_BOOKED reason=duplicate_key totalMs={}",
-                    userId, concertId, totalMs);
-            meterRegistry.counter("booking.attempt", "result", "ALREADY_BOOKED").increment();
-            return new BookingResult("ALREADY_BOOKED", concertId, "");
-
-        } catch (RuntimeException e) {
-            // 그 외 예상치 못한 예외: 미복구 건만 정리
-            if (seatDecremented) queueService.restoreSeat(concertId);
-            if (!admittedRestored) queueService.restoreAdmitted(concertId, userId, ttl);
-            long totalMs = (System.nanoTime() - t0) / 1_000_000;
-            log.warn("[BOOKING][RESTORE] userId={} concertId={} ttlSec={} errorType={} msg={} totalMs={}",
-                    userId, concertId, ttl, e.getClass().getSimpleName(), e.getMessage(), totalMs);
-            throw e;
+            transactions.create(requestId, concertId, userId);
+        } catch (DataIntegrityViolationException duplicate) {
+            if (!attempts.existsById(requestId)) throw duplicate;
         }
+        BookingResult result;
+        try {
+            result = transactions.execute(requestId, concertId, userId);
+        } catch (BookingAttemptTransactions.RequestOwnershipException invalidOwner) {
+            throw invalidOwner;
+        } catch (RuntimeException failure) {
+            BookingResult resolved;
+            try {
+                // Fresh locked primary read waits for the original transaction's outcome.
+                resolved = transactions.prepareFailed(requestId, concertId, userId, failure.getMessage());
+            } catch (RuntimeException unknown) {
+                log.error("[BOOKING][OUTCOME_UNKNOWN] requestId={}; no Redis release", requestId, unknown);
+                return new BookingResult("BOOKING_PROCESSING", concertId, "");
+            }
+            if ("BOOKED".equals(resolved.getStatus()) || "ALREADY_BOOKED".equals(resolved.getStatus())
+                    || "SOLD_OUT".equals(resolved.getStatus())) {
+                result = resolved;
+            } else {
+                releaseService.releaseSafely(requestId);
+                throw failure;
+            }
+        } finally {
+            long ms = (System.nanoTime() - start) / 1_000_000;
+            if (ms >= 30) log.warn("[BOOKING][SLOW] requestId={} totalMs={}", requestId, ms);
+        }
+        meterRegistry.counter("booking.attempt", "result", result.getStatus()).increment();
+        // This business rejection is raised only AFTER the transaction has committed.
+        if ("SOLD_OUT".equals(result.getStatus())) throw new IllegalStateException("정원이 마감되었습니다.");
+        return result;
     }
 
     @Transactional(readOnly = true)

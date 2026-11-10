@@ -23,10 +23,17 @@ class BookingExpirySchedulerTest {
     @Autowired private BookingExpiryScheduler scheduler;
     @Autowired private ConcertRepository concertRepository;
     @Autowired private BookingRepository bookingRepository;
+    @Autowired private BookingAttemptRepository attemptRepository;
+    @Autowired private org.springframework.data.redis.core.StringRedisTemplate redis;
     @Autowired private JdbcTemplate jdbcTemplate;
 
+    @Autowired private studying.blog.repository.PaymentRepository payments;
+    @Autowired private studying.blog.repository.PaymentCompensationOutboxRepository outboxes;
     @BeforeEach
     void setUp() {
+        outboxes.deleteAll();
+        payments.deleteAll();
+        attemptRepository.deleteAll();
         bookingRepository.deleteAll();
         concertRepository.deleteAll();
     }
@@ -115,7 +122,7 @@ class BookingExpirySchedulerTest {
     // --- helpers ---
 
     private Concert savedConcert(int bookedCount, ConcertStatus status) {
-        return concertRepository.save(Concert.builder()
+        Concert concert = concertRepository.save(Concert.builder()
                 .title("만료 테스트 콘서트")
                 .totalSeats(10)
                 .bookedCount(bookedCount)
@@ -123,13 +130,14 @@ class BookingExpirySchedulerTest {
                 .eventAt(LocalDateTime.now().minusMinutes(1))
                 .price(50000)
                 .build());
+        redis.opsForValue().set("seats:concert:" + concert.getId(), String.valueOf(10 - bookedCount));
+        return concert;
     }
 
     private Booking savedBooking(Concert concert, Long userId) {
-        return bookingRepository.save(Booking.builder()
-                .concert(concert)
-                .userId(userId)
-                .build());
+        Booking b = bookingRepository.save(Booking.builder().concert(concert).userId(userId).build());
+        studying.blog.support.BookingAttemptFixtures.seed(b, attemptRepository, redis);
+        return b;
     }
 
     /** H2의 @PrePersist 이후 createdAt을 직접 과거 시각으로 덮어쓴다. */

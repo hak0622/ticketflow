@@ -35,6 +35,8 @@ public class PaymentCompensationScheduler {
             try {
                 outboxProcessor.process(outboxId);
                 meterRegistry.counter("scheduler.payment_compensation.processed", "result", "PUBLISHED").increment();
+            } catch (studying.blog.exception.PaymentDeferredException deferred) {
+                meterRegistry.counter("scheduler.payment_compensation.processed", "result", "DEFERRED").increment();
             } catch (Exception e) {
                 outboxProcessor.markRetry(outboxId, e);
                 meterRegistry.counter("scheduler.payment_compensation.processed", "result", "FAILED").increment();

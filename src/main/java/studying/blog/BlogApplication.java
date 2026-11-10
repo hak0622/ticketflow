@@ -8,13 +8,11 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.util.TimeZone;
 
 @SpringBootApplication
 @EnableJpaAuditing
-@EnableScheduling
 @EntityScan("studying.blog.domain")
 @EnableJpaRepositories("studying.blog.repository")
 @ComponentScan(

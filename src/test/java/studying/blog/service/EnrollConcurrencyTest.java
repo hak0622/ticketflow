@@ -35,10 +35,13 @@ public class EnrollConcurrencyTest {
     @Autowired
     private QueueService queueService;
 
+    @Autowired private studying.blog.repository.BookingAttemptRepository attemptRepository;
+
     private Concert concert;
 
     @BeforeEach
     void setUp() {
+        attemptRepository.deleteAll();
         bookingRepository.deleteAll();
         concertRepository.deleteAll();
 
@@ -83,12 +86,14 @@ public class EnrollConcurrencyTest {
             });
         }
 
-        latch.await();
+        assertThat(latch.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        executorService.shutdownNow();
 
         Concert reloaded = concertRepository.findById(concert.getId()).orElseThrow();
 
-        //정원 1명이므로 bookedCount는 1이어야 한다.
-        assertThat(reloaded.getBookedCount()).isEqualTo(1);
+        // Redis owns capacity; the old DB bookedCount remains unchanged.
+        assertThat(reloaded.getBookedCount()).isZero();
+        assertThat(queueService.getRemainingSeat(concert.getId())).isZero();
 
         // Booking도 1개만 저장되어야 한다.
         assertThat(bookingRepository.count()).isEqualTo(1);

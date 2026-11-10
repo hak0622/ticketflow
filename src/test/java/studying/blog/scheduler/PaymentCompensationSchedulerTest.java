@@ -24,6 +24,8 @@ class PaymentCompensationSchedulerTest {
     @Autowired private PaymentCompensationScheduler scheduler;
     @Autowired private ConcertRepository concertRepository;
     @Autowired private BookingRepository bookingRepository;
+    @Autowired private BookingAttemptRepository attemptRepository;
+    @Autowired private org.springframework.data.redis.core.StringRedisTemplate redis;
     @Autowired private PaymentCompensationOutboxRepository outboxRepository;
     @Autowired private QueueService queueService;
     @Autowired private RedisConnectionFactory redisConnectionFactory;
@@ -32,6 +34,8 @@ class PaymentCompensationSchedulerTest {
     @BeforeEach
     void setUp() {
         outboxRepository.deleteAll();
+        paymentRepository.deleteAll();
+        attemptRepository.deleteAll();
         bookingRepository.deleteAll();
         concertRepository.deleteAll();
         redisConnectionFactory.getConnection().serverCommands().flushDb();
@@ -74,7 +78,7 @@ class PaymentCompensationSchedulerTest {
     void 이미_CANCELLED된_Booking은_멱등_처리_좌석_이중반납_없음() {
         Concert concert = savedConcert(1, ConcertStatus.OPEN);
         Booking booking = pendingBooking(concert, 1L);
-        // 미리 cancel 처리
+        // CANCELLED without RELEASED must still complete its pending return
         booking.cancel();
         bookingRepository.save(booking);
 
@@ -84,9 +88,9 @@ class PaymentCompensationSchedulerTest {
 
         Concert updated = concertRepository.findById(concert.getId()).orElseThrow();
         assertThat(updated.getStatus()).isEqualTo(ConcertStatus.OPEN);
-        assertThat(queueService.getRemainingSeat(concert.getId())).isEqualTo(9L);
+        assertThat(queueService.getRemainingSeat(concert.getId())).isEqualTo(10L);
 
-        // Outbox는 PUBLISHED (멱등 완료 처리)
+        // Outbox is published after canonical release completes
         PaymentCompensationOutbox outbox = outboxRepository.findAll().get(0);
         assertThat(outbox.getStatus()).isEqualTo(OutboxStatus.PUBLISHED);
     }
@@ -135,16 +139,23 @@ class PaymentCompensationSchedulerTest {
     }
 
     private Booking pendingBooking(Concert concert, Long userId) {
-        return bookingRepository.save(Booking.builder()
-                .concert(concert)
-                .userId(userId)
-                .build());  // status = PENDING_PAYMENT (Builder.Default)
+        Booking b = bookingRepository.save(Booking.builder().concert(concert).userId(userId).build());
+        studying.blog.support.BookingAttemptFixtures.seed(b, attemptRepository, redis);
+        return b;  // status = PENDING_PAYMENT (Builder.Default)
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    studying.blog.repository.PaymentRepository paymentRepository;
     private void pendingOutbox(Long bookingId, Long concertId, Long userId) {
+        Long paymentId=99L;
+        var booking=bookingRepository.findById(bookingId);
+        if(booking.isPresent()) {
+            var payment=studying.blog.domain.Payment.create(booking.get(),userId,concertId,90000,"MOCK",java.util.UUID.randomUUID().toString());
+            payment.fail("fixture failure"); paymentRepository.saveAndFlush(payment); paymentId=payment.getId();
+        }
         String payload = String.format(
-                "{\"bookingId\":%d,\"concertId\":%d,\"userId\":%d,\"paymentId\":99}",
-                bookingId, concertId, userId
+                "{\"bookingId\":%d,\"concertId\":%d,\"userId\":%d,\"paymentId\":%d}",
+                bookingId, concertId, userId, paymentId
         );
         outboxRepository.save(PaymentCompensationOutbox.create(payload));
     }
