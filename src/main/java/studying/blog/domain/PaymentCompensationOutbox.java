@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
         indexes = {@Index(name = "idx_outbox_status", columnList = "status")}
 )
 public class PaymentCompensationOutbox {
+    @Version private Long version;
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

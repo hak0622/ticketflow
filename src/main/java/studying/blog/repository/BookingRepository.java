@@ -13,6 +13,17 @@ import java.util.List;
 import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select b from Booking b where b.id = :id")
+    Optional<Booking> findLockedById(@Param("id") Long id);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select b from Booking b where b.concert.id = :concertId and b.userId = :userId")
+    Optional<Booking> findLockedByConcertIdAndUserId(@Param("concertId") Long concertId, @Param("userId") Long userId);
+
+    @Query("select b.concert.title from Booking b where b.concert.id = :concertId and b.userId = :userId")
+    Optional<String> findBookedConcertTitle(@Param("concertId") Long concertId, @Param("userId") Long userId);
+
     boolean existsByConcertIdAndUserId(Long concertId, Long userId);
     Optional<Booking> findByConcertIdAndUserId(Long concertId, Long userId);
 
