@@ -56,7 +56,7 @@ polling이 진짜 병목입니다. 대기열 진입은 33 req/s에 불과하지�
 
 ### 📹 데모 영상
 
-<video src="https://github.com/user-attachments/assets/ea70e348-7d5c-41cd-af44-f2d95484a94a" controls width="100%"></video>
+https://github.com/user-attachments/assets/ea70e348-7d5c-41cd-af44-f2d95484a94a
 
 ---
 
