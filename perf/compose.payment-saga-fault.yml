@@ -1,0 +1,30 @@
+# Disposable overlay; no production settings or external PG credentials.
+services:
+  pg:
+    image: python:3.12-alpine
+    cpus: 0.25
+    mem_limit: 128m
+    command: ["python", "-u", "/scripts/payment_pg.py"]
+    ports:
+      - "127.0.0.1::5000"
+    volumes:
+      - ./payment_pg.py:/scripts/payment_pg.py:ro
+      - ${PG_DATA_DIR:?set by runner}:/data
+  app:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,payment-saga-fault
+      FAULT_INSTANCE: app
+    volumes:
+      - ${FAULT_DIR:?set by runner}:/fault
+  app-2:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,payment-saga-fault
+      FAULT_INSTANCE: app-2
+    volumes:
+      - ${FAULT_DIR:?set by runner}:/fault
+  app-3:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,payment-saga-fault
+      FAULT_INSTANCE: app-3
+    volumes:
+      - ${FAULT_DIR:?set by runner}:/fault

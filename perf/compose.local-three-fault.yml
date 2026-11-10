@@ -1,0 +1,20 @@
+# Overlay used only by local_three_fault.py with its instrumented, disposable JAR.
+services:
+  app:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,local-three-fault
+      FAULT_INSTANCE: app
+    volumes:
+      - ${FAULT_DIR:?set by local_three_fault.py}:/fault
+  app-2:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,local-three-fault
+      FAULT_INSTANCE: app-2
+    volumes:
+      - ${FAULT_DIR:?set by local_three_fault.py}:/fault
+  app-3:
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,local-three-fault
+      FAULT_INSTANCE: app-3
+    volumes:
+      - ${FAULT_DIR:?set by local_three_fault.py}:/fault

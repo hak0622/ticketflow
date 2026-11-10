@@ -1,0 +1,5 @@
+services:
+  k6:
+    entrypoint: ["k6", "--log-format", "raw"]
+    volumes:
+      - ./booking-fault.js:/scripts/booking-fault.js:ro
