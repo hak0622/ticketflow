@@ -7,6 +7,7 @@ import studying.blog.domain.Concert;
 import studying.blog.support.IntegrationTestSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ConcertServiceAdminDeleteIntegrationTest extends IntegrationTestSupport {
 
@@ -46,17 +47,14 @@ class ConcertServiceAdminDeleteIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void adminDelete_withBookings_removesConcertAndRedisState() {
+    void adminDelete_withBookingAttempt_keepsRecoveryRecords() {
         Concert concert = savedConcert("예매 삭제 테스트", 50, 0);
         savedPendingBooking(concert, 101L);
-        queueService.setConcertInfo(concert.getId(), concert.getStatus(), concert.getTitle(), concert.getEventAt());
-
-        transactionTemplate.executeWithoutResult(status -> concertService.adminDelete(concert.getId()));
-
-        assertThat(concertRepository.findById(concert.getId())).isEmpty();
-        assertThat(bookingRepository.findAllByConcertId(concert.getId())).isEmpty();
-        assertThat(redisTemplate.opsForValue().get(seatKey(concert.getId()))).isNull();
-        assertThat(redisTemplate.opsForValue().get(statusKey(concert.getId()))).isNull();
+        assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> concertService.adminDelete(concert.getId())))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("복구 기록 보존");
+        assertThat(concertRepository.findById(concert.getId())).isPresent();
+        assertThat(bookingRepository.findAllByConcertId(concert.getId())).hasSize(1);
+        assertThat(redisTemplate.opsForValue().get(seatKey(concert.getId()))).isNotNull();
     }
 
     private static String seatKey(Long concertId) {

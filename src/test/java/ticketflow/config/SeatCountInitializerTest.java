@@ -104,8 +104,19 @@ class SeatCountInitializerTest {
         verifyNoMoreInteractions(queueService);
     }
 
+    @Test
+    void existingAttemptWithMissingCounterMustNotReinitializeFromBookingCount(CapturedOutput output) {
+        Concert concert = concert(10, 0, ConcertStatus.OPEN);
+        var attempts = mock(studying.blog.repository.BookingAttemptRepository.class);
+        when(attempts.existsByConcertId(concert.getId())).thenReturn(true);
+        when(queueService.getRemainingSeat(concert.getId())).thenReturn(null);
+        new SeatCountInitializer(attempts, concerts, bookings, queueService).onApplicationEvent(null);
+        verify(queueService, never()).initSeatCountIfAbsent(anyLong(), anyInt());
+        assertThat(output.getOut()).contains("[SEAT_INIT][BLOCKED]");
+    }
+
     private void initialize() {
-        new SeatCountInitializer(concerts, bookings, queueService).onApplicationEvent(null);
+        new SeatCountInitializer(mock(studying.blog.repository.BookingAttemptRepository.class), concerts, bookings, queueService).onApplicationEvent(null);
     }
 
     private Concert concert(int total, int oldCount, ConcertStatus status) {

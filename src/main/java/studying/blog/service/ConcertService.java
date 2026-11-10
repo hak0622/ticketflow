@@ -24,6 +24,7 @@ import java.util.List;
 @Service
 public class ConcertService {
     private final ConcertRepository concertRepository;
+    private final studying.blog.repository.BookingAttemptRepository attemptRepository;
     private final BookingRepository bookingRepository;
     private final PaymentRepository paymentRepository;
     private final PaymentCompensationOutboxRepository outboxRepository;
@@ -115,6 +116,8 @@ public class ConcertService {
             throw new IllegalArgumentException("totalSeats는 현재 예매 인원(bookedCount)보다 작을 수 없습니다. 현재 예매 인원: " + derivedBookedCount);
         }
 
+        if (req.getTotalSeats() != concert.getTotalSeats() && attemptRepository.existsByConcertId(id))
+            throw new IllegalStateException("예매 요청 기록이 있는 공연의 수량 변경은 별도 정합성 점검 후 진행해야 합니다.");
         int prevTotalSeats = concert.getTotalSeats();
         concert.updateByAdmin(req.getTitle(), req.getArtist(), req.getVenue(), req.getGenre(),
                 req.getEventAt(), req.getBookingOpenAt(),
@@ -157,6 +160,8 @@ public class ConcertService {
 
     @Transactional
     public void adminDelete(Long id){
+        if (attemptRepository.existsByConcertId(id))
+            throw new IllegalStateException("예매 요청 기록이 있는 공연은 복구 기록 보존을 위해 삭제할 수 없습니다.");
         Concert concert = concertRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Concert not found : " + id));
         outboxRepository.deleteAllByConcertId(id);
         paymentRepository.deleteAllByConcertId(id);

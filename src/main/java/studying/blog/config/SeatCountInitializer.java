@@ -27,6 +27,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SeatCountInitializer implements ApplicationListener<ApplicationReadyEvent> {
 
+    private final studying.blog.repository.BookingAttemptRepository attemptRepository;
     private final ConcertRepository concertRepository;
     private final BookingRepository bookingRepository;
     private final QueueService queueService;
@@ -39,6 +40,11 @@ public class SeatCountInitializer implements ApplicationListener<ApplicationRead
 
         int count = 0;
         for (Concert concert : targets) {
+            // An in-flight Redis hold cannot be reconstructed from committed bookings alone.
+            if (attemptRepository.existsByConcertId(concert.getId()) && queueService.getRemainingSeat(concert.getId()) == null) {
+                log.error("[SEAT_INIT][BLOCKED] concertId={} existing attempts but missing Redis counter; manual reconciliation required", concert.getId());
+                continue;
+            }
             // 아직 취소되지 않은 결제 대기는 만료 시간이 지났더라도 수량을 점유한다.
             long activeBookings = bookingRepository.countByConcertIdAndStatusIn(
                     concert.getId(), List.of(BookingStatus.PENDING_PAYMENT, BookingStatus.CONFIRMED));
