@@ -1,6 +1,7 @@
 HELP.md
 .gradle
 build/
+/test-results/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
@@ -38,7 +39,13 @@ out/
 
 ### Secrets ###
 .env
-secrets/slack_webhook_url
+.env.*
+!.env.example
+/secrets/*
+!/secrets/*.example
+
+# Runtime logs may contain SQL parameters and request data.
+*.log
 
 # Docker build artifact (CI에서 임시 생성)
 app.jar
