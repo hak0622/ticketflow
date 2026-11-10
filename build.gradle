@@ -84,6 +84,7 @@ dependencies {
 
 
 tasks.named('test') {
+    systemProperty 'faultTest.classpath', sourceSets.test.runtimeClasspath.asPath
 	useJUnitPlatform {
 		if (project.hasProperty('excludeTags')) {
 			excludeTags(project.property('excludeTags').toString().split(',') as String[])
