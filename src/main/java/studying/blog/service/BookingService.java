@@ -7,6 +7,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import studying.blog.domain.Booking;
+import studying.blog.domain.BookingAttempt;
+import studying.blog.domain.BookingAttemptStatus;
 import studying.blog.dto.BookingResult;
 import studying.blog.dto.BookingResponse;
 import studying.blog.repository.BookingRepository;
@@ -50,11 +52,17 @@ public class BookingService {
                 log.error("[BOOKING][OUTCOME_UNKNOWN] requestId={}; no Redis release", requestId, unknown);
                 return new BookingResult("BOOKING_PROCESSING", concertId, "");
             }
-            if ("BOOKED".equals(resolved.getStatus()) || "ALREADY_BOOKED".equals(resolved.getStatus())
+            if ("BOOKING_PROCESSING".equals(resolved.getStatus()) || "BOOKED".equals(resolved.getStatus()) || "ALREADY_BOOKED".equals(resolved.getStatus())
                     || "SOLD_OUT".equals(resolved.getStatus())) {
                 result = resolved;
             } else {
                 releaseService.releaseSafely(requestId);
+                try {
+                    if ("BOOKING_PROCESSING".equals(attemptStatus(concertId, userId, requestId).get("status")))
+                        return new BookingResult("BOOKING_PROCESSING", concertId, "");
+                } catch (RuntimeException unavailable) {
+                    return new BookingResult("BOOKING_PROCESSING", concertId, "");
+                }
                 throw failure;
             }
         } finally {
@@ -65,6 +73,23 @@ public class BookingService {
         // This business rejection is raised only AFTER the transaction has committed.
         if ("SOLD_OUT".equals(result.getStatus())) throw new IllegalStateException("정원이 마감되었습니다.");
         return result;
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> attemptStatus(Long concertId, Long userId, String requestId) {
+        BookingAttempt a = attempts.findById(UUID.fromString(requestId).toString())
+                .filter(x -> x.getConcertId().equals(concertId) && x.getUserId().equals(userId))
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND));
+        var data = new java.util.HashMap<String, Object>();
+        String state = a.getStatus() == BookingAttemptStatus.REQUESTED || a.getStatus() == BookingAttemptStatus.RELEASE_PENDING
+                ? "BOOKING_PROCESSING" : a.getResultStatus();
+        data.put("requestId", a.getId()); data.put("concertId", concertId);
+        data.put("status", state); data.put("reason", state.equals("BOOKING_PROCESSING") ? "RECOVERING" : a.getStatus().name());
+        if (state.equals("BOOKING_PROCESSING")) data.put("retryAfterMs", 5000);
+        Booking b = a.getBookingId() == null ? null : bookingRepository.findById(a.getBookingId()).orElseThrow();
+        if (b == null && state.equals("ALREADY_BOOKED")) b = bookingRepository.findByConcertIdAndUserId(concertId,userId).orElse(null);
+        if (b != null) { data.put("bookingId", b.getId()); data.put("bookingStatus", b.getStatus().name()); }
+        return data;
     }
 
     @Transactional(readOnly = true)

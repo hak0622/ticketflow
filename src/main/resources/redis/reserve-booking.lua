@@ -5,7 +5,22 @@ if attemptType ~= 'none' and attemptType ~= 'hash' then return redis.error_reply
 if attemptType == 'hash' then
   if redis.call('HGET', KEYS[3], 'owner') ~= ARGV[1] then return redis.error_reply('Attempt owner mismatch') end
   if redis.call('HGET', KEYS[3], 'state') == 'HELD' then
-    return tonumber(redis.call('HGET', KEYS[3], 'remaining'))
+    local version = redis.call('HGET', KEYS[3], 'holdVersion')
+    if not version then
+      if redis.call('HEXISTS', KEYS[3], 'holdExpiresAt') == 1 then return redis.error_reply('Hold version missing') end
+      return -7
+    end
+    if version ~= '2' then return redis.error_reply('Unknown hold version') end
+    if version == '2' then
+      local deadline = tonumber(redis.call('HGET', KEYS[3], 'holdExpiresAt'))
+      if not deadline then return redis.error_reply('Hold deadline missing') end
+      local t = redis.call('TIME')
+      if deadline <= t[1] * 1000 + math.floor(t[2] / 1000) then return -6 end
+      if redis.call('GET', KEYS[4]) ~= ARGV[2] then return redis.error_reply('Active attempt mismatch') end
+    end
+    local current = redis.call('GET', KEYS[1])
+    if not current or not string.match(current, '^%d+$') then return redis.error_reply('Seat key invalid') end
+    return tonumber(current)
   end
   if redis.call('HGET', KEYS[3], 'state') == 'RELEASED' and redis.call('HGET', KEYS[3], 'result') == 'SOLD_OUT' then return -1 end
   return -4 -- tombstone: delayed reserve must never acquire again
@@ -28,7 +43,7 @@ end
 local t = redis.call('TIME')
 local expires = t[1] * 1000 + math.floor(t[2] / 1000) + ttl
 -- Validate all types/values before the first write. Lua errors do not roll back writes.
-redis.call('HSET', KEYS[3], 'owner', ARGV[1], 'state', 'HELD', 'remaining', seats - 1, 'admissionExpires', expires)
+redis.call('HSET', KEYS[3], 'owner', ARGV[1], 'state', 'HELD', 'remaining', seats - 1, 'admissionExpires', expires, 'holdVersion', '2', 'holdExpiresAt', t[1] * 1000 + math.floor(t[2] / 1000) + 300000)
 redis.call('SET', KEYS[4], ARGV[2])
 redis.call('DECR', KEYS[1])
 redis.call('DEL', KEYS[2])

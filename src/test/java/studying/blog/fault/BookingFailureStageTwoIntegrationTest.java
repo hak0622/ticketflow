@@ -194,14 +194,24 @@ class BookingFailureStageTwoIntegrationTest {
         expectSoldOut(id);
     }
 
-    @Test void redisDecrementThenRealMysqlInsertFailureReturnsExactlyOneSeat() {
+    @Test void redisDecrementThenRealMysqlInsertFailureRetainsHoldAndRecovers() {
         String id = id();
         jdbc.execute("CREATE TRIGGER fault_booking_insert BEFORE INSERT ON booking FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'stage2 real insert failure'");
         gate.arm(id, () -> assertState(id, 9, null, BookingAttemptStatus.REQUESTED), false);
-        assertThatThrownBy(() -> bookingService.book(concertId, 1L, id)).isInstanceOf(RuntimeException.class);
-        assertState(id, 10, null, BookingAttemptStatus.RELEASED);
+        assertThat(bookingService.book(concertId, 1L, id).getStatus()).isEqualTo("BOOKING_PROCESSING");
+        assertState(id, 9, null, BookingAttemptStatus.REQUESTED);
         assertThat(attempt(id).getLastError()).contains("stage2 real insert failure");
-        recover(id); assertState(id, 10, null, BookingAttemptStatus.RELEASED);
+        jdbc.execute("DROP TRIGGER fault_booking_insert");
+        recover(id); assertState(id, 9, BookingStatus.PENDING_PAYMENT, BookingAttemptStatus.BOOKED);
+    }
+
+    @Test void requestedCommitReplyLostReplaysSameIdWithoutNewRequest() throws Exception {
+        String id = id();
+        mysqlWire.loseNextCommitReply();
+        assertThatThrownBy(() -> bookingService.book(concertId, 1L, id)).isInstanceOf(RuntimeException.class);
+        assertState(id, 10, null, BookingAttemptStatus.REQUESTED);
+        assertThat(bookingService.book(concertId, 1L, id).getStatus()).isEqualTo("BOOKED");
+        assertState(id, 9, BookingStatus.PENDING_PAYMENT, BookingAttemptStatus.BOOKED);
     }
 
     @Test void mysqlCommitOkReplyLostStillKeepsCommittedBookingAndSeat() throws Exception {
@@ -224,9 +234,9 @@ class BookingFailureStageTwoIntegrationTest {
         assertThat(redisWire.awaitDrop(Duration.ofSeconds(5))).isTrue();
         assertThat(redisWire.dropCount()).isEqualTo(before + 1);
         recover(id);
-        assertState(id, 10, null, BookingAttemptStatus.RELEASED);
-        assertThat(bookingService.book(concertId, 1L, id).getStatus()).isEqualTo("BOOKING_FAILED");
-        assertState(id, 10, null, BookingAttemptStatus.RELEASED);
+        assertState(id, 9, BookingStatus.PENDING_PAYMENT, BookingAttemptStatus.BOOKED);
+        assertThat(bookingService.book(concertId, 1L, id).getStatus()).isEqualTo("BOOKED");
+        assertState(id, 9, BookingStatus.PENDING_PAYMENT, BookingAttemptStatus.BOOKED);
     }
 
     @Test void redisReconnectReplayAfterLostReplyAlsoConsumesOnlyOneSeat() throws Exception {
@@ -290,9 +300,9 @@ class BookingFailureStageTwoIntegrationTest {
             assertThat(process.exitValue()).isNotZero();
             System.out.printf("[STAGE2_KILL] pid=%d exit=%d request=%s log=%s%n", killedPid, process.exitValue(), id, log);
             recover(id);
-            assertState(id, 10, null, BookingAttemptStatus.RELEASED);
-            assertThat(seatStore.reserve(attempt(id))).isEqualTo(-4);
-            assertState(id, 10, null, BookingAttemptStatus.RELEASED);
+            assertState(id, 9, BookingStatus.PENDING_PAYMENT, BookingAttemptStatus.BOOKED);
+            assertThat(bookingService.book(concertId,1L,id).getStatus()).isEqualTo("BOOKED");
+            assertState(id, 9, BookingStatus.PENDING_PAYMENT, BookingAttemptStatus.BOOKED);
         } finally {
             if (process.isAlive()) { process.destroyForcibly(); process.waitFor(10, TimeUnit.SECONDS); }
         }

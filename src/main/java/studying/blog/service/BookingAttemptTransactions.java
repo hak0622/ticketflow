@@ -55,7 +55,8 @@ public class BookingAttemptTransactions {
         public RequestOwnershipException() { super("Idempotency-Key belongs to a different booking request"); }
     }
     private BookingResult result(BookingAttempt a) {
-        return new BookingResult(a.getResultStatus(), a.getConcertId(), a.getConcertTitle());
+        return new BookingResult(a.getStatus() == BookingAttemptStatus.RELEASE_PENDING
+                ? "BOOKING_PROCESSING" : a.getResultStatus(), a.getConcertId(), a.getConcertTitle());
     }
 
     public BookingResult execute(String id, Long concertId, Long userId) {
@@ -63,28 +64,41 @@ public class BookingAttemptTransactions {
             BookingAttempt a = locked(id);
             validate(a, concertId, userId);
             if (a.getStatus() != BookingAttemptStatus.REQUESTED) return result(a);
-            var existing = bookings.findBookedConcertTitle(concertId, userId);
-            if (existing.isPresent()) {
-                a.alreadyBooked(existing.get());
-                return result(a);
-            }
-            Concert concert = concerts.findById(concertId)
-                    .orElseThrow(() -> new IllegalArgumentException("Concert not found: " + concertId));
-            if (concert.getStatus() == ConcertStatus.CLOSED) throw new IllegalStateException("마감된 콘서트입니다.");
-            long remaining = seats.reserve(a);
-            if (remaining == -1) {
-                a.soldOut();
-                return result(a);
-            }
-            if (remaining == -3) throw new IllegalStateException("입장 권한이 없습니다. (입장권이 없거나 만료/이미 사용됨)");
-            if (remaining < 0) throw new IllegalStateException("종료되었거나 다른 예매 요청이 처리 중입니다.");
-            Booking booking = bookings.saveAndFlush(Booking.create(concert, userId));
-            a.booked(booking.getId(), concert.getTitle());
-            // No concert row lock or bookedCount update. Redis is the quantity authority.
-            if (remaining == 0) concert.markSoldOut();
-            attempts.flush();
-            return result(a);
+            return executeLocked(a);
         });
+    }
+
+    private BookingResult executeLocked(BookingAttempt a) {
+        Long concertId = a.getConcertId(), userId = a.getUserId();
+        var existing = bookings.findBookedConcertTitle(concertId, userId);
+        if (existing.isPresent()) {
+            if (seats.holdRemaining(a) != -1) {
+                a.releasePending("Another request already created a Booking");
+                return result(a);
+            }
+            a.alreadyBooked(existing.get());
+            return result(a);
+        }
+        Concert concert = concerts.findById(concertId)
+                .orElseThrow(() -> new IllegalArgumentException("Concert not found: " + concertId));
+        if (concert.getStatus() == ConcertStatus.CLOSED) throw new IllegalStateException("마감된 콘서트입니다.");
+        long remaining = seats.reserve(a);
+        if (remaining == -1) {
+            a.soldOut();
+            return result(a);
+        }
+        if (remaining == -6 || remaining == -7) {
+            a.releasePending("HOLD_EXPIRED");
+            return result(a);
+        }
+        if (remaining == -3) throw new IllegalStateException("입장 권한이 없습니다. (입장권이 없거나 만료/이미 사용됨)");
+        if (remaining < 0) throw new IllegalStateException("종료되었거나 다른 예매 요청이 처리 중입니다.");
+        Booking booking = bookings.saveAndFlush(Booking.create(concert, userId));
+        a.booked(booking.getId(), concert.getTitle());
+        // No concert row lock or bookedCount update. Redis is the quantity authority.
+        if (remaining == 0) concert.markSoldOut();
+        attempts.flush();
+        return result(a);
     }
 
     /** Resolve even an ambiguous commit by a fresh locking read on the primary DB.
@@ -94,7 +108,16 @@ public class BookingAttemptTransactions {
             BookingAttempt a = locked(id);
             validate(a, concertId, userId);
             if (restoreSoldOut(a)) return result(a);
-            if (a.getStatus() == BookingAttemptStatus.REQUESTED) a.releasePending(reason);
+            if (a.getStatus() == BookingAttemptStatus.REQUESTED) {
+                long remaining = seats.holdRemaining(a);
+                Concert concert = concerts.findById(concertId).orElse(null);
+                if (remaining > 0 && concert != null && concert.getStatus() != ConcertStatus.CLOSED) {
+                    a.retry(new IllegalStateException(reason == null ? "Booking write failed" : reason));
+                    a.limitRetry(remaining);
+                } else a.releasePending(reason);
+            }
+            if (a.getStatus() == BookingAttemptStatus.RELEASE_PENDING)
+                return new BookingResult("RELEASE_REQUIRED", a.getConcertId(), a.getConcertTitle());
             return result(a);
         });
     }
@@ -105,8 +128,19 @@ public class BookingAttemptTransactions {
             if (a.getStatus() == BookingAttemptStatus.REQUESTED && a.getNextRetryAt().isAfter(LocalDateTime.now()))
                 return false;
             if (restoreSoldOut(a)) return false;
-            if (a.getStatus() == BookingAttemptStatus.REQUESTED)
-                a.releasePending("Unfinished request recovered");
+            if (a.getStatus() == BookingAttemptStatus.REQUESTED) {
+                long remaining = seats.holdRemaining(a);
+                if (remaining > 0) {
+                    Concert concert = concerts.findById(a.getConcertId()).orElse(null);
+                    if (concert != null && concert.getStatus() != ConcertStatus.CLOSED) {
+                        executeLocked(a);
+                        log.info("[BOOKING_RECOVERY][RESULT] requestId={} status={}", id, a.getStatus());
+                        return a.getStatus() == BookingAttemptStatus.RELEASE_PENDING;
+                    }
+                }
+                a.releasePending("Unfinished request expired or rejected");
+                log.info("[BOOKING_RECOVERY][RETURN_REQUIRED] requestId={} holdRemainingMs={}", id, remaining);
+            }
             return a.getStatus() == BookingAttemptStatus.RELEASE_PENDING;
         }));
     }
@@ -175,6 +209,16 @@ public class BookingAttemptTransactions {
             BookingAttempt a = locked(id);
             if (a.getStatus() == BookingAttemptStatus.RELEASE_PENDING || a.getStatus() == BookingAttemptStatus.REQUESTED) {
                 a.retry(error);
+                if (a.getStatus() == BookingAttemptStatus.REQUESTED) {
+                    try {
+                        long remaining = seats.holdRemaining(a);
+                        if (remaining >= 0) a.limitRetry(remaining);
+                    } catch (RuntimeException unavailable) {
+                        // Keep the backoff even if Redis cannot provide a safe deadline.
+                        // Otherwise corrupt/unreachable candidates can starve later requests.
+                        log.warn("[BOOKING_RECOVERY][HOLD_UNKNOWN] requestId={}", id);
+                    }
+                }
                 if (a.getRetryCount() >= 3) log.error("[BOOKING_RECOVERY][RETRY] requestId={} retryCount={} error={}",
                         id, a.getRetryCount(), a.getLastError());
             }

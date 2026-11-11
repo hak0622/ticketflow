@@ -29,6 +29,11 @@ public class BookingSeatStore {
                 "booking:active:concert:" + a.getConcertId() + ":user:" + a.getUserId());
     }
     private String owner(BookingAttempt a) { return a.getConcertId() + ":" + a.getUserId(); }
+    private static final DefaultRedisScript<Long> INSPECT = script("redis/inspect-booking-hold.lua");
+    // Positive: live lease milliseconds; zero: expired; -1: no hold; -2: legacy hold.
+    public long holdRemaining(BookingAttempt a) {
+        return execute(INSPECT, a, owner(a), a.getId());
+    }
     public long reserve(BookingAttempt a) {
         return execute(RESERVE, a, owner(a), a.getId());
     }

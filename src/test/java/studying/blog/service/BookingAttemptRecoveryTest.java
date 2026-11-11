@@ -66,7 +66,7 @@ class BookingAttemptRecoveryTest {
         assertThat(a(id).getStatus()).isEqualTo(BookingAttemptStatus.BOOKED);
         assertThat(concerts.findById(concert.getId()).orElseThrow().getBookedCount()).isZero();
     }
-    @Test void intentIsCommittedBeforeRedisAndBookingCommitFailureRestores() {
+    @Test void intentIsCommittedBeforeRedisAndBookingCommitFailureRetainsHold() {
         String id = id();
         doAnswer(call -> {
             // Independent transaction can see REQUESTED before Redis execution.
@@ -80,18 +80,19 @@ class BookingAttemptRecoveryTest {
             });
             return result;
         }).when(seats).reserve(any());
-        assertThatThrownBy(() -> service.book(concert.getId(), 1L, id)).hasMessageContaining("commit failed");
-        remaining(10); assertThat(bookings.count()).isZero();
-        assertThat(a(id).getStatus()).isEqualTo(BookingAttemptStatus.RELEASED);
-        assertThat(queue.isAdmitted(concert.getId(), 1L)).isTrue();
+        assertThat(service.book(concert.getId(), 1L, id).getStatus()).isEqualTo("BOOKING_PROCESSING");
+        remaining(9); assertThat(bookings.count()).isZero();
+        assertThat(a(id).getStatus()).isEqualTo(BookingAttemptStatus.REQUESTED);
+        reset(seats); stale(id); worker.recoverIncompleteRequests();
+        remaining(9); assertThat(a(id).getStatus()).isEqualTo(BookingAttemptStatus.BOOKED);
     }
-    @Test void reserveResponseLostStillRestoresAndDoesNotRepeat() {
+    @Test void reserveResponseLostRetainsHoldThenRecoversWithoutDecrement() {
         String id = id();
         doAnswer(call -> { call.callRealMethod(); throw new IllegalStateException("reserve response lost"); }).when(seats).reserve(any());
-        assertThatThrownBy(() -> service.book(concert.getId(), 1L, id)).hasMessageContaining("response lost");
-        remaining(10);
-        assertThat(service.book(concert.getId(), 1L, id).getStatus()).isEqualTo("BOOKING_FAILED");
-        release.recover(id); remaining(10);
+        assertThat(service.book(concert.getId(), 1L, id).getStatus()).isEqualTo("BOOKING_PROCESSING");
+        remaining(9); reset(seats); stale(id); release.recover(id);
+        assertThat(service.book(concert.getId(), 1L, id).getStatus()).isEqualTo("BOOKED");
+        remaining(9);
     }
     @Test void actualCommitSucceededButResponseLostMustNeverRelease() {
         String id = id();
@@ -107,11 +108,12 @@ class BookingAttemptRecoveryTest {
         assertThat(service.book(concert.getId(), 1L, id).getStatus()).isEqualTo("BOOKING_PROCESSING");
         remaining(9); verify(seats, never()).release(any());
         reset(transactions, bookings); stale(id); worker.recoverIncompleteRequests();
-        remaining(10); assertThat(a(id).getStatus()).isEqualTo(BookingAttemptStatus.RELEASED);
+        remaining(9); assertThat(a(id).getStatus()).isEqualTo(BookingAttemptStatus.BOOKED);
     }
     @Test void abandonedRequestRecoveredAndLateReserveIsRejected() {
         String id = id(); transactions.create(id, concert.getId(), 1L);
         seats.reserve(a(id)); remaining(9);
+        redis.opsForHash().put("booking:attempt:" + id, "holdExpiresAt", "1");
         stale(id); worker.recoverIncompleteRequests(); remaining(10);
         assertThat(seats.reserve(a(id))).isEqualTo(-4);
         assertThat(service.book(concert.getId(), 1L, id).getStatus()).isEqualTo("BOOKING_FAILED");
@@ -191,7 +193,9 @@ class BookingAttemptRecoveryTest {
         String id = id(); transactions.create(id, concert.getId(), 1L);
         Instant until = Instant.now().plusSeconds(5);
         redis.expireAt("admitted:concert:" + concert.getId() + ":user:1", until);
-        seats.reserve(a(id)); transactions.prepareFailed(id, concert.getId(), 1L, "failed");
+        seats.reserve(a(id));
+        redis.opsForHash().put("booking:attempt:" + id, "holdExpiresAt", "1");
+        transactions.prepareFailed(id, concert.getId(), 1L, "failed");
         transactions.release(id);
         Long ttl = redis.getExpire("admitted:concert:" + concert.getId() + ":user:1", TimeUnit.MILLISECONDS);
         assertThat(ttl).isPositive().isLessThanOrEqualTo(5000);
@@ -354,7 +358,9 @@ class BookingAttemptRecoveryTest {
         assertThat(service.book(concert.getId(), 1L, id()).getStatus()).isEqualTo("ALREADY_BOOKED");
         verify(bookings).findBookedConcertTitle(concert.getId(), 1L);
         verify(bookings, never()).findByConcertIdAndUserId(anyLong(), anyLong());
-        verifyNoInteractions(concerts, seats);
+        verifyNoInteractions(concerts);
+        verify(seats).holdRemaining(any());
+        verify(seats, never()).reserve(any());
     }
 
     @Test void workerWaitsForSoldOutTransactionThenSkipsReturn() throws Exception {

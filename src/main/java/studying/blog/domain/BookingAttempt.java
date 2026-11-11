@@ -68,6 +68,10 @@ public class BookingAttempt implements org.springframework.data.domain.Persistab
         this.lastError = truncate(error.getMessage());
         this.nextRetryAt = LocalDateTime.now().plusSeconds(Math.min(60, 5L << Math.min(retryCount - 1, 4)));
     }
+    public void limitRetry(long remainingMillis) {
+        LocalDateTime deadline = LocalDateTime.now().plusNanos(remainingMillis * 1_000_000);
+        if (nextRetryAt.isAfter(deadline)) nextRetryAt = deadline;
+    }
     private static String truncate(String text) {
         return text == null ? "Unknown failure" : text.substring(0, Math.min(500, text.length()));
     }
