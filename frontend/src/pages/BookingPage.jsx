@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getConcert } from '../features/concert/api'
-import { createBooking } from '../features/booking/api'
+import { createBooking, getBookingAttempt } from '../features/booking/api'
 import useAuthStore from '../features/auth/store'
 import LoadingSpinner from '../shared/ui/LoadingSpinner'
 
@@ -63,7 +63,60 @@ export default function BookingPage() {
 
   // Keep the same ID across uncertain responses, reloads, and retries for this login/concert.
   const requestStorageKey = `booking-request:${user?.sub}:${concertId}`
+  const pollTimer = useRef(null)
+  const alive = useRef(true)
+  const pollStarted = useRef(0)
+  const requestGeneration = useRef(0)
+  const [recovering, setRecovering] = useState(false)
+  const stopRecovery = () => { clearTimeout(pollTimer.current); setRecovering(false) }
+  const inspectRequest = async (requestId, generation = requestGeneration.current) => {
+    if (!alive.current || generation !== requestGeneration.current) return
+    try {
+      const res = await getBookingAttempt(concertId, requestId)
+      if (!alive.current || generation !== requestGeneration.current) return
+      if (res.status === 202) {
+        setRecovering(true)
+        setError('예매 요청의 처리 결과를 확인 중입니다. 기존 요청을 유지하며 복구를 진행합니다.')
+        if (Date.now() - pollStarted.current < 600000) pollTimer.current = setTimeout(() => inspectRequest(requestId, generation), 5000)
+        else { stopRecovery(); setError('자동 확인을 중단했습니다. 버튼을 눌러 같은 요청을 다시 확인해주세요.') }
+        return
+      }
+      stopRecovery()
+      sessionStorage.removeItem(requestStorageKey)
+      if (res.data.bookingStatus === 'PENDING_PAYMENT') {
+        navigate(`/concerts/${concertId}/payment`, { replace: true })
+      } else if (res.data.bookingStatus) {
+        navigate('/my-bookings', { replace: true })
+      } else setError(res.data.status === 'SOLD_OUT' ? '매진된 공연입니다.' : '종료된 요청입니다. 다시 예매하거나 대기열에 등록해주세요.')
+    } catch (failure) {
+      if (!alive.current || generation !== requestGeneration.current) return
+      const status = failure.response?.status
+      if (status === 409 && failure.response?.data?.status === 'BOOKING_FAILED') {
+        stopRecovery(); sessionStorage.removeItem(requestStorageKey)
+        setError('반환이 완료된 요청입니다. 다시 예매하거나 대기열에 등록해주세요.')
+      } else if (status === 404) {
+        stopRecovery(); setError('요청 접수 여부를 확인하지 못했습니다. 버튼을 누르면 같은 요청을 다시 보냅니다.')
+      } else if (status === 401 || status === 400) {
+        stopRecovery(); setError('로그인 또는 요청 정보를 확인해주세요.')
+      } else if (Date.now() - pollStarted.current < 600000) {
+        setRecovering(true); setError('서버 연결을 확인 중입니다. 기존 요청은 유지됩니다.')
+        pollTimer.current = setTimeout(() => inspectRequest(requestId, generation), 10000)
+      } else { stopRecovery(); setError('결과를 확인하지 못했습니다. 같은 요청으로 다시 확인해주세요.') }
+    }
+  }
+  useEffect(() => {
+    alive.current = true
+    submittingRef.current = false
+    setSubmitting(false)
+    setRecovering(false)
+    const saved = sessionStorage.getItem(requestStorageKey)
+    if (token && saved) { pollStarted.current = Date.now(); inspectRequest(saved) }
+    return () => { alive.current = false; requestGeneration.current += 1; clearTimeout(pollTimer.current) }
+    // Request identity is scoped to this login and concert.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestStorageKey, token])
   const handleBook = async () => {
+    const generation = requestGeneration.current
     if (submittingRef.current) return
     submittingRef.current = true
     setSubmitting(true)
@@ -74,19 +127,14 @@ export default function BookingPage() {
         requestId = crypto.randomUUID()
         sessionStorage.setItem(requestStorageKey, requestId)
       }
-      const res = await createBooking(concertId, undefined, requestId)
-      if (res.status === 202) {
-        setError('예매 결과를 확인 중입니다. 잠시 후 같은 요청으로 다시 확인해주세요.')
-        submittingRef.current = false
-        setSubmitting(false)
-        return
-      }
-      sessionStorage.removeItem(requestStorageKey)
-      navigate(`/concerts/${concertId}/payment`, {
-        state: { concert, booking: res.data },
-        replace: true,
-      })
+      await createBooking(concertId, undefined, requestId)
+      if (!alive.current || generation !== requestGeneration.current) return
+      pollStarted.current = Date.now()
+      await inspectRequest(requestId, generation)
+      submittingRef.current = false
+      setSubmitting(false)
     } catch (err) {
+      if (!alive.current || generation !== requestGeneration.current) return
       const status    = err.response?.status
       const serverMsg = err.response?.data?.message ?? ''
 
@@ -109,7 +157,8 @@ export default function BookingPage() {
         navigate('/login', { state: { from: `/concerts/${concertId}/booking` } })
         return
       } else {
-        setError(serverMsg || '예매 처리 중 오류가 발생했습니다.')
+        pollStarted.current = Date.now()
+        await inspectRequest(sessionStorage.getItem(requestStorageKey))
       }
       submittingRef.current = false
       setSubmitting(false)
@@ -205,7 +254,7 @@ export default function BookingPage() {
         <div className="fixed bottom-16 left-0 right-0 px-4 md:static md:bottom-auto md:px-0">
           <button
             onClick={handleBook}
-            disabled={submitting || concert.status === 'SOLD_OUT' || concert.status === 'CLOSED'}
+            disabled={submitting || recovering || (!sessionStorage.getItem(requestStorageKey) && (concert.status === 'SOLD_OUT' || concert.status === 'CLOSED'))}
             className="w-full py-4 bg-primary-500 hover:bg-primary-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-lg rounded-2xl transition-colors shadow-md shadow-primary-100"
           >
             {submitting ? (
@@ -213,7 +262,7 @@ export default function BookingPage() {
                 <LoadingSpinner size="sm" />
                 처리 중...
               </span>
-            ) : concert.status === 'SOLD_OUT' ? '매진된 공연입니다' : '예매 확정'}
+            ) : recovering ? '예매 복구 중...' : sessionStorage.getItem(requestStorageKey) ? '기존 요청 확인·재전송' : concert.status === 'SOLD_OUT' ? '매진된 공연입니다' : '예매 확정'}
           </button>
         </div>
       </div>

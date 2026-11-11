@@ -32,3 +32,6 @@ export const tossConfirm = (concertId, data) =>
 
 /** 결제 결과 조회 */
 export const getMyPayment = (concertId) => axiosInstance.get(`/concerts/${concertId}/payment/me`)
+
+export const getBookingAttempt = (concertId, requestId) =>
+  axiosInstance.get(`/concerts/${concertId}/booking/attempts/${requestId}`)
