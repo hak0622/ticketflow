@@ -336,3 +336,16 @@ PYTHONPYCACHEPREFIX=/tmp/ticketflow-pycache python3 perf/toss_live_cancel.py
 실행기는 새 공연을 생성하고 테스트 전용 JAR로 전환한다. 사용자는 출력된 공연 주소에서 1원 카카오페이 테스트 결제를 진행한다. 취소 의도는 fixture로 준비하며 공개 사용자 환불 API를 검증하는 것은 아니다. 최종 상태를 DB에 직접 쓰거나 Worker를 수동 호출하지 않는다. 원래 승인 처리 완료·추가 스케줄러 실행·중복 요청을 확인한 후 일반 JAR로 복원한다.
 
 이번 작업의 최초 환경 준비 메타데이터·실행 원본은 로컬 결과 폴더에 보존되어 있고 Git에는 포함하지 않는다. 다른 환경의 DB를 이 실행기와 임의로 연결하지 않는다. 실행 이력은 재현 범위와 한계를 포함하며, 모든 PG 장애나 성능을 검증한 결과로 해석하지 않는다.
+
+## 예매 선점 유지·자동 생성 복구 검증
+
+현재 동작은 [선점 유지 설계](../docs/booking-hold-recovery.md)를 따른다. 예전 `local_three_fault.py`는 실패 시 반환 정책의 역사적 기대값을 포함하므로, 새 정책은 다음 전용 실행기로 검증한다.
+
+```bash
+python3 perf/booking_hold_fault.py
+./gradlew test --offline --tests studying.blog.fault.BookingHoldRecoveryIntegrationTest
+# 스케줄러를 켜는 실제 5분 테스트는 다른 클래스와 섞지 않고 별도 실행한다.
+./gradlew test --offline --tests studying.blog.fault.BookingHoldLeaseClockIntegrationTest
+```
+
+실프로세스 실행기는 기존 test-only Probe를 재사용하고 새 Compose 프로젝트에서 앱 3대·MySQL·Redis를 실행한다. SIGKILL 후 자동 Worker 복구, 커밋 후 응답 유실, 동시 중복 요청, 미선점 요청 종료 뒤 늦은 실행을 검사한다. 기한·Worker를 수동 조작하지 않으며 종료 후 해당 프로젝트만 정리한다. 원본은 `test-results/booking-hold-recovery/process/<실행 ID>/`에 저장한다. 5분 테스트는 DB INSERT 거부를 유지한 채 기본 선점 기한을 실제로 기다리므로 5분 이상 걸린다. 전체 k6나 실제 PG 호출은 포함하지 않는다.

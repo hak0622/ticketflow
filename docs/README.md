@@ -29,3 +29,7 @@
 공개 문서는 현재 설계와 대표 결과를 선별했다. 과거 계획·중복 중간 기록은 로컬 `test-results/commit-preparation/`에 보존한다. 실패 원인을 숨기거나 기존 결과를 성공으로 덮어쓰지 않는다.
 
 `build/`와 `test-results/`의 로그·XML·JAR·원장은 Git 제외 로컬 원본이다. Git push로 백업되지 않는다. 민감한 설정은 `.env`/`secrets/`에 두며 실제 키를 문서에 기록하지 않는다.
+
+- [선점 유지와 Booking 생성 복구](booking-hold-recovery.md) — 5분 선점 기한, Worker 생성 재개, 상태 조회 화면.
+
+- [선점 유지 복구 검증 결과](booking-hold-recovery-results.md) — 관련 회귀 164건, 실제 5분 만료, 앱 3대 장애 및 화면 검증.
