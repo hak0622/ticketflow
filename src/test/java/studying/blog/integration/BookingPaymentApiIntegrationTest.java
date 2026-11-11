@@ -47,6 +47,28 @@ class BookingPaymentApiIntegrationTest extends IntegrationTestSupport {
     private TokenProvider tokenProvider;
 
     @Autowired org.springframework.context.ApplicationContext applicationContext;
+    @Autowired studying.blog.service.BookingAttemptTransactions bookingTransactions;
+    @Autowired studying.blog.service.BookingSeatStore bookingSeats;
+
+    @Test void requestStatusIsPrivateReadOnlyAndTracksPendingAndBooked() throws Exception {
+        User owner=savedUser("hold-status-owner",Role.USER);
+        User other=savedUser("hold-status-other",Role.USER);
+        Concert c=savedConcert("Hold status",10,0);
+        grantAdmitted(c.getId(),owner.getId());
+        String id=UUID.randomUUID().toString();
+        String path="/api/concerts/"+c.getId()+"/booking/attempts/"+id;
+        mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+        mockMvc.perform(get(path).header("Authorization",authorizationHeader(owner))).andExpect(status().isNotFound());
+        bookingTransactions.create(id,c.getId(),owner.getId());
+        mockMvc.perform(get(path).header("Authorization",authorizationHeader(other))).andExpect(status().isNotFound());
+        mockMvc.perform(get(path).header("Authorization",authorizationHeader(owner)))
+                .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("BOOKING_PROCESSING"));
+        assertThat(bookingRepository.count()).isZero();
+        bookingTransactions.execute(id,c.getId(),owner.getId());
+        mockMvc.perform(get(path).header("Authorization",authorizationHeader(owner)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.bookingStatus").value("PENDING_PAYMENT"));
+    }
+
     @Test
     void bookingDetailsAndMyPageSerializeLazyConcertWithoutOsiv() throws Exception {
         assertThat(applicationContext.containsBean("openEntityManagerInViewInterceptor")).isFalse();

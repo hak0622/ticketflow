@@ -42,6 +42,15 @@ public class BookingApiController {
         ));
     }
 
+    @GetMapping("/{concertId}/booking/attempts/{requestId}")
+    public ResponseEntity<?> attemptStatus(@PathVariable Long concertId, @PathVariable String requestId,
+            @AuthenticationPrincipal CustomPrincipal principal) {
+        var data = bookingService.attemptStatus(concertId, principal.getUserId(), requestId);
+        int code = "BOOKING_PROCESSING".equals(data.get("status")) ? 202
+                : "BOOKING_FAILED".equals(data.get("status")) ? 409 : 200;
+        return ResponseEntity.status(code).body(data);
+    }
+
     @Operation(summary = "내 예매 상태 조회")
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/{concertId}/booking/me")
