@@ -221,7 +221,95 @@ MVP에서는 DB row lock으로 좌석을 제어했으나, 부하 테스트에서
 
 ### 예매 플로우
 
-> 아래는 이전 입장권 소비·재고 차감 및 Mock 결제 경로의 개발 기록입니다. 현재 운영 경로는 요청별 Lua 선점과 DB 요청 복구, PG Saga를 사용합니다. [최신 흐름](docs/flow.md)을 확인하세요.
+현재 외부 PG를 사용하는 정상 경로입니다. 대기열 입장권은 **예매를 시작할 권한**이며, 실제 티켓 확보는 예매 요청 시 Redis Lua에서 처리합니다.
+
+```mermaid
+sequenceDiagram
+    actor U as 사용자
+    participant A as 예매 API
+    participant Q as 입장 스케줄러
+    participant R as Redis
+    participant D as MySQL
+    participant S as 결제 Saga
+    participant P as 외부 PG
+
+    U->>A: 대기열 등록 및 순번 조회
+    A->>R: 대기열 등록 및 순번 읽기
+    Q->>R: 1초 주기 입장권 발급, 유효시간 10분
+    U->>A: 요청 ID를 포함한 예매 요청
+    A->>D: TX1 예매 요청 기록 후 커밋
+    A->>D: TX2 요청 행 잠금 및 기존 처리 결과 확인
+    A->>R: Lua로 입장권 소비, 티켓 차감, 요청별 선점 기록
+    alt 티켓 확보
+        A->>D: 예매 생성과 요청 완료를 함께 커밋
+        A-->>U: 결제 대기 예매 생성
+    else 명확한 매진
+        A->>D: 매진 종료 결과 커밋
+        A-->>U: HTTP 409 매진 응답
+    end
+    opt 예매 생성 후 사용자가 결제창에서 결제 진행
+        U->>S: PG 승인 요청
+        S->>D: 결제 진행 정보 커밋
+        S->>D: 최초 승인 호출 권한 선점 후 커밋
+        S->>P: 승인 HTTP 요청, DB 트랜잭션 밖
+        alt 승인 확인 및 예매 확정 가능
+            S->>D: 예매와 결제를 잠그고 함께 확정 후 커밋
+            S-->>U: 결제 완료 및 예매 확정
+        else 응답 유실 또는 DB 확정 실패
+            S->>D: 미확정 상태 유지 및 재확인 예약
+            S-->>U: 현재 저장된 결제 상태
+            Note over S,P: 결제 복구 Worker가 실제 PG 결과를 재조회
+        end
+    end
+```
+
+같은 요청 ID의 재시도는 저장된 결과와 기존 선점을 재사용하며, 매 예매마다 공연 행의 예약 수를 증가시키지 않습니다. 마지막 티켓 확보 시 매진 상태 변경은 수행합니다. PG 호출은 DB 트랜잭션 밖에서 실행하고, 결과 적용 시에는 예매 → 결제 순서로 잠급니다. Mock 결제의 Redis SETNX 경로는 별도 구현입니다.
+
+[정상 흐름과 트랜잭션 상세](docs/flow.md#대기열과-정상-예매) · [PG 승인·결과 재확인](docs/flow.md#pg-승인과-결과-재확인)
+
+### 예매 저장 실패·서버 종료 후 복구
+
+Redis에서 티켓을 확보한 뒤 DB 저장이 실패하더라도 즉시 반환하지 않습니다. 요청 기록과 실제 예매 저장 결과를 확인하고, **최초 선점부터 5분 이내라면 기존 티켓으로 예매 생성을 재시도**합니다.
+
+```mermaid
+sequenceDiagram
+    actor U as 사용자
+    participant A as 예매 API
+    participant W as 예매 복구 Worker
+    participant D as MySQL
+    participant R as Redis
+
+    Note over A,R: Redis 선점 후 DB 저장 실패 또는 서버 종료
+    Note over W,D: Worker는 5초 주기로 재시도 시각이 지난 요청 조회
+    W->>D: 요청 행 잠금 및 실제 예매 저장 결과 확인
+    alt 이미 예매 저장 완료
+        Note over W,D: 기존 결과 유지, 추가 차감과 반환 없음
+    else 예매 미생성
+        W->>R: 기존 선점과 최초 복구 기한 확인
+        alt 선점 유효 및 예매 생성 가능
+            W->>D: 예매 생성과 요청 완료를 함께 커밋
+            Note over W,R: 재차감 및 선점 기한 연장 없음
+        else 기한 경과 또는 생성 불가
+            W->>D: 반환 필요 상태 먼저 커밋
+            W->>R: 별도 요청 잠금 트랜잭션에서 공통 반환 Lua
+            W->>D: 반환 후처리와 요청 종료 커밋
+        else DB 또는 Redis 결과 불명확
+            Note over W,R: 임의 반환하지 않고 재확인
+        end
+    end
+    U->>A: 같은 요청 ID로 처리 상태 조회
+    A-->>U: 처리 중 또는 기존 예매 결과
+    Note over U,A: 결제 대기 예매가 생성되면 화면에서 결제 페이지로 이동
+```
+
+실행 중인 API가 저장 예외를 감지한 경우에도 새 잠금 조회로 DB 결과부터 확인합니다. Worker는 선점하지 않은 요청을 새로 차감하지 않으며, 정상 매진은 수량·입장권 변경 없이 종료합니다. 5분은 예매 생성 재시도를 시작할 수 있는 기한으로, Redis 키 TTL이나 복구 완료 보장 시간이 아닙니다. 생성된 예매의 미결제 만료 후보 기준은 별도의 30분이며, 미확정·완료 결제가 있으면 반환을 보류합니다. 화면은 같은 요청 ID를 유지해 조회하며 PG 승인을 자동 실행하지 않습니다.
+
+[복구·화면 처리 상세](docs/flow.md#저장-실패와-서버-종료-후-복구) · [5분 정책과 한계](docs/booking-hold-recovery.md)
+
+<details>
+<summary>이전 예매·Mock 결제 구현 보기</summary>
+
+아래는 요청별 Lua 선점·예매 생성 복구·PG Saga를 적용하기 전의 개발 기록입니다. 입장권 소비와 재고 차감이 나뉜 경로 및 Mock 결제 처리이며, 현재 외부 PG 예매 경로와 구분합니다.
 
 ```mermaid
 sequenceDiagram
@@ -258,9 +346,67 @@ sequenceDiagram
     Note over BookingService: finally: Redis 멱등성 키 삭제
 ```
 
-### 결제 실패 보상 플로우
+</details>
 
-> 아래 도식은 이전 Mock·반환 구현 기준입니다. Outbox 사용은 유지하지만 현재 반환은 예매 요청 ID 기반 공통 Lua를 사용하며, 이미 취소된 Booking도 미완료 반환을 재개할 수 있습니다. PG timeout을 즉시 실패 보상으로 처리하지 않습니다. [현재 보상 흐름](docs/flow.md#취소outbox반환)을 확인하세요.
+### 결제 결과 확인·취소 보상 플로우
+
+**PG timeout이나 호출 차단만으로 결제 실패를 확정하거나 티켓을 반환하지 않습니다.** 실제 승인·취소 결과를 재조회하고, 취소가 필요한 결제는 전액 취소 확인 후 반환합니다.
+
+```mermaid
+sequenceDiagram
+    participant W as 결제 Saga 및 복구 Worker
+    participant P as 외부 PG
+    participant D as MySQL
+    participant O as Outbox 스케줄러 및 처리기
+    participant R as Redis
+
+    W->>P: 미확정 결제 결과 조회, DB 트랜잭션 밖
+    alt 결과 불명확 또는 조회 실패
+        W->>D: 진행 상태 유지 및 재확인 예약
+        Note over W,R: 티켓 유지, 반환 작업 생성 안 함
+    else 승인 확인 및 예매 확정 가능
+        W->>D: 결제 완료와 예매 확정을 같은 트랜잭션으로 커밋
+    else 승인 확인됐지만 취소 필요
+        W->>D: 취소 의도와 진행 단계 커밋
+        W->>P: 저장된 멱등키로 전액 취소, DB 트랜잭션 밖
+        alt 취소 응답 유실 또는 결과 불명확
+            W->>D: 취소 재확인 예약
+            Note over W,R: 전액 취소 확인 전 반환하지 않음
+        else 전액 취소와 잔액 0 확인
+            W->>D: 결제 취소 상태와 반환 Outbox를 함께 커밋
+        end
+    else 명확한 최종 승인 실패
+        W->>D: 결제 실패 상태와 반환 Outbox를 함께 커밋
+    end
+
+    opt 반환 Outbox가 생성된 경우
+        Note over O,D: 10초 주기로 미처리 작업 조회
+        O->>D: 예매 잠금 및 결제 이력 확인
+        alt 미확정 또는 완료 결제로 반환 불가
+            Note over O,R: 반환 보류, 미확정 결제 보호
+        else 취소 및 반환 가능
+            O->>D: 예매 취소와 반환 필요 상태 먼저 커밋
+            O->>D: 별도 트랜잭션에서 요청 행 잠금
+            O->>R: Lua로 요청별 반환 여부 확인 및 한 번만 재고 증가
+            R-->>O: 실제 반환 또는 기존 반환 결과
+            O->>R: 필요한 경우 현재 잔여 수량 확인
+            O->>D: 공연 상태 후처리와 요청 반환 완료 커밋
+            O->>D: Outbox 처리 완료 커밋
+        end
+    end
+```
+
+- **PG 취소 확인 → Redis 반환 → DB 후처리 → Outbox 완료는 서로 다른 단계**입니다. Redis 반환 후 서버가 종료돼도 같은 요청의 Lua 재실행은 재고를 추가 증가시키지 않고 남은 후처리를 재개합니다.
+- 이미 취소된 예매도 미완료 반환을 재개할 수 있습니다. 선점하지 않은 정상 매진·미선점 반환은 수량을 증가시키지 않습니다.
+- 반환 후처리를 재실행할 때는 현재 잔여 수량과 공연 상태를 기준으로 판단합니다. 재고가 남고 공연이 SOLD_OUT일 때만 OPEN으로 전환하며, CLOSED는 변경하지 않습니다. 명확한 미선점 결과는 불필요한 재고 조회·공연 갱신·캐시 삭제를 생략하고, 결과가 불명확하면 재확인합니다.
+- 늦은 승인 응답은 기존 취소 결정을 뒤집지 못합니다. 예약 만료도 같은 결제 보호·멱등 반환 경로를 사용합니다.
+
+[현재 보상·반환의 트랜잭션 상세](docs/flow.md#취소outbox반환) · [Saga 장애·경합 검증](docs/payment-saga-fault-results.md) · [취소·Outbox 커밋 응답 유실 검증](docs/payment-cancel-commit-fault-results.md)
+
+<details>
+<summary>이전 Mock 결제 실패·보상 구현 보기</summary>
+
+아래는 이전 Mock 결제와 반환 구현의 개발 기록입니다. 현재는 예매 요청 ID 기반 공통 반환 Lua를 사용하며, 이미 취소된 예매도 미완료 반환을 재개할 수 있습니다. 아래의 CANCELLED 즉시 종료·단순 좌석 복원 경로를 현재 구현으로 해석하지 않습니다.
 
 보상을 "결제 실패 직후 즉시 호출"로 먼저 구현했지만, 실패 주입 실험에서 보상 호출 자체도 같은 비율로 유실됐습니다.
 현재는 보상 사실을 Outbox에 남기고, 스케줄러가 좌석 복구와 상태 전환을 책임집니다.
@@ -291,6 +437,8 @@ sequenceDiagram
         end
     end
 ```
+
+</details>
 
 ---
 
