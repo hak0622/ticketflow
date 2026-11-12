@@ -33,6 +33,8 @@
 | PaymentStageOneIntegrationTest / PaymentMockDisabledIntegrationTest / PaymentFlowIntegrationTest | 소유권·기존 결과·Mock 정책·API 회귀 |
 | BookingExpirySchedulerTest / PaymentCompensationSchedulerTest | 만료·Outbox·재처리·결제 보호 |
 | QueueServiceIntegrationTest | 대기열 및 테스트에 남긴 옛 Redis 메서드 계약 |
+| PaymentCircuitBreakerIntegrationTest / PaymentCircuitBreakerSafetyIntegrationTest / PaymentCircuitBreakerGuardIntegrationTest | 회로 경계·호출 차단·읽기 타임아웃·결제 보호. [결과·실행 방법](payment-circuit-breaker-results.md) |
+| PaymentCircuitBreakerWorkerIntegrationTest | 스케줄러 ON 자동 복구. 다른 클래스와 별도 Gradle 실행 |
 | EnrollServiceTest / EnrollConcurrencyTest | 구 이름이 남아 있는 예매 테스트 |
 
 PaymentMockPolicyTest·PaymentServiceFailRateTest는 Mock 정책 검증이다. Mock 또는 단위 테스트 성공을 외부 PG 장애 검증으로 해석하지 않는다. 실제 존재하는 클래스명은 아래 결과 문서·소스에서 확인한다.
