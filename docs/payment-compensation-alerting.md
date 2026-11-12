@@ -37,3 +37,7 @@ Prometheus는 `http://localhost:9090/alerts`, Alertmanager는 `http://localhost:
 3. `POST /api/admin/payment-compensations/{outboxId}/retry`로 다시 처리합니다.
 
 실패 건이 없어지면 Slack에 `RESOLVED` 알림이 전송됩니다.
+
+## Lua 부분 쓰기 보류 알림 추가
+
+기존 Outbox FAILED 알림과 별개로 `BookingInventoryIncomplete`는 Redis의 선점/반환 PENDING 진행 기록을, `BookingInventoryObservationUnavailable`은 관측 불능을 알립니다. [판단 기준과 운영 절차](redis-lua-partial-write.md#불완전-진행-기록의-관리자-알림)를 확인하세요. Outbox 재등록과 앱 재시작만으로 불완전 기록이 해소되지는 않습니다.

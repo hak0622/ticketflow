@@ -22,6 +22,7 @@
 | Worker 중복 재시도 | [동일 회차 비교 수정·지연 검증](payment-retry-round-fix-results.md). Worker 공정성 보장은 아님 |
 | 커밋 응답 유실 | [결제 완료](payment-commit-fault-results.md), [취소·Outbox](payment-cancel-commit-fault-results.md). 실제 JDBC commit 성공 후 예외 주입, 네트워크 ACK 차단과 구분 |
 | 실제 Toss 테스트 환경 | [간편결제 승인 수정](payment-easypay-fix-results.md), [취소·늦은 승인·추가 Worker](toss-live-cancel-final-results.md). 실제 PG 장애나 일반 환불 API 검증은 아님 |
+| Redis Lua 부분 쓰기 | [진행 표시·자동 처리 보류·운영 확인](redis-lua-partial-write.md). 기존 불일치의 자동 복원은 아님 |
 | PG Circuit Breaker | [회로 전이·HTTP 차단·결제 안전성·자동 복구](payment-circuit-breaker-results.md). 앱별 회로이며 실제 Toss 장애·타 API 성능 검증은 아님 |
 | 성능·계측 | [버전 비교](booking-performance-optimized-results.md), [성공 경로 계측](booking-success-path-timing-results.md). 최신 5분 선점 유지 버전의 성능 수치가 아님 |
 
@@ -44,3 +45,5 @@
 ## 이번 문서 점검 범위
 
 2026-11-12에 현재 소스·설정·스크립트 인자를 정적으로 대조했다. 실제 테스트 재실행·k6·실제 PG 호출·시연 앱 교체는 하지 않았다. 로컬 링크와 코드 블록을 검사했고 Mermaid는 렌더러가 없어 텍스트 구조만 점검했다. 외부 URL 접속과 현재 가동 앱의 JAR 일치 여부는 이번에 확인하지 않았다.
+
+- Lua 부분 쓰기 보류 알림: [판단 기준·감시 공백·관리자 대응](redis-lua-partial-write.md#불완전-진행-기록의-관리자-알림)
