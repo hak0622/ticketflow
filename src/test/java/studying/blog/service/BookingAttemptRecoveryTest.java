@@ -428,7 +428,8 @@ class BookingAttemptRecoveryTest {
         String id = id(); service.book(concert.getId(), 1L, id);
         transactions.cancel(booking().getId(), null);
         seats.release(a(id));
-        redis.opsForHash().delete("booking:attempt:" + id, "releaseOutcome");
+        // A legacy marker has neither the old outcome nor the new inventory protocol fields.
+        redis.opsForHash().delete("booking:attempt:" + id, "releaseOutcome", "inventoryVersion", "inventoryPhase");
         jdbc.update("update concert set status='SOLD_OUT' where id=?", concert.getId());
         assertThat(seats.release(a(id))).isEqualTo(BookingSeatStore.ReleaseResult.LEGACY_UNKNOWN);
         release.recover(id);

@@ -40,9 +40,10 @@ public class BookingSeatStore {
     /** A single atomic HMGET; missing records retain the legacy recovery path. */
     public boolean isSoldOut(BookingAttempt a) {
         List<Object> fields = redis.opsForHash().multiGet(keys(a).get(2),
-                List.of("owner", "state", "result", "remaining", "admissionExpires", "releaseOutcome"));
+                List.of("owner", "state", "result", "remaining", "admissionExpires", "releaseOutcome", "inventoryVersion", "inventoryPhase"));
         if (fields.stream().allMatch(java.util.Objects::isNull)) return false;
         if (!owner(a).equals(fields.get(0))) throw new IllegalStateException("Attempt owner mismatch");
+        validateInventory(a, fields);
         Object state = fields.get(1), result = fields.get(2);
         if ("RELEASED".equals(state) && "SOLD_OUT".equals(result)
                 && fields.get(3) == null && fields.get(4) == null && fields.get(5) == null) return true;
@@ -64,12 +65,49 @@ public class BookingSeatStore {
             default -> throw new IllegalStateException("Unknown Redis release result: " + result);
         };
     }
+    public static class InventoryStateException extends IllegalStateException {
+        public InventoryStateException(String message) { super(message); }
+        public InventoryStateException(String message, Throwable cause) { super(message, cause); }
+    }
+    private void validateInventory(BookingAttempt attempt, List<Object> fields) {
+        Object version = fields.get(6), phase = fields.get(7);
+        if (version == null && phase == null) return;
+        String problem = null;
+        if (!"1".equals(version) || phase == null) problem = "INVENTORY_INVALID version/phase";
+        else if ("RESERVE_PENDING".equals(phase) || "RELEASE_PENDING".equals(phase))
+            problem = "INVENTORY_INCOMPLETE " + phase;
+        else {
+            Object state = fields.get(1), result = fields.get(2), outcome = fields.get(5);
+            boolean valid = "HELD".equals(phase) && "HELD".equals(state) && result == null && outcome == null
+                || "RELEASED".equals(state) && (
+                    "RETURNED".equals(phase) && "RETURNED".equals(outcome) && result == null
+                    || "NOT_HELD".equals(phase) && "NOT_HELD".equals(outcome) && result == null
+                    || "SOLD_OUT".equals(phase) && "SOLD_OUT".equals(result) && outcome == null);
+            if (!valid) problem = "INVENTORY_INVALID state combination";
+        }
+        if (problem != null) {
+            log.error("[INVENTORY][BLOCKED] requestId={} concertId={} operation=inspect phase={} reason={}",
+                    attempt.getId(), attempt.getConcertId(), phase, problem);
+            throw new InventoryStateException(problem);
+        }
+    }
     private long execute(DefaultRedisScript<Long> script, BookingAttempt a, String... args) {
         long start = System.nanoTime();
         try {
             Long result = redis.execute(script, keys(a), (Object[]) args);
             if (result == null) throw new IllegalStateException("Redis booking result unknown");
             return result;
+        } catch (RuntimeException failure) {
+            for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+                String message = cause.getMessage();
+                if (message != null && (message.startsWith("INVENTORY_INCOMPLETE ")
+                        || message.startsWith("INVENTORY_INVALID "))) {
+                    log.error("[INVENTORY][BLOCKED] requestId={} concertId={} operation={} reason={}",
+                            a.getId(), a.getConcertId(), script == RESERVE ? "reserve" : script == RELEASE ? "release" : "inspect", message);
+                    throw new InventoryStateException(message, failure);
+                }
+            }
+            throw failure;
         } finally {
             long ms = (System.nanoTime() - start) / 1_000_000;
             if (ms >= 30) log.warn("[BOOKING_REDIS][SLOW] requestId={} tookMs={}", a.getId(), ms);
