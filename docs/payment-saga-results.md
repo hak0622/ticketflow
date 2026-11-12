@@ -1,5 +1,7 @@
 # 결제 Orchestration Saga 구현 및 검증
 
+> 후속 안내: 아래는 실행 당시 기록입니다. [현재 설계](architecture.md), [후속 실프로세스 장애](payment-saga-fault-results.md), [커밋 예외](payment-cancel-commit-fault-results.md), [실제 Toss 취소](toss-live-cancel-final-results.md)를 함께 확인하세요. 당시 실패·미검증을 현재 전체 범위로 해석하지 않습니다.
+
 > 이 결과는 결제 Saga 구현 당시 검증입니다. 현재 안내는 [문서 목록](README.md), 이후 가독성 정리는 [문서 안내](README.md)를 참고하세요.
 
 2026-11-09. 로컬 환경만 사용. 실제 외부 PG·클라우드·k6는 사용하지 않았다.

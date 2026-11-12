@@ -46,6 +46,10 @@ k6 JSON, 앱별 로그와 Hikari 시계열을 보존한다.
 
 ## 실행
 
+2026-11-12 문서 정적 점검: 아래 baseline `092d272`는 현재 로컬 Git에서 commit으로 해석된다. 다른 clone에서도 `git rev-parse --verify '092d272^{commit}'`로 확인한다. 이력 정리나 shallow clone으로 참조가 없으면 임의의 다른 버전으로 대체하지 않는다.
+
+`--historical-results` 예시는 로컬 보존 JAR·해시가 있을 때만 가능하다. `build/`·`test-results/`는 Git 제외라 clone으로 내려받을 수 없다. 현재 동작·재현 범위는 [테스트 안내](../docs/testing.md), 최신 생성 복구는 문서 아래 전용 실행기를 따른다. 문서 정리에서 명령 실행·부하·실제 PG 호출은 하지 않았다.
+
 필요: Docker Desktop(권장 8GB 이상, 이번 실행 VM 10 CPU), Java 17, Python 3.9+, Gradle wrapper의 의존성 캐시. 로컬 k6/MySQL/Redis 설치는 필요 없다. k6는 `grafana/k6:1.0.0` 컨테이너에서 실행한다.
 
 ```bash

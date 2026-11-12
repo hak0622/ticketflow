@@ -68,7 +68,7 @@ SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=<id>
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=<secret>
 ```
 
-로컬 개발: MySQL (3306), Redis (localhost:6379) 실행 필요.
+로컬 개발: DB_URL이 가리키는 MySQL과 Redis(local 설정 localhost:6380)가 필요하다. 루트 Compose 호스트 포트는 MySQL 3307/Redis 6380이며 Docker 앱 내부 포트와 구분한다. TOSS_SECRET_KEY도 실행 환경에 주입한다. 테스트 Redis는 별도 인스턴스를 사용한다.
 
 선택:
 ```
@@ -79,7 +79,13 @@ payment.mock.fail-rate=0   # Mock 결제 실패율 (정수 0~100, 기본 0)
 
 ## 아키텍처 요약
 
-Queue(Redis) → Scheduler 1s/100명 입장권 발급(Lua, TTL 10분) → Booking(Redis 좌석 차감 + 상태 캐시) → Payment(Redis 멱등성 + Outbox 보상)
+현재 환경은 로컬이며 클라우드 구성은 과거 검증 기록이다. 지정 좌석 없이 공연별 수량을 관리한다.
+
+Queue(Redis) → Scheduler(인스턴스별 1s/최대 100명, 입장권 TTL 10분) → 요청 DB 선커밋 → 요청 잠금·Lua 선점 → Booking/요청 완료 동시 커밋 → 결제 Saga.
+
+예매 저장 실패는 최초 선점 기준 5분 동안 기존 선점으로 생성 재시도한다. Worker는 5초마다 due 요청을 처리하며 재차감·기한 연장은 없다. 결과 불명확·손상 기록은 임의 반환하지 않는다. 5분은 TTL 삭제나 복구 완료 SLA가 아니며 Booking 생성 후 미결제 30분과 구분한다. 요청별 상태 GET은 조회 전용이다.
+
+PG는 Payment 선커밋·최초 호출 선점 후 DB 트랜잭션 밖에서 호출한다. Booking→Payment 잠금으로 확정/취소를 적용하며 미확정은 재조회한다. 회차 비교로 여러 Worker의 실패 중복 갱신을 막는다. SETNX는 별도 Mock 결제 경로다. 확정 실패/전액 취소와 반환 Outbox를 함께 저장하며 요청별 공통 Lua로 반환한다.
 보안: `/api/**` JWT STATELESS / `/**` OAuth2 세션
 
 → 상세: [docs/architecture.md](docs/architecture.md), [docs/flow.md](docs/flow.md)

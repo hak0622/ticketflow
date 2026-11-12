@@ -1,5 +1,7 @@
 # 2단계 Redis–MySQL 장애 테스트 결과
 
+> 후속 안내: 아래는 실행 당시 기록입니다. [최신 선점 유지 정책](booking-hold-recovery.md)과 [후속 검증](booking-hold-recovery-results.md)를 함께 확인하세요. 당시 실패·미검증을 현재 전체 범위로 해석하지 않습니다.
+
 > 이 문서는 작성·실행 당시의 계획 또는 검증 기록입니다. 현재 흐름은 [문서 안내](README.md), PG 구현 및 한계는 [결제 결과](payment-saga-results.md)를 확인하세요. 과거 결과는 현재 전체 기능의 검증을 뜻하지 않습니다.
 
 ## 검증 방식
