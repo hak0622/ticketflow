@@ -1,0 +1,81 @@
+rule_files:
+  - ../rules/inventory-observation.yml
+evaluation_interval: 15s
+tests:
+  - interval: 15s
+    input_series:
+      - series: 'up{job="blog-concert-app",instance="a"}'
+        values: '1+0x20'
+      - series: 'up{job="blog-concert-app",instance="b"}'
+        values: '1+0x20'
+      - series: 'booking_inventory_observation_last_success_timestamp_seconds{job="blog-concert-app",instance="a"}'
+        values: '1+15x20'
+      - series: 'booking_inventory_observation_last_success_timestamp_seconds{job="blog-concert-app",instance="b"}'
+        values: '1+15x20'
+      - series: 'booking_inventory_incomplete_current{job="blog-concert-app",instance="a",phase="RESERVE_PENDING"}'
+        values: '2+0x4 0+0x15'
+      - series: 'booking_inventory_incomplete_current{job="blog-concert-app",instance="b",phase="RESERVE_PENDING"}'
+        values: '2+0x4 0+0x15'
+      - series: 'booking_inventory_incomplete_current{job="blog-concert-app",instance="a",phase="RELEASE_PENDING"}'
+        values: '0+0x20'
+      - series: 'booking_inventory_incomplete_current{job="blog-concert-app",instance="b",phase="RELEASE_PENDING"}'
+        values: '0+0x20'
+    promql_expr_test:
+      - expr: 'ALERTS{alertname="BookingInventoryIncomplete",alertstate="firing"}'
+        eval_time: 45s
+        exp_samples:
+          - labels: 'ALERTS{alertname="BookingInventoryIncomplete",alertstate="firing",phase="RESERVE_PENDING",service="ticketflow",severity="critical"}'
+            value: 1
+      - expr: 'ALERTS{alertname="BookingInventoryIncomplete",alertstate="firing"}'
+        eval_time: 15s
+        exp_samples: []
+      - expr: 'ALERTS{alertname="BookingInventoryIncomplete",alertstate="firing"}'
+        eval_time: 90s
+        exp_samples: []
+  - interval: 15s
+    input_series:
+      - series: 'up{job="blog-concert-app",instance="a"}'
+        values: '1+0x30'
+      - series: 'booking_inventory_observation_last_success_timestamp_seconds{job="blog-concert-app",instance="a"}'
+        values: '1+0x30'
+      - series: 'booking_inventory_incomplete_current{job="blog-concert-app",instance="a",phase="RESERVE_PENDING"}'
+        values: '1+0x30'
+      - series: 'booking_inventory_incomplete_current{job="blog-concert-app",instance="a",phase="RELEASE_PENDING"}'
+        values: '0+0x30'
+    promql_expr_test:
+      - expr: 'ALERTS{alertname="BookingInventoryIncomplete",alertstate="firing"}'
+        eval_time: 210s
+        exp_samples: []
+      - expr: 'ALERTS{alertname="BookingInventoryObservationUnavailable",alertstate="firing"}'
+        eval_time: 210s
+        exp_samples:
+          - labels: 'ALERTS{alertname="BookingInventoryObservationUnavailable",alertstate="firing",instance="a",job="blog-concert-app",service="ticketflow",severity="critical"}'
+            value: 1
+  - interval: 15s
+    input_series:
+      - series: 'up{job="blog-concert-app",instance="a"}'
+        values: '0+0x15'
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertname="BookingInventoryObservationUnavailable",alertstate="firing"})'
+        eval_time: 120s
+        exp_samples:
+          - labels: '{}'
+            value: 1
+  - interval: 15s
+    input_series:
+      - series: 'up{job="blog-concert-app",instance="a"}'
+        values: '1+0x15'
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertname="BookingInventoryObservationUnavailable",alertstate="firing"})'
+        eval_time: 120s
+        exp_samples:
+          - labels: '{}'
+            value: 1
+  - interval: 15s
+    input_series: []
+    promql_expr_test:
+      - expr: 'count(ALERTS{alertname="BookingInventoryObservationUnavailable",alertstate="firing"})'
+        eval_time: 120s
+        exp_samples:
+          - labels: '{}'
+            value: 1
