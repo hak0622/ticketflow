@@ -53,6 +53,25 @@ public class BookingSeatStore {
             throw new IllegalStateException("Invalid held attempt");
         return false;
     }
+    /** Read-only observation of the same primary used by the booking scripts. */
+    public String observeInventory(String requestId, Long concertId, Long userId) {
+        List<Object> values = redis.opsForHash().multiGet("booking:attempt:" + requestId,
+                List.of("owner", "state", "result", "releaseOutcome", "inventoryVersion", "inventoryPhase"));
+        if (values.stream().allMatch(java.util.Objects::isNull)) return "LEGACY_OR_ABSENT";
+        if (!(concertId + ":" + userId).equals(values.get(0)))
+            throw new InventoryStateException("Observation owner mismatch");
+        if ("1".equals(values.get(4)) && ("RESERVE_PENDING".equals(values.get(5))
+                || "RELEASE_PENDING".equals(values.get(5)))) {
+            if (!"HELD".equals(values.get(1)) || values.get(2) != null || values.get(3) != null)
+                throw new InventoryStateException("Observation invalid pending combination");
+            return values.get(5).toString();
+        }
+        // Match the existing guard's field order; no lease/business operation is executed.
+        validateInventory(new BookingAttempt(requestId, concertId, userId), java.util.Arrays.asList(
+                values.get(0), values.get(1), values.get(2), null, null, values.get(3), values.get(4), values.get(5)));
+        return "COMPLETE_OR_LEGACY";
+    }
+
     public enum ReleaseResult { NOT_HELD, RETURNED, ALREADY_RETURNED, LEGACY_UNKNOWN }
     public ReleaseResult release(BookingAttempt a) {
         long result = execute(RELEASE, a, owner(a), a.getId(), a.getBookingId() == null ? "1" : "0",
