@@ -88,3 +88,7 @@ PaymentPgBoundaryCharacterizationTest는 수정 전 위험 동작을 기대하�
 `build/`, `test-results/`는 Git 제외이며 clone으로 복원되지 않는다. 원본 XML·JAR·PG 원장 경로는 로컬 증거 위치다. 특정 historical-results 명령은 원본 JAR가 있어야 실행 가능하다. 공개 저장소에는 비밀키·토큰·원본 원장을 추가하지 않는다. Redis 유실, 장기 장애, 실제 PG 네트워크 장애, 완료 거래 정기 대사 등 남은 한계는 아키텍처와 개별 결과를 따른다.
 
 결제 접수 10분 경계·잠금 대기·접수 후 기한 경과 검증: [결과와 재현](payment-expiry-boundary-results.md).
+
+대기열 재등록·입장권·동시 발급 특성 검증: [문제 재현과 한계](queue-consistency-results.md). 테스트 통과를 운영 문제 해결로 해석하지 않습니다.
+
+대기열 운영 수정과 후속 검증: [대기열 1차 수정 결과](queue-consistency-fix-results.md). 수정 전 특성 검증과 기대 동작 변경을 구분한다.

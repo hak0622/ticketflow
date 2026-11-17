@@ -13,6 +13,14 @@
 | POST | `/api/concerts/{concertId}/queue` | JWT | 대기열 등록 |
 | GET | `/api/concerts/{concertId}/queue/me` | JWT | 내 대기 순번 조회 (`QUEUED`일 때 `nextPollMs` 포함) |
 
+2026-11-17 대기열 수정: POST는 기존 대기 점수를 유지하고, 입장권이 있으면 `ADMITTED`를 반환한다. GET은 입장권을 먼저 확인하며 조회로 등록·TTL 갱신을 하지 않는다. 두 API 모두 한 번의 Lua 결과로 응답해 `QUEUED`의 순번은 양수다.
+
+- POST `QUEUED`: concertId, status, position, total. GET은 여기에 nextPollMs를 포함한다.
+- POST/GET `ADMITTED`: concertId, status. 입장권 기한을 연장하지 않는다.
+- GET `NOT_IN_QUEUE`: concertId, status, total. Booking 보유 여부를 뜻하지 않는다.
+- 기존 입장권의 존재 판정은 유지한다. TTL 없는 기존 문자열 키도 대기열에서는 인정하지만 예매 Lua는 별도로 양의 잔여 TTL을 요구한다. 이번 수정은 비정상 입장권을 자동 갱신하지 않는다.
+- CLOSED/SOLD_OUT/종료 공연의 POST는 기존처럼 HTTP 403이며 GET은 공연 상태를 새로 검증하지 않는다.
+
 `GET /api/concerts/{concertId}/queue/me` 응답 예시:
 
 ```json
