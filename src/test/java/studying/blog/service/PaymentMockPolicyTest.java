@@ -25,7 +25,7 @@ class PaymentMockPolicyTest {
         var environment = new MockEnvironment();
         environment.setActiveProfiles(profile);
         var service = new PaymentService(payments, bookings, concerts, outboxes, redis,
-                new ObjectMapper(), new SimpleMeterRegistry(), toss, environment, mock(PaymentSaga.class));
+                new ObjectMapper(), new SimpleMeterRegistry(), toss, environment, mock(PaymentSaga.class), mock(PaymentDeadlinePolicy.class));
         ReflectionTestUtils.setField(service, "mockEnabled", enabled);
         assertThatThrownBy(() -> service.pay(1L, 1L, null)).isInstanceOf(MockPaymentDisabledException.class);
         verifyNoInteractions(payments, bookings, concerts, outboxes, redis, toss);

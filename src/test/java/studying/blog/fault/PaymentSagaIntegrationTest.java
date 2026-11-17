@@ -122,7 +122,7 @@ class PaymentSagaIntegrationTest extends IntegrationTestSupport {
         assertThat(calls.get()).isEqualTo(1);
         assertThat(response.getStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(outboxRepository.count()).isZero();
-        jdbcTemplate.update("UPDATE booking SET created_at=? WHERE concert_id=?",LocalDateTime.now().minusMinutes(31),concert.getId());
+        jdbcTemplate.update("UPDATE booking SET created_at=? WHERE concert_id=?",LocalDateTime.now().minusMinutes(11),concert.getId());
         expiry.expireStaleBookings();
         assertThat(queueService.getRemainingSeat(concert.getId())).isEqualTo(2);
         loseReply=false;
@@ -197,7 +197,7 @@ class PaymentSagaIntegrationTest extends IntegrationTestSupport {
             assertThat(calls.get()).isEqualTo(1); assertThat(paymentRepository.count()).isEqualTo(1);
             var mockRequest=json.readValue("{\"idempotencyKey\":\"another-order\",\"paymentMethod\":\"MOCK\"}",studying.blog.dto.PaymentRequest.class);
             assertThatThrownBy(() -> payments.pay(c.getId(),1L,mockRequest)).isInstanceOf(IllegalStateException.class);
-            jdbcTemplate.update("UPDATE booking SET created_at=? WHERE concert_id=?",LocalDateTime.now().minusMinutes(31),c.getId());
+            jdbcTemplate.update("UPDATE booking SET created_at=? WHERE concert_id=?",LocalDateTime.now().minusMinutes(11),c.getId());
             loseReply=false; final Long selected=paymentId;
             var recover=pool.submit(() -> saga.recover(selected));
             var expire=pool.submit(() -> expiry.expireStaleBookings());
@@ -230,7 +230,7 @@ class PaymentSagaIntegrationTest extends IntegrationTestSupport {
     @Test void expiredBookingCannotStartApproval() throws Exception {
         var c=savedConcert("expired",3,0); grantAdmitted(c.getId(),1L);
         String id=UUID.randomUUID().toString(); bookings.book(c.getId(),1L,id);
-        jdbcTemplate.update("UPDATE booking SET created_at=? WHERE concert_id=?",LocalDateTime.now().minusMinutes(31),c.getId());
+        jdbcTemplate.update("UPDATE booking SET created_at=? WHERE concert_id=?",LocalDateTime.now().minusMinutes(11),c.getId());
         var request=request(UUID.randomUUID().toString());
         assertThatThrownBy(() -> payments.tossConfirm(c.getId(),1L,request)).isInstanceOf(IllegalStateException.class);
         assertThat(calls.get()).isZero(); assertThat(paymentRepository.count()).isZero();

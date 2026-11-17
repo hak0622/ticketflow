@@ -41,6 +41,7 @@ public class PaymentService {
     private final TossPaymentClient tossPaymentClient;
     private final Environment environment;
     private final PaymentSaga paymentSaga;
+    private final PaymentDeadlinePolicy deadline;
 
     @Value("${payment.mock.enabled:false}")
     private boolean mockEnabled;
@@ -108,7 +109,7 @@ public class PaymentService {
         Booking booking = bookingRepository.findLockedByConcertIdAndUserId(concertId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("예매 내역이 없습니다."));
 
-        if (booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
+        if (booking.getStatus() != BookingStatus.PENDING_PAYMENT || deadline.expired(booking.getCreatedAt())) {
             throw new IllegalStateException("결제할 수 없는 상태입니다. 현재 예매 상태: " + booking.getStatus());
         }
 

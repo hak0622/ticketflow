@@ -60,7 +60,7 @@ class BookingLifecycleIntegrationTest extends IntegrationTestSupport {
         Concert concert = savedConcert("Expired Pending Concert", 10, 1);
         Long userId = 32L;
         Booking booking = savedPendingBooking(concert, userId);
-        backdateBooking(booking.getId(), LocalDateTime.now().minusMinutes(31));
+        backdateBooking(booking.getId(), LocalDateTime.now().minusMinutes(11));
 
         // When
         bookingExpiryScheduler.expireStaleBookings();
@@ -84,7 +84,7 @@ class BookingLifecycleIntegrationTest extends IntegrationTestSupport {
         booking.confirm();
         bookingRepository.save(booking);
         Payment payment = savedCompletedPayment(booking, userId, concert.getId(), UUID.randomUUID().toString());
-        backdateBooking(booking.getId(), LocalDateTime.now().minusMinutes(31));
+        backdateBooking(booking.getId(), LocalDateTime.now().minusMinutes(11));
 
         // When
         bookingExpiryScheduler.expireStaleBookings();

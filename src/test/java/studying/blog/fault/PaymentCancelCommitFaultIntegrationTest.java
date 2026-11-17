@@ -32,7 +32,7 @@ class PaymentCancelCommitFaultIntegrationTest extends PaymentCommitFaultIntegrat
         var oldRound=PaymentRetryRound.from(paymentRepository.findById(payment.getId()).orElseThrow());
         var oldDone=pg.lookup(payment.getPgPaymentKey());
         jdbcTemplate.update("UPDATE payment SET recovery_phase='CANCEL_REQUIRED',cancel_reason='cancel test fixture',version=version+1 WHERE id=?",payment.getId());
-        jdbcTemplate.update("UPDATE booking SET created_at=DATE_SUB(created_at,INTERVAL 31 MINUTE) WHERE id=?",payment.getBooking().getId());
+        jdbcTemplate.update("UPDATE booking SET created_at=DATE_SUB(created_at,INTERVAL 11 MINUTE) WHERE id=?",payment.getBooking().getId());
         String key="cancel-"+payment.getId();Path arm=DIR.resolve("commit-target-test.arm");
         Files.writeString(arm,payment.getId()+","+payment.getBooking().getId()+","+key+",CANCEL");
         var pool=Executors.newFixedThreadPool(4);
@@ -45,7 +45,7 @@ class PaymentCancelCommitFaultIntegrationTest extends PaymentCommitFaultIntegrat
             assertThat(queueService.getRemainingSeat(payment.getConcertId())).isEqualTo(2);
             if(returnFirst) {
                 var stale=pool.submit(()->org.springframework.test.util.ReflectionTestUtils.invokeMethod((Object)org.springframework.test.util.AopTestUtils.getUltimateTargetObject(saga),"applyResult",payment.getId(),oldDone,oldRound));
-                var expire=pool.submit(()->release.cancelAndRelease(payment.getBooking().getId(),java.time.LocalDateTime.now().minusMinutes(30)));
+                var expire=pool.submit(()->release.cancelAndRelease(payment.getBooking().getId(),java.time.LocalDateTime.now().minusMinutes(10)));
                 var compensate=pool.submit(()->{compensation.process(event);return true;});
                 stale.get(5,TimeUnit.SECONDS);expire.get(5,TimeUnit.SECONDS);compensate.get(5,TimeUnit.SECONDS);
                 assertThat(queueService.getRemainingSeat(payment.getConcertId())).isEqualTo(3);

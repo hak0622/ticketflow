@@ -42,7 +42,7 @@ class BookingExpirySchedulerTest {
     void 만료된_PENDING_PAYMENT_예약은_취소되고_좌석_반납() {
         Concert concert = savedConcert(1, ConcertStatus.OPEN);
         Booking booking = savedBooking(concert, 1L);
-        setCreatedAt(booking.getId(), LocalDateTime.now().minusMinutes(31));
+        setCreatedAt(booking.getId(), LocalDateTime.now().minusMinutes(11));
 
         scheduler.expireStaleBookings();
 
@@ -57,7 +57,7 @@ class BookingExpirySchedulerTest {
     void 만료기준_미달_예약은_처리_안_함() {
         Concert concert = savedConcert(1, ConcertStatus.OPEN);
         Booking booking = savedBooking(concert, 1L);
-        setCreatedAt(booking.getId(), LocalDateTime.now().minusMinutes(29));
+        setCreatedAt(booking.getId(), LocalDateTime.now().minusMinutes(9));
 
         scheduler.expireStaleBookings();
 
@@ -74,7 +74,7 @@ class BookingExpirySchedulerTest {
         Booking booking = savedBooking(concert, 1L);
         booking.confirm();
         bookingRepository.save(booking);
-        setCreatedAt(booking.getId(), LocalDateTime.now().minusMinutes(31));
+        setCreatedAt(booking.getId(), LocalDateTime.now().minusMinutes(11));
 
         scheduler.expireStaleBookings();
 
@@ -94,7 +94,7 @@ class BookingExpirySchedulerTest {
                 savedBooking(concert, 2L),
                 savedBooking(concert, 3L)
         );
-        bookings.forEach(b -> setCreatedAt(b.getId(), LocalDateTime.now().minusMinutes(31)));
+        bookings.forEach(b -> setCreatedAt(b.getId(), LocalDateTime.now().minusMinutes(11)));
 
         scheduler.expireStaleBookings();
 
@@ -111,7 +111,7 @@ class BookingExpirySchedulerTest {
     void SOLD_OUT_콘서트_만료_처리시_OPEN으로_복원() {
         Concert concert = savedConcert(10, ConcertStatus.SOLD_OUT);
         Booking booking = savedBooking(concert, 1L);
-        setCreatedAt(booking.getId(), LocalDateTime.now().minusMinutes(31));
+        setCreatedAt(booking.getId(), LocalDateTime.now().minusMinutes(11));
 
         scheduler.expireStaleBookings();
 

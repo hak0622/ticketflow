@@ -18,7 +18,7 @@ class PaymentCircuitBreakerGuardIntegrationTest extends CircuitPgSupport {
   var b=bookingRepository.findByConcertIdAndUserId(c.getId(),1L).orElseThrow();
   var old=Payment.create(b,1L,c.getId(),90000,"CARD",UUID.randomUUID().toString());old.fail("historical fixture");old=paymentRepository.saveAndFlush(old);
   var event=outboxRepository.saveAndFlush(PaymentCompensationOutbox.create(json.writeValueAsString(Map.of("bookingId",b.getId(),"concertId",c.getId(),"userId",1L,"paymentId",old.getId()))));
-  jdbcTemplate.update("UPDATE booking SET created_at=? WHERE id=?",LocalDateTime.now().minusMinutes(31),b.getId());
+  jdbcTemplate.update("UPDATE booking SET created_at=? WHERE id=?",LocalDateTime.now().minusMinutes(11),b.getId());
   open();saga.recover(r.getPaymentId());expiry.expireStaleBookings();
   assertThatThrownBy(()->processor.process(event.getId())).isInstanceOf(studying.blog.exception.PaymentDeferredException.class);
   assertThat(queueService.getRemainingSeat(c.getId())).isEqualTo(2);assertThat(bookingRepository.findById(b.getId()).orElseThrow().getStatus()).isEqualTo(BookingStatus.PENDING_PAYMENT);

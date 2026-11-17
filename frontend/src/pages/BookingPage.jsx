@@ -239,7 +239,7 @@ export default function BookingPage() {
         <div className="bg-primary-50 rounded-xl px-4 py-3 mb-5">
           <p className="text-xs text-primary-700 leading-relaxed">
             입장권 1매 기준으로 예매됩니다.<br />
-            예매 확정 후 <strong>30분 이내</strong>에 결제하지 않으면 자동 취소됩니다.
+            예매 생성 후 <strong>10분 이내</strong>에 결제하지 않으면 자동 취소됩니다.
           </p>
         </div>
 

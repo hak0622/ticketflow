@@ -22,9 +22,11 @@ public class BookingAttemptTransactions {
     private final QueueService queue;
     private final TransactionTemplate tx;
     private final PaymentRepository payments;
+    private final PaymentDeadlinePolicy deadline;
 
     public BookingAttemptTransactions(BookingAttemptRepository attempts, BookingRepository bookings,
-            ConcertRepository concerts, BookingSeatStore seats, QueueService queue, PaymentRepository payments, PlatformTransactionManager manager) {
+            ConcertRepository concerts, BookingSeatStore seats, QueueService queue, PaymentRepository payments, PlatformTransactionManager manager, PaymentDeadlinePolicy deadline) {
+        this.deadline = deadline;
         this.payments = payments;
         this.attempts = attempts;
         this.bookings = bookings;
@@ -172,7 +174,9 @@ public class BookingAttemptTransactions {
                 if(source.getStatus()!=PaymentStatus.FAILED && source.getStatus()!=PaymentStatus.CANCELED)
                     throw new studying.blog.exception.PaymentDeferredException();
             }
-            if (expiryThreshold != null && !b.getCreatedAt().isBefore(expiryThreshold)) return null;
+            // Non-null identifies expiry (null is compensation). Re-read time after locking;
+            // the scheduler's candidate cutoff must not become the final decision time.
+            if (expiryThreshold != null && !deadline.expired(b.getCreatedAt())) return null;
             BookingAttempt linked = attempts.findByBookingId(bookingId)
                     .orElseThrow(() -> new IllegalStateException("Booking attempt missing; migrate existing booking: " + bookingId));
             BookingAttempt a = locked(linked.getId());

@@ -64,7 +64,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         select b from Booking b
         join fetch b.concert
         where b.status = :status
-        and b.createdAt < :threshold
+        and b.createdAt <= :threshold
     """)
     List<Booking> findAllByStatusAndCreatedAtBefore(
             @Param("status") BookingStatus status,

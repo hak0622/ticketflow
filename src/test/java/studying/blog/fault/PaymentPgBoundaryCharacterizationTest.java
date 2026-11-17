@@ -127,7 +127,7 @@ class PaymentPgBoundaryCharacterizationTest extends IntegrationTestSupport {
         assertThat(queueService.getRemainingSeat(concert.getId())).isEqualTo(2);
         jdbcTemplate.execute("DROP TRIGGER fault_pg_payment_update");
         // Advance only the test Booking age; invoke the real expiry method deterministically.
-        jdbcTemplate.update("UPDATE booking SET created_at=? WHERE concert_id=?", LocalDateTime.now().minusMinutes(31), concert.getId());
+        jdbcTemplate.update("UPDATE booking SET created_at=? WHERE concert_id=?", LocalDateTime.now().minusMinutes(11), concert.getId());
         expiry.expireStaleBookings();
         assertReturned(concert.getId(), requestId);
         assertThat(approved.get(order)).isEqualTo("APPROVED");

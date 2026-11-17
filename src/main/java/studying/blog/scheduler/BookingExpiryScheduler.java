@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import studying.blog.domain.BookingStatus;
 import studying.blog.repository.BookingRepository;
 import studying.blog.service.BookingSeatReleaseService;
+import studying.blog.service.PaymentDeadlinePolicy;
 import java.time.LocalDateTime;
 
 @Slf4j
@@ -16,11 +17,12 @@ import java.time.LocalDateTime;
 public class BookingExpiryScheduler {
     private final BookingRepository bookingRepository;
     private final BookingSeatReleaseService release;
+    private final PaymentDeadlinePolicy deadline;
 
     @Scheduled(fixedDelay = 60_000)
     @SchedulerLock(name = "BookingExpiryScheduler", lockAtMostFor = "55s", lockAtLeastFor = "0s")
     public void expireStaleBookings() {
-        LocalDateTime threshold = LocalDateTime.now().minusMinutes(30);
+        LocalDateTime threshold = deadline.cutoff();
         for (var booking : bookingRepository.findAllByStatusAndCreatedAtBefore(BookingStatus.PENDING_PAYMENT, threshold)) {
             try {
                 release.cancelAndRelease(booking.getId(), threshold);

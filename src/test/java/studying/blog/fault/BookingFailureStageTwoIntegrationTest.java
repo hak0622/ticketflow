@@ -335,7 +335,7 @@ class BookingFailureStageTwoIntegrationTest {
     @Test void expiryAndPaymentCompensationExecuteConcurrentlyAndReturnOnlyOnce() throws Exception {
         String id = id(); bookingService.book(concertId, 1L, id);
         long bookingId = bookingId();
-        jdbc.update("UPDATE booking SET created_at = ? WHERE id = ?", LocalDateTime.now().minusMinutes(31), bookingId);
+        jdbc.update("UPDATE booking SET created_at = ? WHERE id = ?", LocalDateTime.now().minusMinutes(11), bookingId);
         var payment = Payment.create(bookings.findById(bookingId).orElseThrow(), 1L, concertId, 90000, "CARD", id());
         payment.fail("stage2 payment failure"); payments.saveAndFlush(payment);
         var outbox = outboxes.saveAndFlush(PaymentCompensationOutbox.create("{\"bookingId\":" + bookingId + ",\"concertId\":" + concertId + "}"));

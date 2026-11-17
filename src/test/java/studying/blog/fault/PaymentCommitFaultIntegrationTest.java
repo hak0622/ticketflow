@@ -47,7 +47,7 @@ class PaymentCommitFaultIntegrationTest extends PaymentRetryRoundIntegrationTest
         var selected=PaymentRetryRound.from(paymentRepository.findById(payment.getId()).orElseThrow());
         Long historicalEvent=null;
         if(race) {
-            jdbcTemplate.update("UPDATE booking SET created_at=DATE_SUB(created_at,INTERVAL 31 MINUTE) WHERE id=?",payment.getBooking().getId());
+            jdbcTemplate.update("UPDATE booking SET created_at=DATE_SUB(created_at,INTERVAL 11 MINUTE) WHERE id=?",payment.getBooking().getId());
             var failed=studying.blog.domain.Payment.create(payment.getBooking(),1L,payment.getConcertId(),90000,"MOCK",java.util.UUID.randomUUID().toString());
             failed.fail("historical fixture");failed=paymentRepository.saveAndFlush(failed);
             var event=studying.blog.domain.PaymentCompensationOutbox.create("{\"bookingId\":"+payment.getBooking().getId()+",\"concertId\":"+payment.getConcertId()+",\"paymentId\":"+failed.getId()+"}");
@@ -67,7 +67,7 @@ class PaymentCommitFaultIntegrationTest extends PaymentRetryRoundIntegrationTest
             if(race) {
                 final Long event=historicalEvent;
                 var stale=pool.submit(()->saga.recover(payment.getId(),selected));
-                var expire=pool.submit(()->release.cancelAndRelease(payment.getBooking().getId(),java.time.LocalDateTime.now().minusMinutes(30)));
+                var expire=pool.submit(()->release.cancelAndRelease(payment.getBooking().getId(),java.time.LocalDateTime.now().minusMinutes(10)));
                 var compensate=pool.submit(()->{compensation.process(event);return true;});
                 stale.get(5,TimeUnit.SECONDS);expire.get(5,TimeUnit.SECONDS);compensate.get(5,TimeUnit.SECONDS);
                 assertThat(outboxRepository.findById(event).orElseThrow().getStatus()).isEqualTo(studying.blog.domain.OutboxStatus.PUBLISHED);

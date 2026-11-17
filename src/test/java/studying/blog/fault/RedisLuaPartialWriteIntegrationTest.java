@@ -86,7 +86,7 @@ class RedisLuaPartialWriteIntegrationTest extends IntegrationTestSupport {
   long quantity=queueService.getRemainingSeat(concert.getId());
   for(int i=0;i<3;i++)outboxWorker.processPending();assertThat(outboxRepository.findById(event.getId()).orElseThrow().getStatus()).isEqualTo(OutboxStatus.FAILED);
   admin.retry(event.getId());outboxWorker.processPending();
-  jdbcTemplate.update("UPDATE booking SET created_at=? WHERE id=?",LocalDateTime.now().minusMinutes(31),booking.getId());expiry.expireStaleBookings();due();worker.recoverIncompleteRequests();
+  jdbcTemplate.update("UPDATE booking SET created_at=? WHERE id=?",LocalDateTime.now().minusMinutes(11),booking.getId());expiry.expireStaleBookings();due();worker.recoverIncompleteRequests();
   assertThat(queueService.getRemainingSeat(concert.getId())).isEqualTo(quantity);assertThat(outboxRepository.findById(event.getId()).orElseThrow().getStatus()).isEqualTo(OutboxStatus.PENDING);
   assertThat(attemptRepository.findById(attempt.getId()).orElseThrow().getStatus()).isEqualTo(BookingAttemptStatus.RELEASE_PENDING);
  }

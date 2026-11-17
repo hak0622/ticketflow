@@ -161,7 +161,7 @@ class BookingAttemptRecoveryTest {
     @Test void expiredBookingAndTwoDifferentOutboxesUseTheSameReturn() throws Exception {
         String id = id(); service.book(concert.getId(), 1L, id);
         Long bookingId = booking().getId();
-        jdbc.update("update booking set created_at = ? where id = ?", LocalDateTime.now().minusMinutes(31), bookingId);
+        jdbc.update("update booking set created_at = ? where id = ?", LocalDateTime.now().minusMinutes(11), bookingId);
         expiry.expireStaleBookings(); remaining(10);
         for (int i = 0; i < 2; i++) {
             var outbox = outboxes.saveAndFlush(PaymentCompensationOutbox.create("{\"bookingId\":" + bookingId + ",\"concertId\":" + concert.getId() + "}"));

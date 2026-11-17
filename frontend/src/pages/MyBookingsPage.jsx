@@ -78,7 +78,7 @@ function BookingCard({ booking }) {
       {isPending && (
         <div className="bg-yellow-50 border-t border-yellow-100 px-5 py-3 flex items-center justify-between gap-3">
           <p className="text-xs text-yellow-700 leading-snug">
-            30분 이내에 결제하지 않으면 자동 취소됩니다.
+            10분 이내에 결제하지 않으면 자동 취소됩니다.
           </p>
           <Link
             to={`/concerts/${booking.concertId}/payment`}

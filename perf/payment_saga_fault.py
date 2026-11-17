@@ -135,7 +135,7 @@ class Suite:
         c=self.current;pid,bid,key=c['payment_id'],c['booking_id'],c['pg_key']
         sql=f"START TRANSACTION; SELECT id FROM booking WHERE id={bid} FOR UPDATE; UPDATE payment SET recovery_phase='CANCEL_REQUIRED',cancel_reason='TicketFlow booking cannot be finalized',version=version+1 WHERE id={pid};"
         if race:
-            sql+=f"UPDATE booking SET created_at=DATE_SUB(created_at,INTERVAL 31 MINUTE) WHERE id={bid};"
+            sql+=f"UPDATE booking SET created_at=DATE_SUB(created_at,INTERVAL 11 MINUTE) WHERE id={bid};"
         sql+='COMMIT;';self.env.sql(sql)
         self.record('fixture_only_sql',sql=sql,reason='initial cancellation intent; not generated through public API')
         self.snapshot('cancellation_intent_committed')

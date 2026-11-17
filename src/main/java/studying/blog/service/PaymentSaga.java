@@ -37,6 +37,7 @@ public class PaymentSaga {
     private final PaymentCompensationOutboxRepository outbox;
     private final TossPaymentClient pg;
     private final ObjectMapper json;
+    private final PaymentDeadlinePolicy deadline;
 
     public PaymentResponse confirm(Long concertId, Long userId, TossConfirmRequest request) {
         validateRequest(request);
@@ -140,7 +141,7 @@ public class PaymentSaga {
                 return existingPayment.get();
             }
             if (booking.getStatus() != BookingStatus.PENDING_PAYMENT
-                    || !booking.getCreatedAt().plusMinutes(30).isAfter(LocalDateTime.now())) {
+                    || deadline.expired(booking.getCreatedAt())) {
                 throw new IllegalStateException("결제할 수 없는 예매입니다.");
             }
             if (!payments.findAllByBookingIdOrderByIdAsc(booking.getId()).isEmpty()) {
