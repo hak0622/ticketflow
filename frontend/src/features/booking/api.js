@@ -15,8 +15,8 @@ export const getBookingStatus = (concertId) =>
   axiosInstance.get(`/concerts/${concertId}/booking/me`)
 
 /** 예매 상세 - GET /api/concerts/:id/booking/detail */
-export const getBookingDetail = (concertId) =>
-  axiosInstance.get(`/concerts/${concertId}/booking/detail`)
+export const getBookingDetail = (concertId, options = {}) =>
+  axiosInstance.get(`/concerts/${concertId}/booking/detail`, options)
 
 /** 결제 - POST /api/concerts/:id/payment */
 export const pay = (concertId, data) =>
@@ -31,7 +31,7 @@ export const tossConfirm = (concertId, data) =>
   axiosInstance.post(`/concerts/${concertId}/payment/toss-confirm`, data)
 
 /** 결제 결과 조회 */
-export const getMyPayment = (concertId) => axiosInstance.get(`/concerts/${concertId}/payment/me`)
+export const getMyPayment = (concertId, options = {}) => axiosInstance.get(`/concerts/${concertId}/payment/me`, options)
 
 export const getBookingAttempt = (concertId, requestId) =>
   axiosInstance.get(`/concerts/${concertId}/booking/attempts/${requestId}`)
