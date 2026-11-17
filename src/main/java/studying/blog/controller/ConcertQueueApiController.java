@@ -20,21 +20,22 @@ public class ConcertQueueApiController {
     private final QueueService queueService;
 
     @Operation(summary = "대기열 등록",
-            description = "콘서트 대기열에 등록합니다. 이미 예매한 경우 BOOKED, 대기 중이면 QUEUED와 순번을 반환합니다.")
+            description = "콘서트 대기열에 등록합니다. 입장권이 있으면 ADMITTED, 대기 중이면 기존 순번을 유지해 QUEUED를 반환합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/{concertId}/queue")
     public ResponseEntity<?> enqueue(@PathVariable Long concertId,
                                      @AuthenticationPrincipal CustomPrincipal principal) {
         Long userId = principal.getUserId();
 
-        Long position = queueService.enqueue(concertId, userId);
-        Long total = queueService.getTotal(concertId);
-
+        QueueService.QueueSnapshot snapshot = queueService.register(concertId, userId);
+        if ("ADMITTED".equals(snapshot.status())) {
+            return ResponseEntity.ok(Map.of("concertId", concertId, "status", "ADMITTED"));
+        }
         return ResponseEntity.ok(Map.of(
                 "concertId", concertId,
-                "status", "QUEUED",
-                "position", position != null ? position : 0,
-                "total", total != null ? total : 0
+                "status", snapshot.status(),
+                "position", snapshot.position(),
+                "total", snapshot.total()
         ));
     }
 
@@ -46,8 +47,9 @@ public class ConcertQueueApiController {
                                      @AuthenticationPrincipal CustomPrincipal principal){
         Long userId = principal.getUserId();
 
-        Long position = queueService.getPosition(concertId, userId);
-        Long total = queueService.getTotal(concertId);
+        QueueService.QueueSnapshot snapshot = queueService.readQueue(concertId, userId);
+        Long position = snapshot.position();
+        long total = snapshot.total();
 
         if (position != null) {
             int nextPollMs = position > 1000 ? 10_000 : 5_000;
@@ -55,12 +57,12 @@ public class ConcertQueueApiController {
                     "concertId", concertId,
                     "status", "QUEUED",
                     "position", position,
-                    "total", total == null ? 0 : total,
+                    "total", total,
                     "nextPollMs", nextPollMs
             ));
         }
 
-        if (queueService.isAdmitted(concertId, userId)) {
+        if ("ADMITTED".equals(snapshot.status())) {
             return ResponseEntity.ok(Map.of(
                     "concertId", concertId,
                     "status", "ADMITTED"
@@ -70,7 +72,7 @@ public class ConcertQueueApiController {
         return ResponseEntity.ok(Map.of(
                 "concertId", concertId,
                 "status", "NOT_IN_QUEUE",
-                "total", total == null ? 0 : total
+                "total", total
         ));
     }
 }

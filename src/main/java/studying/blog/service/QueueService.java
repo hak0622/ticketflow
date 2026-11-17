@@ -3,6 +3,7 @@ package studying.blog.service;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import studying.blog.domain.Concert;
@@ -57,8 +58,24 @@ public class QueueService {
         }
     }
 
-    //줄서기 등록
+    private final DefaultRedisScript<List> enqueueScript = queueScript("enqueue-concert.lua");
+    private final DefaultRedisScript<List> readQueueScript = queueScript("read-concert-queue.lua");
+
+    private static DefaultRedisScript<List> queueScript(String name) {
+        DefaultRedisScript<List> script = new DefaultRedisScript<>();
+        script.setLocation(new ClassPathResource("redis/" + name));
+        script.setResultType(List.class);
+        return script;
+    }
+
+    public record QueueSnapshot(String status, Long position, long total) {}
+
+    // Legacy callers need only the rank. HTTP registration uses the full atomic snapshot.
     public Long enqueue(Long concertId, Long userId) {
+        return register(concertId, userId).position();
+    }
+
+    public QueueSnapshot register(Long concertId, Long userId) {
         ConcertInfo info = getConcertInfo(concertId);
         if (info == null) {
             Concert concert = concertRepository.findById(concertId)
@@ -75,22 +92,53 @@ public class QueueService {
         }
 
         long score = Instant.now().toEpochMilli();
-        String m = member(userId);
-
-        // Redis ZADD + RANK 시간 측정
         long t0 = System.nanoTime();
-        redisTemplate.opsForZSet().add(queueKey(concertId), m, score);
-        Long rank = redisTemplate.opsForZSet().rank(queueKey(concertId), m);
-        long ms = (System.nanoTime() - t0) / 1_000_000;
+        List<?> result = redisTemplate.execute(enqueueScript,
+                List.of(queueKey(concertId), admittedKey(concertId, userId)),
+                member(userId), String.valueOf(score));
+        QueueSnapshot snapshot = parseSnapshot(result);
+        logQueueTiming("enqueue", concertId, userId, t0);
+        meterRegistry.counter("queue.enqueue").increment();
+        return snapshot;
+    }
 
-        //너무 자주 찍히는 API라서 "느릴 때만" 경고 로그
+    // The snapshot is read atomically and never consumes or refreshes an admission.
+    public QueueSnapshot readQueue(Long concertId, Long userId) {
+        long t0 = System.nanoTime();
+        List<?> result = redisTemplate.execute(readQueueScript,
+                List.of(queueKey(concertId), admittedKey(concertId, userId)), member(userId));
+        QueueSnapshot snapshot = parseSnapshot(result);
+        logQueueTiming("readQueue", concertId, userId, t0);
+        return snapshot;
+    }
+
+    private QueueSnapshot parseSnapshot(List<?> result) {
+        if (result == null || result.size() != 3) {
+            throw new IllegalStateException("Invalid Redis queue response");
+        }
+        try {
+            long state = Long.parseLong(String.valueOf(result.get(0)));
+            long position = Long.parseLong(String.valueOf(result.get(1)));
+            long total = Long.parseLong(String.valueOf(result.get(2)));
+            if (total >= 0) {
+                if (state == 1 && position > 0 && position <= total) {
+                    return new QueueSnapshot("QUEUED", position, total);
+                }
+                if (state == 2 && position == 0) return new QueueSnapshot("ADMITTED", null, total);
+                if (state == 0 && position == 0) return new QueueSnapshot("NOT_IN_QUEUE", null, total);
+            }
+        } catch (NumberFormatException malformed) {
+            throw new IllegalStateException("Invalid Redis queue response", malformed);
+        }
+        throw new IllegalStateException("Invalid Redis queue response");
+    }
+
+    private void logQueueTiming(String operation, Long concertId, Long userId, long started) {
+        long ms = (System.nanoTime() - started) / 1_000_000;
         if (ms >= SLOW_REDIS_MS) {
             org.slf4j.LoggerFactory.getLogger(QueueService.class)
-                    .warn("[QUEUE][SLOW] op=enqueue concertId={} userId={} tookMs={}", concertId, userId, ms);
+                    .warn("[QUEUE][SLOW] op={} concertId={} userId={} tookMs={}", operation, concertId, userId, ms);
         }
-
-        meterRegistry.counter("queue.enqueue").increment();
-        return rank != null ? rank + 1 : null;
     }
 
     //현재 내 순번 조회만
@@ -123,31 +171,7 @@ public class QueueService {
         return total;
     }
 
-    // Lua 스크립트: queue에서 앞 n명 꺼내서 admitted 키 발급(SETEX)
-    private static final String POP_AND_GRANT_LUA = """
-            local queueKey = KEYS[1]
-            local count = tonumber(ARGV[1])
-            local ttl = tonumber(ARGV[2])
-            local admittedPrefix = ARGV[3]
-            
-            local users = redis.call('ZRANGE', queueKey, 0, count - 1)
-            if (#users == 0) then
-              return users
-            end
-            
-            redis.call('ZREM', queueKey, unpack(users))
-            
-            for i = 1, #users do
-              local userId = users[i]
-              local key = admittedPrefix .. userId
-              redis.call('SETEX', key, ttl, '1')
-            end
-            
-            return users
-            """;
-
-    private final DefaultRedisScript<List> popAndGrantScript =
-            new DefaultRedisScript<>(POP_AND_GRANT_LUA, List.class);
+    private final DefaultRedisScript<List> popAndGrantScript = queueScript("pop-concert-queue.lua");
 
     // Lua 스크립트: admitted 선점(있으면 TTL 반환 + DEL, 없으면 -1)
     private static final String CLAIM_ADMITTED_LUA = """
@@ -222,14 +246,15 @@ public class QueueService {
         long ms = (System.nanoTime() - t0) / 1_000_000;
 
         // 스케줄러는 반복이라 "느릴 때만" 경고 + granted size 같이
-        int size = granted == null ? 0 : granted.size();
+        if (granted == null) throw new IllegalStateException("Missing Redis queue grant response");
+        int size = granted.size();
         if (ms >= SLOW_REDIS_MS) {
             org.slf4j.LoggerFactory.getLogger(QueueService.class)
                     .warn("[QUEUE][SLOW] op=popAndGrant concertId={} batch={} granted={} ttlSec={} tookMs={}",
                             concertId, n, size, ttlSeconds, ms);
         }
 
-        return granted == null ? List.of() : granted;
+        return granted;
     }
 
     // 입장권 있는지 확인
