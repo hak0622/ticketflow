@@ -55,7 +55,7 @@ QueueService.claimAdmitted/restoreSeatOnceForCompensation은 옛 테스트용 �
 | BookingAttemptRecoveryWorker | 5초 | due 미완료 최대 100건. 유효 선점은 생성 재개, 만료/미선점은 종료·반환. 최초 REQUESTED 유예 30초, 요청 행 잠금 |
 | PaymentRecoveryWorker | 5초 | due PENDING 최대 100건 PG 재조회, backoff |
 | PaymentCompensationScheduler | 10초 | 기존 반환 Outbox 처리, 보류와 일반 오류 구분 |
-| BookingExpiryScheduler | 60초 | 30분 초과 Booking 취소 후보 처리, 잠금 안에서 미확정/완료 결제 보호 |
+| BookingExpiryScheduler | 60초 | 10분 초과 Booking 취소 후보 처리, 잠금 안에서 미확정/완료 결제 보호 |
 
 Outbox와 만료 Scheduler는 ShedLock을 사용하지만 안전성은 만료되지 않는 전역 락이 아니라 상태 재검사·행 잠금·멱등 반환에도 의존한다. 결제 Worker는 중복 조회를 허용하고 잠금·저장된 PG 멱등키로 보호한다. 후보 선택 때 retryCount/nextRetryAt/recoveryPhase 스냅샷을 보존하고 실패 저장 시 현재 DB와 비교해 같은 회차를 한 번만 갱신한다. version은 진단용이며 단독 회차 식별자가 아니다. 정상 결과는 스냅샷이 오래됐다는 이유만으로 버리지 않고 현재 상태와 PG 정보를 검증한다.
 
@@ -83,7 +83,7 @@ Redis 반환 성공 후 DB 커밋 전에 종료되면 다음 실행이 RETURNED 
 |---|---|
 | 입장권 10분 | 발급 시점부터 예매 시작 권한의 TTL. 재고 선점 아님 |
 | 예매 생성 복구 5분 | 최초 Redis 선점 시점부터 생성 재시도 시작 기한. TTL 자동 반환 아님 |
-| 미결제 만료 30분 | Booking 생성 시점 기준 만료 후보. 60초 Scheduler와 결제 상태 보호를 거쳐 취소 |
+| 미결제 만료 10분 | Booking 생성 시점 기준 만료 후보. 60초 Scheduler와 결제 상태 보호를 거쳐 취소 |
 
 5분 내 생성 재시도를 시작해도 커밋은 기한 뒤에 끝날 수 있다. 요청 트랜잭션 설정은 10초이며 정확한 복구 완료 시각의 보장이 아니다. Worker 주기·backoff·DB/Redis 장애에 따라 반환이 지연될 수 있다. [상세 정책·배포 조건](booking-hold-recovery.md)을 따른다.
 

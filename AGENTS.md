@@ -21,7 +21,7 @@
 
 - Redis 대기열 → 입장권 발급 → 예매(Booking) → 결제(Payment)
 - 결제 실패 시 Outbox 기반 보상 처리
-- PENDING_PAYMENT 방치 시 30분 후 자동 만료. 미확정/완료 결제가 있으면 잠금 안에서 반환 보류
+- PENDING_PAYMENT 방치 시 10분 후 자동 만료. 미확정/완료 결제가 있으면 잠금 안에서 반환 보류
 
 ---
 
@@ -93,13 +93,13 @@ payment.mock.fail-rate=0   # Mock 결제 실패율 (정수 0~100, 기본 0)
     POST /payment는 설정으로 허용하는 별도 Mock 경로
     실패 시: PaymentCompensationOutbox 생성
              → PaymentCompensationScheduler (10s) 보상 처리
-    방치 시: BookingExpiryScheduler (60s) → 30분 초과 자동 취소
+    방치 시: BookingExpiryScheduler (60s) → 10분 초과 자동 취소
 ```
 
 ### 동시성 제어
 
 - Concert 잔여석: BookingSeatStore의 요청별 Redis Lua. 공연 행 비관적 락·매 예매 bookedCount UPDATE 없음
-- 예매: booking_attempt 요청 행 잠금·Booking 유니크 제약·공통 멱등 반환. 복구 Worker 5초. 5분은 생성 재시도 기한이며 TTL 자동 반환/완료 SLA가 아님. Booking 생성 후 미결제 30분과 구분
+- 예매: booking_attempt 요청 행 잠금·Booking 유니크 제약·공통 멱등 반환. 복구 Worker 5초. 5분은 생성 재시도 기한이며 TTL 자동 반환/완료 SLA가 아님. Booking 생성 후 미결제 10분과 구분
 - PG 결제: Booking→Payment 잠금·DB 주문 유니크·저장된 승인/취소 멱등키. PG HTTP는 트랜잭션 밖. 후보 선택 회차 비교로 실패 중복 갱신 방지
 - Mock 결제: Redis SETNX (30s TTL) + DB unique key (`uk_payment_idempotency_key`)
 - 대기열: Lua 스크립트 (원자적 ZADD / ZRANGE+ZREM+SETEX)

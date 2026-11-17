@@ -21,7 +21,7 @@
 
 - Redis 대기열 → 입장권 발급 → 예매(Booking) → 결제(Payment)
 - 결제 실패 시 Outbox 기반 보상 처리
-- PENDING_PAYMENT 방치 시 30분 후 자동 만료
+- PENDING_PAYMENT 방치 시 10분 후 자동 만료
 
 ---
 
@@ -83,7 +83,7 @@ payment.mock.fail-rate=0   # Mock 결제 실패율 (정수 0~100, 기본 0)
 
 Queue(Redis) → Scheduler(인스턴스별 1s/최대 100명, 입장권 TTL 10분) → 요청 DB 선커밋 → 요청 잠금·Lua 선점 → Booking/요청 완료 동시 커밋 → 결제 Saga.
 
-예매 저장 실패는 최초 선점 기준 5분 동안 기존 선점으로 생성 재시도한다. Worker는 5초마다 due 요청을 처리하며 재차감·기한 연장은 없다. 결과 불명확·손상 기록은 임의 반환하지 않는다. 5분은 TTL 삭제나 복구 완료 SLA가 아니며 Booking 생성 후 미결제 30분과 구분한다. 요청별 상태 GET은 조회 전용이다.
+예매 저장 실패는 최초 선점 기준 5분 동안 기존 선점으로 생성 재시도한다. Worker는 5초마다 due 요청을 처리하며 재차감·기한 연장은 없다. 결과 불명확·손상 기록은 임의 반환하지 않는다. 5분은 TTL 삭제나 복구 완료 SLA가 아니며 Booking 생성 후 미결제 10분과 구분한다. 요청별 상태 GET은 조회 전용이다.
 
 PG는 Payment 선커밋·최초 호출 선점 후 DB 트랜잭션 밖에서 호출한다. Booking→Payment 잠금으로 확정/취소를 적용하며 미확정은 재조회한다. 회차 비교로 여러 Worker의 실패 중복 갱신을 막는다. SETNX는 별도 Mock 결제 경로다. 확정 실패/전액 취소와 반환 Outbox를 함께 저장하며 요청별 공통 Lua로 반환한다.
 보안: `/api/**` JWT STATELESS / `/**` OAuth2 세션

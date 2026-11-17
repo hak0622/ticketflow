@@ -260,7 +260,7 @@ B가 복구하도록 기다립니다. 회차 사이 JVM 재시작은 Circuit Bre
 위한 준비 과정이며, 장애 후 A 재시작으로 복구를 대신하지 않습니다.
 
 취소 시나리오는 테스트 DB의 초기 Payment 취소 의도를 준비합니다. 만료 경합에는
-31분 전 Booking과 과거 실패 Payment/Outbox도 준비합니다. 과거 Outbox는 B/C가
+11분 전 Booking과 과거 실패 Payment/Outbox도 준비합니다. 과거 Outbox는 B/C가
 같은 결제를 선택한 뒤 넣어 단일 스케줄링 스레드를 준비 게이트로 막는 간섭을 피합니다.
 이는 테스트 fixture이며 공개 API가 취소 의도를 생성했다는 검증이 아닙니다.
 
