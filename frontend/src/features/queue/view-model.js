@@ -105,8 +105,8 @@ export function getQueueViewModel({ data, loading, error, countdown, concertId }
       queueLineSuffix: '명의 대기자가 있습니다.',
       queueNoticeLine1: '현재 접속 인원이 많아 대기 중입니다.',
       queueNoticeLine2: '잠시만 기다리시면 예매하기 페이지로 자동 연결됩니다.',
-      queueWarningLine1: '새로고침 하거나 재접속하시면',
-      queueWarningLine2: '대기순서가 초기화되어 대기시간이 더 길어집니다.',
+      queueWarningLine1: '중복 등록 대신 이 화면에서',
+      queueWarningLine2: '대기 상태를 확인해주세요.',
       lastUpdatedLabel: '마지막 업데이트:',
     },
     actions: {

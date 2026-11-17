@@ -35,19 +35,22 @@ export default function QueuePage() {
   const navigate = useNavigate()
   const { token } = useAuthStore()
 
-  const [countdown, setCountdown] = useState(null)
-
+  const { user } = useAuthStore()
   useEffect(() => {
-    if (!token) {
-      navigate('/login', { state: { from: `/concerts/${concertId}/queue` } })
-    }
+    if (!token) navigate('/login', { state: { from: `/concerts/${concertId}/queue` } })
   }, [token, navigate, concertId])
+  if (!token) return null
+  return <QueueSession key={`${concertId}:${user?.sub ?? 'unknown'}`} concertId={concertId} navigate={navigate} />
+}
+
+function QueueSession({ concertId, navigate }) {
+  const [countdown, setCountdown] = useState(null)
 
   const handleAdmitted = () => {
     startAdmittedCountdown()
   }
 
-  const { data, loading, error } = useQueuePolling(concertId, {
+  const { data, loading, error, connection, reason, lastUpdatedAt, resume } = useQueuePolling(concertId, {
     onAdmitted: handleAdmitted,
   })
 
@@ -66,6 +69,31 @@ export default function QueuePage() {
     countdown,
     concertId,
   })
+
+  if (['retrying', 'paused', 'checking', 'auth_error'].includes(connection)) {
+    const retryAllowed = connection === 'paused' && ['network', 'invalid'].includes(reason)
+    const message = reason === 'auth' ? '다시 로그인해주세요.'
+      : reason === 'forbidden' ? '대기열 조회 권한이 없습니다.'
+      : reason === 'request' ? '대기 상태를 조회할 수 없습니다. 공연 정보를 확인해주세요.'
+      : reason === 'invalid' ? '서버 응답을 확인하지 못해 자동 조회를 중단했습니다.'
+      : connection === 'paused' ? '연결 오류로 자동 조회를 중단했습니다.'
+      : connection === 'checking' ? '대기 상태를 다시 확인 중입니다.' : '연결을 다시 확인 중입니다.'
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 text-center">
+        <p aria-live="polite">{message}</p>
+        {data?.status === 'QUEUED' && !['auth', 'forbidden', 'request'].includes(reason) && <>
+          <p>마지막 확인 순번: {data.position.toLocaleString()}명</p>
+          <p>마지막 확인: {new Date(lastUpdatedAt).toLocaleTimeString('ko-KR')}</p>
+        </>}
+        <p>현재 순번과 입장 가능 여부는 다시 확인해야 합니다.</p>
+        {(retryAllowed || connection === 'checking') && <button onClick={resume}
+          disabled={connection === 'checking'} className="rounded-xl bg-primary-500 text-white px-6 py-3">
+          {connection === 'checking' ? '확인 중...' : '순번 다시 확인'}
+        </button>}
+        <Link to={`/concerts/${concertId}`}>공연 페이지로 돌아가기</Link>
+      </div>
+    )
+  }
 
   if (vm.viewState === 'loading') {
     return (
@@ -245,7 +273,7 @@ export default function QueuePage() {
         </div>
 
         <p className="mt-4 text-xs text-center text-gray-300">
-          {vm.messages.lastUpdatedLabel} {new Date().toLocaleTimeString('ko-KR')}
+          {vm.messages.lastUpdatedLabel} {lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString('ko-KR') : '-'}
         </p>
       </div>
     </div>

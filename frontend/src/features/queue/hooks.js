@@ -1,118 +1,63 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { getQueueStatus } from './api'
 
-const FAST_POLL_INTERVAL_MS = 5000
-const DEFAULT_POLL_INTERVAL_MS = 10000
+const jitter = (ms) => ms + Math.floor(Math.random() * 501) - 250
+const valid = (data) => data && (data.status === 'QUEUED'
+  ? Number.isInteger(data.position) && data.position > 0
+  : ['ADMITTED', 'BOOKED', 'NOT_IN_QUEUE'].includes(data.status))
 
-function withJitter(ms) {
-  return ms + Math.floor(Math.random() * 501) - 250
-}
-
-function getNextPollInterval(resData) {
-  if (resData.status !== 'QUEUED') {
-    return null
-  }
-
-  if (Number.isFinite(resData.nextPollMs) && resData.nextPollMs > 0) {
-    return withJitter(resData.nextPollMs)
-  }
-
-  const position = resData.position
-  if (typeof position !== 'number' || !Number.isFinite(position) || position <= 0) {
-    return withJitter(DEFAULT_POLL_INTERVAL_MS)
-  }
-
-  return withJitter(position <= 1000 ? FAST_POLL_INTERVAL_MS : DEFAULT_POLL_INTERVAL_MS)
-}
-
-/**
- * 대기열 서버 상태를 순번에 따라 차등 폴링하는 훅
- *
- * 반환값:
- *  - data   : { concertId, status, position?, total?, message? }
- *  - loading: 첫 응답 전 true
- *  - error  : 네트워크/서버 오류
- *
- * status 값:
- *  QUEUED        - 대기 중 (position: 내 순번, total: 전체 대기 수)
- *  ADMITTED      - 입장 가능 → onAdmitted 콜백 즉시 호출
- *  BOOKED        - 이미 예매 완료
- *  NOT_IN_QUEUE  - 대기열 없음 또는 만료
- */
 export function useQueuePolling(concertId, { onAdmitted } = {}) {
-  const [data, setData]       = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState(null)
-  const timerRef              = useRef(null)
-  const stoppedRef            = useRef(false)
-  const errorCountRef         = useRef(0)
-  const MAX_ERRORS            = 3
-  const onAdmittedRef         = useRef(onAdmitted)
-
-  useEffect(() => { onAdmittedRef.current = onAdmitted }, [onAdmitted])
-
-  const stopPolling = useCallback(() => {
-    stoppedRef.current = true
-    clearTimeout(timerRef.current)
-  }, [])
-
-  const scheduleNextPoll = useCallback((delay) => {
-    if (stoppedRef.current || delay == null) return
-
-    clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => {
-      pollRef.current?.()
-    }, delay)
-  }, [])
-
-  const pollRef = useRef(null)
-
-  const poll = useCallback(async () => {
-    if (stoppedRef.current) return
-    try {
-      const res = await getQueueStatus(concertId)
-      const resData = res.data
-      setData(resData)
-      setError(null)
-      errorCountRef.current = 0
-
-      // 서버가 더 이상 대기열 진행 상태가 아니라고 응답하면 폴링 종료
-      if (resData.status === 'ADMITTED') {
-        stopPolling()
-        onAdmittedRef.current?.()
-      } else if (resData.status === 'BOOKED' || resData.status === 'NOT_IN_QUEUE') {
-        stopPolling()
-      } else {
-        scheduleNextPoll(getNextPollInterval(resData))
-      }
-    } catch (err) {
-      errorCountRef.current += 1
-      if (errorCountRef.current >= MAX_ERRORS) {
-        stopPolling()
-      } else {
-        scheduleNextPoll(withJitter(DEFAULT_POLL_INTERVAL_MS))
-      }
-      setError(err)
-    } finally {
-      setLoading(false)
-    }
-  }, [concertId, scheduleNextPoll, stopPolling])
-
+  const [state, setState] = useState({ data: null, loading: true, error: null,
+    connection: 'initial', reason: null, lastUpdatedAt: null })
+  const callback = useRef(onAdmitted)
+  const resumeRef = useRef(null)
+  useEffect(() => { callback.current = onAdmitted }, [onAdmitted])
   useEffect(() => {
-    pollRef.current = poll
-  }, [poll])
-
-  useEffect(() => {
-    stoppedRef.current = false
-    setLoading(true)
-    setError(null)
-    errorCountRef.current = 0
-    poll()
-    return () => {
-      stoppedRef.current = true
-      clearTimeout(timerRef.current)
+    let active = true, finished = false, busy = false, failures = 0, timer, controller
+    let paused = false
+    const publish = (change) => { if (active) setState((previous) => ({ ...previous, ...change })) }
+    const schedule = (delay) => { clearTimeout(timer); timer = setTimeout(poll, jitter(delay)) }
+    async function poll() {
+      if (!active || finished || busy) return
+      busy = true
+      controller = new AbortController()
+      try {
+        const { data } = await getQueueStatus(concertId, { signal: controller.signal })
+        if (!active) return
+        if (!valid(data)) {
+          paused = true
+          publish({ loading: false, connection: 'paused', reason: 'invalid', error: new Error('Invalid queue response') })
+          return
+        }
+        failures = 0; paused = false
+        finished = data.status !== 'QUEUED'
+        publish({ data, loading: false, error: null, reason: null,
+          connection: finished ? 'finished' : 'polling', lastUpdatedAt: Date.now() })
+        if (finished) { if (data.status === 'ADMITTED') callback.current?.() }
+        else schedule(Number.isFinite(data.nextPollMs) && data.nextPollMs > 0
+          ? data.nextPollMs : data.position <= 1000 ? 5000 : 10000)
+      } catch (error) {
+        if (!active || controller.signal.aborted || error.code === 'ERR_CANCELED') return
+        const code = error.response?.status
+        const retryable = !code || code === 408 || code === 429 || code >= 500
+        failures++
+        paused = !retryable || failures >= 3
+        const reason = code === 401 ? 'auth' : code === 403 ? 'forbidden' : retryable ? 'network' : 'request'
+        publish({ loading: false, error, reason,
+          connection: code === 401 ? 'auth_error' : paused ? 'paused' : 'retrying' })
+        if (!paused) schedule(10000)
+      } finally { busy = false }
     }
-  }, [poll])
-
-  return { data, loading, error }
+    resumeRef.current = () => {
+      if (!active || finished || busy || !paused) return
+      clearTimeout(timer); failures = 0; paused = false
+      publish({ connection: 'checking', reason: null, error: null })
+      poll()
+    }
+    // StrictMode cleanup runs before this initial request can start.
+    Promise.resolve().then(poll)
+    return () => { active = false; clearTimeout(timer); controller?.abort(); resumeRef.current = null }
+  }, [concertId])
+  const resume = useCallback(() => resumeRef.current?.(), [])
+  return { ...state, resume }
 }
