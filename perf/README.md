@@ -1,5 +1,7 @@
 # TicketFlow k6 성능·정합성 검증
 
+일반 local 프로파일의 테스트 지원 API는 기본 비활성화다. 아래 성능·장애 실행은 개발 DB/Redis와 분리된 환경에서 수행하며 `perf/compose.yml`은 `TEST_SUPPORT_ENABLED=true`를 명시한다. 테스트 API는 JWT 발급과 데이터 초기화를 포함하므로 개발·시연 앱에서 편의상 켜지 않는다.
+
 ## 로컬 앱 3개 검증 시작
 
 ```bash

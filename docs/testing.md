@@ -17,8 +17,15 @@
 - 개발 기본 프로파일은 local이다. DB_URL/DB_USERNAME/DB_PASSWORD, JWT_SECRET_KEY, Google OAuth 클라이언트 ID·secret, TOSS_SECRET_KEY를 실행 프로세스에 전달한다. 이 프로젝트의 `./gradlew bootRun`은 루트 `.env`를 읽어 환경변수를 전달한다. 직접 `java -jar`로 실행할 때는 이 Gradle 처리가 없으므로 별도로 주입한다. 값은 공개 문서·로그에 붙이지 않는다.
 - local의 Redis는 현재 localhost:6380이다. 루트 Compose는 MySQL 호스트 3307, Redis 호스트 6380을 매핑하므로 DB_URL도 대상 포트를 맞춘다. Docker 앱은 서비스 이름 mysql:3306·redis:6379로 접속한다.
 - 준비한 개발 DB·Redis에서 `./gradlew bootRun`으로 백엔드를 시작하고, frontend 폴더에서 의존성을 준비한 뒤 `npm run dev`로 실행한다. Vite의 기본 /api 프록시는 localhost:8080이며 허용 frontend origin·OAuth 리다이렉트도 해당 실행 주소와 맞아야 한다.
-- local은 Mock 결제와 테스트 지원 API를 활성화한다. 공통 설정의 Mock 기본값 false, prod의 강제 거부 정책과 구분한다. local을 공개 운영 환경으로 안내하지 않는다.
+- 로컬 Google 로그인은 `http://localhost:5173`에서 시작해 기본 `http://localhost:8080/login/oauth2/code/google` 콜백을 사용한다. Google 콘솔에 해당 주소를 정확히 등록해야 한다. Docker에서 `FRONTEND_URL=http://localhost:5173`을 지정하면 콜백 주소는 `http://localhost:5173/login/oauth2/code/google`이고 Vite가 백엔드로 전달한다. 로그인 요청과 콜백이 같은 호스트의 세션 쿠키를 사용하도록 `localhost`로 통일한다.
+- local은 Mock 결제를 활성화하지만 테스트 지원 API는 기본 비활성화한다. 테스트 JWT 발급·CSV·공연 setup/reset은 격리 DB/Redis를 사용하는 별도 실행에서만 `TEST_SUPPORT_ENABLED=true`로 켠다. 공통 설정의 Mock 기본값 false, prod의 강제 거부 정책과 구분한다. local을 공개 운영 환경으로 안내하지 않는다.
 - 루트 Compose의 MySQL/Redis 볼륨은 개발 데이터다. 아래 격리 검증과 혼용하거나 `down -v`로 임의 삭제하지 않는다. 이 문서 정리에서는 어느 앱도 재시작하지 않았다.
+
+### 로그인 변경 검증
+
+- 로컬 시연에서 실제 Google 계정으로 로그인한 사용자가 내 예매 조회, 새로고침 후 로그인 유지, 로그아웃 후 보호 화면 접근 차단이 정상이라고 확인했다.
+- 선택 백엔드 회귀 130건과 프론트 92건이 통과했다. Chrome·Vite에서는 모의 Google과 모의 결제 응답으로 새로고침 후 로그인 복구 및 결제 조회 복귀를 검증했다. 승인 요청이 401을 받은 뒤 자동 갱신과 새 로그인에서 추가 승인 요청은 없었다.
+- 실행 로그와 JUnit XML은 로컬의 Git 제외 `test-results/auth-renewal/`에 있다. 실제 Toss 결제와 배포 환경은 이 실행에서 검증하지 않았다.
 
 ## 현재 검증 경로
 
@@ -28,6 +35,7 @@
 | BookingHoldLeaseClockIntegrationTest | 실제 5분 경과 후 자동 Worker 반환. 스케줄러 ON, 반드시 별도 실행 |
 | BookingAttemptMySqlIntegrationTest / BookingFailureStageTwoIntegrationTest | 요청 잠금·매진·멱등 반환·DB/Redis 장애와 응답 유실 |
 | BookingPaymentApiIntegrationTest | 상태 조회의 인증·소유권·조회 전용 및 API 회귀 |
+| OAuthSessionIntegrationTest / TokenApiControllerTest | 로컬 모의 OAuth·MySQL/Redis·두 앱의 세션, 쿠키 갱신과 로그아웃 폐기·DB 경합, 재발급의 Origin·오류 처리 회귀. 통합 테스트는 `./gradlew test --tests studying.blog.integration.OAuthSessionIntegrationTest`로 별도 실행 |
 | PaymentSagaIntegrationTest / PaymentRetryRoundIntegrationTest | HTTP PG 재조회·취소·결과 적용 및 동일 회차 실패 중복 갱신 보호 |
 | PaymentCommitFaultIntegrationTest / PaymentCancelCommitFaultIntegrationTest | 실제 DB commit 후 JDBC 예외 주입과 회귀. 정확한 클래스·범위는 각 결과 문서 참조 |
 | PaymentStageOneIntegrationTest / PaymentMockDisabledIntegrationTest / PaymentFlowIntegrationTest | 소유권·기존 결과·Mock 정책·API 회귀 |
@@ -92,3 +100,5 @@ PaymentPgBoundaryCharacterizationTest는 수정 전 위험 동작을 기대하�
 대기열 재등록·입장권·동시 발급 특성 검증: [문제 재현과 한계](queue-consistency-results.md). 테스트 통과를 운영 문제 해결로 해석하지 않습니다.
 
 대기열 운영 수정과 후속 검증: [대기열 1차 수정 결과](queue-consistency-fix-results.md). 수정 전 특성 검증과 기대 동작 변경을 구분한다.
+
+관리자 수량 불변·생성 권한·테스트 지원 격리: [정책과 검증 결과](admin-concert-safety-results.md).

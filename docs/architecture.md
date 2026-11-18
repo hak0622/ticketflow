@@ -16,7 +16,7 @@ Spring Boot, MySQL, Redis, 외부 Toss PG를 사용한다. 프론트는 React + 
 | 결제 재확인 | PaymentRecoveryWorker → PaymentSaga.recover |
 | 티켓 보상 | PaymentCompensationScheduler → PaymentCompensationOutboxProcessor → BookingSeatReleaseService |
 
-주요 도메인은 Concert, Booking, BookingAttempt, Payment, PaymentCompensationOutbox다. `experiments/`는 읽기 전용 전략 비교 자료이며 운영 코드에서 import하지 않는다. `testsupport/`는 설정으로 활성화하는 테스트 API, `diagnostics/`는 선택적 계측 코드다. 일반 사용자 플로우와 구분한다.
+주요 도메인은 Concert, Booking, BookingAttempt, Payment, PaymentCompensationOutbox다. `experiments/`는 읽기 전용 전략 비교 자료이며 운영 코드에서 import하지 않는다. `testsupport/`는 일반 local에서는 기본 비활성화하며 격리 환경에서 명시적으로 켜는 테스트 API, `diagnostics/`는 선택적 계측 코드다. 일반 사용자 플로우와 구분한다.
 
 ## 대기열과 재고
 
@@ -99,4 +99,18 @@ PG 미확정/취소 미확정은 반환하지 않는다. 취소 의도를 저장
 
 `/api/**`는 JWT Bearer, API 외 경로는 OAuth2/Google 등 별도 SecurityFilterChain을 사용한다. 구체적인 공개 경로·권한은 WebOAuthSecurityConfig가 기준이다. React/Vite 화면과 기존 Web UI 경로를 혼동하지 않는다.
 
+Google 로그인 요청은 웹 체인의 서버 세션에 저장하고 브라우저에는 세션 식별자를 보낸다. 로그인 시작과 콜백이 다른 앱에 도착할 수 있는 구성에서는 같은 Redis 세션 저장소를 사용한다. 세션마다 최신 로그인 요청 하나를 유지하며 콜백의 `state`와 일치하는 요청을 사용한다. 세션이 없거나 만료됐거나 이전 버전에서 시작한 로그인은 다시 시작한다. 로컬 실행 주소와 검증 방법은 [테스트 안내](testing.md#개발-실행과-테스트-실행의-차이)를 따른다.
+
+Google 인증이 끝나면 인증 세션·사용자에 묶인 60초 교환 기록을 Redis에 저장하고 프론트의 `/auth/callback`으로 이동한다. 프론트는 `POST /oauth2/exchange`로 접근 토큰을 받는다. 웹 OAuth 세션과 프론트 Origin을 확인한 뒤 Redis `GETDEL`로 교환 기록을 한 번만 소비한다. 응답 유실로 교환 완료 여부를 알 수 없으면 로그인부터 다시 시작한다.
+
+접근 토큰과 갱신 토큰은 서명된 `token_use`로 용도를 구분한다. 보호 API는 발급자·서명·만료·접근 용도를 검증하고, 재발급 API는 갱신 용도 검증 후 서버에 등록된 값인지 확인한다. 적용 전에 발급한 JWT는 재로그인으로 교체하며, 테스트용 JWT·CSV도 다시 발급한다. 여러 앱은 동일 버전으로 적용한다.
+
+갱신 토큰은 발급마다 무작위 식별자를 갖는다. 갱신 쿠키의 발급과 삭제에는 `HttpOnly`, `SameSite=Lax`, `Path=/`를 동일하게 적용하고, 설정된 프론트 URL이 HTTPS이면 `Secure`도 설정한다. 로그아웃은 행 잠금 안에서 쿠키의 토큰과 DB의 현재 값을 비교해 일치하는 경우에만 폐기한다. 웹 세션을 무효화한 뒤 프론트가 `204`를 받으면 로컬 인증 상태를 정리한다.
+
+프론트는 접근 토큰을 메모리에 보관한다. 새로고침 또는 접근 토큰의 `401` 응답 이후 갱신 쿠키로 접근 토큰을 요청한다. 같은 탭에서 진행 중인 갱신 요청은 공유하며, 같은 사용자의 조회 GET만 한 번 자동 재시도한다. 결제창을 열 때 탭에 주문 식별 정보와 사용자 ID를 저장하고, 첫 승인 시도 전에 기록을 갱신한다. 새로고침이나 재로그인으로 확인을 재개하면 기존 주문을 조회한다. 다시 로그인하더라도 이전 승인 요청을 자동 전송하지 않는다.
+
 현재 환경은 로컬이다. 개발 compose, perf의 독립 테스트 compose, 화면 시연 구성은 목적이 다르다. [실행 명령](../perf/README.md)을 따른다. GCP 배포 파일과 README의 클라우드 측정은 과거 기록이며 현재 가동 중인 인프라를 뜻하지 않는다. Kafka/Redis Stream/Saga 프레임워크는 도입하지 않았다.
+
+## 관리자 변경 제한
+
+두 공연 생성 POST는 ADMIN 전용이며 공개 공연 GET은 유지한다. 생성 후 총 수량은 변경 불가다. `ConcertService.adminUpdate()`는 DB 저장 수량과 다르면 엔티티 변경·Redis 조회/쓰기 전에 거절한다. 같은 수량으로 기존 메타데이터 수정은 가능하며 커밋 이후 공연 캐시를 갱신한다. 관리자 수정에서 Redis 재고를 재계산·초기화하지 않는다. 예매 요청 기록이 있는 공연의 기존 삭제 차단은 유지하며, 삭제 경합·생성 DB/Redis 장애의 새 복구 보장은 별도다. [검증 범위](admin-concert-safety-results.md).
