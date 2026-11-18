@@ -36,7 +36,8 @@ oauth2:
 app:
   frontend-url: http://localhost:5173
   test-support:
-    enabled: true
+    # 격리된 테스트 DB/Redis에서만 명시적으로 활성화한다.
+    enabled: ${TEST_SUPPORT_ENABLED:false}
     user-count: 500
     email-prefix: test
     email-domain: test.com

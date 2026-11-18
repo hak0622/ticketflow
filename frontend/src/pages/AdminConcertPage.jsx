@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../features/auth/store'
 import {
@@ -86,7 +86,7 @@ function ConcertFormModal({ initial, onClose, onSaved }) {
     setError(null)
     const payload = {
       ...form,
-      totalSeats: Number(form.totalSeats),
+      totalSeats: isEdit ? initial.totalSeats : Number(form.totalSeats),
       price: form.price !== '' ? Number(form.price) : null,
       discountRate: form.discountRate !== '' ? Number(form.discountRate) : null,
       eventAt: toLocalDatetime(form.eventAt),
@@ -97,7 +97,7 @@ function ConcertFormModal({ initial, onClose, onSaved }) {
       else await createAdminConcert(payload)
       onSaved()
     } catch (err) {
-      setError(err.response?.data?.message || '저장 실패')
+      setError(err.response?.data?.message || err.response?.data?.error || '저장 실패')
     } finally {
       setSubmitting(false)
     }
@@ -132,7 +132,8 @@ function ConcertFormModal({ initial, onClose, onSaved }) {
               <input type="datetime-local" className={inputCls} value={form.bookingOpenAt} onChange={set('bookingOpenAt')} />
             </Field>
             <Field label="총 좌석수" required>
-              <input type="number" min="1" className={inputCls} value={form.totalSeats} onChange={set('totalSeats')} required />
+              <input type="number" min="1" className={inputCls} value={form.totalSeats} onChange={set('totalSeats')} readOnly={isEdit} aria-label="총 좌석수" required />
+              {isEdit && <p className="text-xs text-gray-500 mt-1">총 티켓 수량은 생성 후 변경할 수 없습니다.</p>}
             </Field>
             <Field label="가격 (원)">
               <input type="number" min="0" className={inputCls} value={form.price} onChange={set('price')} />
@@ -159,7 +160,7 @@ function ConcertFormModal({ initial, onClose, onSaved }) {
             </Field>
           )}
 
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p role="alert" className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose}
@@ -243,33 +244,42 @@ export default function AdminConcertPage() {
   const [error, setError] = useState(null)
   const [formTarget, setFormTarget] = useState(null) // null=닫힘, {}=생성, concert=수정
   const [bookingTarget, setBookingTarget] = useState(null)
+  const [actionError, setActionError] = useState(null)
+  const [actionPending, setActionPending] = useState(false)
+  const actionInFlight = useRef(false)
 
   useEffect(() => {
     if (!token) { navigate('/login'); return }
     if (user?.role !== 'ADMIN') { navigate('/'); return }
   }, [token, user, navigate])
 
-  const load = () => {
-    setLoading(true)
-    getAdminConcerts()
-      .then((r) => setConcerts(r.data))
-      .catch(() => setError('목록 조회 실패'))
-      .finally(() => setLoading(false))
+  const load = useCallback(() => getAdminConcerts()
+    .then((r) => { setConcerts(r.data); setError(null) })
+    .catch(() => setError('목록 조회 실패'))
+    .finally(() => setLoading(false)), [])
+
+  useEffect(() => { if (token && user?.role === 'ADMIN') load() }, [token, user, load])
+
+  const runAction = async (id, action, confirmation) => {
+    if (actionInFlight.current || !window.confirm(confirmation)) return
+    actionInFlight.current = true
+    setActionPending(true)
+    setActionError(null)
+    try {
+      await action(id)
+      setLoading(true)
+      await load()
+    } catch (failure) {
+      setActionError(failure.response?.data?.message || failure.response?.data?.error || '작업에 실패했습니다. 다시 시도해주세요.')
+    } finally {
+      actionInFlight.current = false
+      setActionPending(false)
+    }
   }
 
-  useEffect(() => { if (token && user?.role === 'ADMIN') load() }, [token, user])
-
-  const handleClose = async (id) => {
-    if (!window.confirm('공연을 마감하시겠습니까?')) return
-    await closeAdminConcert(id)
-    load()
-  }
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('공연을 삭제하시겠습니까? 관련 예매도 모두 삭제됩니다.')) return
-    await deleteAdminConcert(id)
-    load()
-  }
+  const handleClose = (id) => runAction(id, closeAdminConcert, '공연을 마감하시겠습니까?')
+  const handleDelete = (id) => runAction(id, deleteAdminConcert,
+    '공연을 삭제하시겠습니까? 예매 요청 기록이 있는 공연은 삭제할 수 없습니다.')
 
   if (loading) {
     return (
@@ -300,6 +310,8 @@ export default function AdminConcertPage() {
             + 공연 생성
           </button>
         </div>
+
+        {actionError && <p role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{actionError}</p>}
 
         {concerts.length === 0 ? (
           <div className="text-center py-24 text-gray-400">등록된 공연이 없습니다.</div>
@@ -339,12 +351,12 @@ export default function AdminConcertPage() {
                           수정
                         </button>
                         {c.status === 'OPEN' && (
-                          <button onClick={() => handleClose(c.id)}
+                          <button disabled={actionPending} onClick={() => handleClose(c.id)}
                             className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-yellow-50 hover:bg-yellow-100 text-yellow-700">
                             마감
                           </button>
                         )}
-                        <button onClick={() => handleDelete(c.id)}
+                        <button disabled={actionPending} onClick={() => handleDelete(c.id)}
                           className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-red-50 hover:bg-red-100 text-red-600">
                           삭제
                         </button>
@@ -362,7 +374,7 @@ export default function AdminConcertPage() {
         <ConcertFormModal
           initial={formTarget.id ? formTarget : null}
           onClose={() => setFormTarget(null)}
-          onSaved={() => { setFormTarget(null); load() }}
+          onSaved={() => { setFormTarget(null); setActionError(null); setLoading(true); load() }}
         />
       )}
 

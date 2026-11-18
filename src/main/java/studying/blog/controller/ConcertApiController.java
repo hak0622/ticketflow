@@ -27,7 +27,7 @@ public class ConcertApiController {
         return ResponseEntity.ok(concertService.search(condition));
     }
 
-    @Operation(summary = "공연 생성", description = "인증 필요")
+    @Operation(summary = "공연 생성", description = "ADMIN 권한 필요. 기존 요청 형식을 유지하는 생성 경로입니다.")
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping
     public ResponseEntity<ConcertResponse> create(@RequestBody ConcertCreateRequest req){

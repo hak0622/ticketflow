@@ -32,6 +32,7 @@ public class ConcertService {
 
     @Transactional
     public ConcertResponse create(ConcertCreateRequest req){
+        validateBasicFields(req.getTitle(), req.getEventAt(), req.getTotalSeats());
         Concert concert = Concert.builder()
                 .title(req.getTitle())
                 .eventAt(req.getEventAt())
@@ -110,24 +111,13 @@ public class ConcertService {
         validateAdminUpsert(req);
 
         Concert concert = concertRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Concert not found : " + id));
-        int derivedBookedCount = resolveBookedCount(concert);
-
-        if(req.getTotalSeats() < derivedBookedCount){
-            throw new IllegalArgumentException("totalSeats는 현재 예매 인원(bookedCount)보다 작을 수 없습니다. 현재 예매 인원: " + derivedBookedCount);
+        if (req.getTotalSeats() != concert.getTotalSeats()) {
+            throw new IllegalStateException("생성된 공연의 총 티켓 수량은 변경할 수 없습니다.");
         }
-
-        if (req.getTotalSeats() != concert.getTotalSeats() && attemptRepository.existsByConcertId(id))
-            throw new IllegalStateException("예매 요청 기록이 있는 공연의 수량 변경은 별도 정합성 점검 후 진행해야 합니다.");
-        int prevTotalSeats = concert.getTotalSeats();
         concert.updateByAdmin(req.getTitle(), req.getArtist(), req.getVenue(), req.getGenre(),
                 req.getEventAt(), req.getBookingOpenAt(),
                 req.getTotalSeats(), req.getPrice(), req.getDiscountRate(),
                 req.getPosterUrl(), req.getZone(), req.getStatus());
-
-        if (req.getTotalSeats() != prevTotalSeats) {
-            int remaining = Math.max(0, req.getTotalSeats() - derivedBookedCount);
-            queueService.initSeatCount(id, remaining);
-        }
 
         // 캐시 갱신은 커밋 이후 — 롤백 시 Redis/DB 불일치 방지
         final ConcertStatus updatedStatus = concert.getStatus();
@@ -182,21 +172,19 @@ public class ConcertService {
     }
 
     private void validateAdminUpsert(ConcertAdminUpsertRequest req){
-        if(req.getTitle() == null || req.getTitle().isBlank()){
-            throw new IllegalArgumentException("title은 필수입니다.");
-        }
-        if(req.getEventAt() == null){
-            throw new IllegalArgumentException("eventAt은 필수입니다.");
-        }
-        if(req.getTotalSeats() <= 0){
-            throw new IllegalArgumentException("totalSeats는 1 이상이어야 합니다.");
-        }
+        validateBasicFields(req.getTitle(), req.getEventAt(), req.getTotalSeats());
         if(req.getPrice() != null && req.getPrice() < 0){
             throw new IllegalArgumentException("price는 0 이상이어야 합니다.");
         }
         if(req.getDiscountRate() != null && (req.getDiscountRate() < 0 || req.getDiscountRate() > 100)){
             throw new IllegalArgumentException("discountRate는 0~100 사이여야 합니다.");
         }
+    }
+
+    private void validateBasicFields(String title, java.time.LocalDateTime eventAt, int totalSeats) {
+        if (title == null || title.isBlank()) throw new IllegalArgumentException("title은 필수입니다.");
+        if (eventAt == null) throw new IllegalArgumentException("eventAt은 필수입니다.");
+        if (totalSeats <= 0) throw new IllegalArgumentException("totalSeats는 1 이상이어야 합니다.");
     }
 
     private ConcertResponse toConcertResponse(Concert concert) {
