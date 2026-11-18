@@ -12,15 +12,16 @@ import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import studying.blog.config.oauth.OAuth2AuthorizationRequestBasedOnCookieRepository;
 import studying.blog.config.oauth.OAuth2SuccessHandler;
 import studying.blog.config.oauth.OAuth2UserCustomService;
+import studying.blog.config.oauth.OAuthLoginExchange;
 import studying.blog.repository.RefreshTokenRepository;
 import studying.blog.service.UserService;
 
@@ -37,8 +38,7 @@ public class WebOAuthSecurityConfig {
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserService userService;
 
-    @Value("${oauth2.redirect-url}")
-    private String oauth2RedirectUrl;
+    private final OAuthLoginExchange loginExchange;
 
     @Value("${FRONTEND_URL:http://localhost:5173}")
     private String frontendUrl;
@@ -62,6 +62,11 @@ public class WebOAuthSecurityConfig {
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration sessionPostCors = new CorsConfiguration();
+        sessionPostCors.setAllowedOrigins(List.of(loginExchange.frontendOrigin()));
+        sessionPostCors.setAllowedMethods(List.of("POST"));
+        sessionPostCors.setAllowCredentials(true);
+        source.registerCorsConfiguration("/oauth2/exchange", sessionPostCors);
         source.registerCorsConfiguration("/**", config);
         return source;
     }
@@ -131,9 +136,10 @@ public class WebOAuthSecurityConfig {
         http.oauth2Login(oauth -> oauth
                 .loginPage("/login")
                 .authorizationEndpoint(ep ->
-                        ep.authorizationRequestRepository(oAuth2AuthorizationRequestBasedOnCookieRepository())
+                        ep.authorizationRequestRepository(new HttpSessionOAuth2AuthorizationRequestRepository())
                 )
                 .successHandler(oAuth2SuccessHandler())
+                .failureUrl(loginExchange.loginErrorUrl())
                 .userInfoEndpoint(user -> user.userService(oAuth2UserCustomService))
         );
 
@@ -145,20 +151,14 @@ public class WebOAuthSecurityConfig {
         return new OAuth2SuccessHandler(
                 tokenProvider,
                 refreshTokenRepository,
-                oAuth2AuthorizationRequestBasedOnCookieRepository(),
                 userService,
-                oauth2RedirectUrl
+                loginExchange
         );
     }
 
     @Bean
     public TokenAuthenticationFilter tokenAuthenticationFilter() {
         return new TokenAuthenticationFilter(tokenProvider);
-    }
-
-    @Bean
-    public OAuth2AuthorizationRequestBasedOnCookieRepository oAuth2AuthorizationRequestBasedOnCookieRepository() {
-        return new OAuth2AuthorizationRequestBasedOnCookieRepository();
     }
 
     @Bean

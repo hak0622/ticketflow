@@ -1,5 +1,4 @@
-import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import Header from './components/layout/Header'
 import BottomNav from './components/layout/BottomNav'
 import HomePage from './pages/HomePage'
@@ -14,27 +13,7 @@ import PaymentFailPage from './pages/PaymentFailPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import AdminConcertPage from './pages/AdminConcertPage'
-import { applyOAuthToken } from './features/auth/auth-actions'
-
-/** OAuth2 콜백 처리: URL에 ?token= 이 있으면 저장 후 제거 */
-function OAuthCallback() {
-  const navigate = useNavigate()
-  const { search } = useLocation()
-
-  useEffect(() => {
-    const params = new URLSearchParams(search)
-    const token = params.get('token')
-    if (token) {
-      applyOAuthToken(token)
-      // 로그인 전 방문하려던 경로로 복귀, 없으면 홈(/)으로
-      const redirect = sessionStorage.getItem('loginRedirect') || '/'
-      sessionStorage.removeItem('loginRedirect')
-      navigate(redirect, { replace: true })
-    }
-  }, [search]) // eslint-disable-line
-
-  return null
-}
+import AuthCallbackPage from './pages/AuthCallbackPage'
 
 function Layout() {
   const { pathname } = useLocation()
@@ -42,7 +21,6 @@ function Layout() {
 
   return (
     <div className="font-sans min-h-screen bg-gray-50">
-      <OAuthCallback />
       <Header />
       <Routes>
         <Route path="/"                     element={<HomePage />} />
@@ -66,7 +44,10 @@ function Layout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Layout />
+      <Routes>
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="*" element={<Layout />} />
+      </Routes>
     </BrowserRouter>
   )
 }

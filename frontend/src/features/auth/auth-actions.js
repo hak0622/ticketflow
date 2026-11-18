@@ -1,8 +1,9 @@
 import { serverLogout } from './api'
-import { clearAuthSession, setAccessToken } from './session'
+import { clearAuthSession, getAccessToken, setAccessToken } from './session'
 
 export function applyOAuthToken(token) {
   setAccessToken(token)
+  return Boolean(token) && getAccessToken() === token
 }
 
 export function clearClientAuth() {

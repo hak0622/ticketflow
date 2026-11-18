@@ -1,21 +1,6 @@
 (function () {
   const TOKEN_KEY = "access_token";
 
-  function searchParam(key) {
-    return new URLSearchParams(location.search).get(key);
-  }
-
-  function saveTokenFromUrl() {
-    const token = searchParam("token");
-    if (token) {
-      localStorage.setItem(TOKEN_KEY, token);
-
-      const url = new URL(location.href);
-      url.searchParams.delete("token");
-      history.replaceState({}, document.title, url.pathname + url.search);
-    }
-  }
-
   function getToken() {
     return localStorage.getItem(TOKEN_KEY);
   }
@@ -56,8 +41,5 @@
     return res.text();
   }
 
-  window.Token = { saveTokenFromUrl, getToken, clearToken, logout, apiFetch };
-
-  // ✅ 핵심: 스크립트 로드되면 즉시 URL의 token을 저장
-  saveTokenFromUrl();
+  window.Token = { getToken, clearToken, logout, authHeaders, apiFetch };
 })();

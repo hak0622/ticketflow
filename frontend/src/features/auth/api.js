@@ -1,5 +1,25 @@
 import axios from 'axios'
 
+let pendingExchange
+
+export function exchangeLoginSession() {
+  if (!pendingExchange) {
+    pendingExchange = fetch('/oauth2/exchange', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+    }).then(response => {
+      if (!response.ok) throw new Error('OAuth login exchange failed')
+      return response.json()
+    }).finally(() => {
+      pendingExchange = undefined
+    })
+  }
+  return pendingExchange
+}
+
 /**
  * 회원가입 - POST /user (form-encoded)
  */
