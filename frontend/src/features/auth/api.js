@@ -2,6 +2,16 @@ import axios from 'axios'
 
 let pendingExchange
 
+export function renewAccessFromCookie() {
+  return fetch('/api/token', {
+    method: 'POST',
+    credentials: 'same-origin',
+    cache: 'no-store',
+    redirect: 'error',
+    signal: AbortSignal.timeout(10000),
+  })
+}
+
 export function exchangeLoginSession() {
   if (!pendingExchange) {
     pendingExchange = fetch('/oauth2/exchange', {

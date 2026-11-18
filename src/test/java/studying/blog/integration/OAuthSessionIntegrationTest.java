@@ -138,7 +138,8 @@ class OAuthSessionIntegrationTest {
         assertThat(browser.get(appB, "/api/admin/concerts", "Authorization", "Bearer " + refreshToken)
                 .statusCode()).isEqualTo(401);
         var json = appB.getBean(ObjectMapper.class);
-        var reissueResponse = reissue(refreshToken);
+        var reissueResponse = browser.renew(appB, FRONTEND_URL);
+        assertThat(reissueResponse.headers().firstValue("cache-control")).hasValue("no-store");
         assertThat(reissueResponse.statusCode()).isEqualTo(201);
         String newAccessToken = json.readTree(reissueResponse.body()).get("accessToken").asText();
         assertThat(browser.get(appB, "/api/admin/concerts", "Authorization", "Bearer " + newAccessToken)
@@ -219,7 +220,7 @@ class OAuthSessionIntegrationTest {
         var logout = browser.logout(appA, FRONTEND_URL);
         assertThat(logout.statusCode()).isEqualTo(204);
         assertRefreshCookie(logout, true);
-        assertThat(reissue(token).statusCode()).isEqualTo(400);
+        assertThat(reissue(token).statusCode()).isEqualTo(401);
         assertExchangeStatus(browser.exchange(appB, FRONTEND_URL), 401);
         assertThat(browser.logout(appB, FRONTEND_URL).statusCode()).isEqualTo(204);
     }
@@ -247,7 +248,7 @@ class OAuthSessionIntegrationTest {
         assertThat(original.equals(replacement)).isFalse();
 
         assertThat(olderBrowser.logout(appB, FRONTEND_URL).statusCode()).isEqualTo(204);
-        assertThat(reissue(original).statusCode()).isEqualTo(400);
+        assertThat(reissue(original).statusCode()).isEqualTo(401);
         assertThat(reissue(replacement).statusCode()).isEqualTo(201);
         issuedAccessToken(newerBrowser.exchange(appB, FRONTEND_URL));
     }
@@ -273,7 +274,7 @@ class OAuthSessionIntegrationTest {
         } finally {
             worker.shutdownNow();
         }
-        assertThat(reissue(original).statusCode()).isEqualTo(400);
+        assertThat(reissue(original).statusCode()).isEqualTo(401);
         assertThat(reissue(replacement).statusCode()).isEqualTo(201);
     }
 
@@ -311,7 +312,7 @@ class OAuthSessionIntegrationTest {
             jdbc.execute("DROP TRIGGER reject_refresh_delete");
         }
         assertThat(browser.logout(appB, FRONTEND_URL).statusCode()).isEqualTo(204);
-        assertThat(reissue(token).statusCode()).isEqualTo(400);
+        assertThat(reissue(token).statusCode()).isEqualTo(401);
     }
 
     @Test
@@ -423,10 +424,10 @@ class OAuthSessionIntegrationTest {
     }
 
     private static HttpResponse<String> reissue(String refreshToken) throws Exception {
-        var json = appA.getBean(ObjectMapper.class).createObjectNode().put("refreshToken", refreshToken).toString();
         var request = HttpRequest.newBuilder(URI.create(address(appA) + "/api/token"))
-                .timeout(Duration.ofSeconds(10)).header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(json)).build();
+                .timeout(Duration.ofSeconds(10)).header("Origin", FRONTEND_URL)
+                .header("Cookie", "refresh_token=" + refreshToken)
+                .POST(HttpRequest.BodyPublishers.noBody()).build();
         return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
     }
 
@@ -572,6 +573,13 @@ class OAuthSessionIntegrationTest {
             var request = HttpRequest.newBuilder(URI.create(address(app) + path)).timeout(Duration.ofSeconds(10));
             if (headers.length > 0) request.headers(headers);
             return client.send(request.GET().build(), HttpResponse.BodyHandlers.ofString());
+        }
+
+        HttpResponse<String> renew(ServletWebServerApplicationContext app, String origin)
+                throws IOException, InterruptedException {
+            var request = HttpRequest.newBuilder(URI.create(address(app) + "/api/token")).timeout(Duration.ofSeconds(10));
+            if (origin != null) request.header("Origin", origin);
+            return client.send(request.POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
         }
 
         HttpResponse<String> exchange(ServletWebServerApplicationContext app, String origin)

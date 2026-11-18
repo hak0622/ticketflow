@@ -4,6 +4,7 @@ import { loadTossPayments, ANONYMOUS } from '@tosspayments/tosspayments-sdk'
 import { getConcert } from '../features/concert/api'
 import { getBookingDetail, getMyPayment } from '../features/booking/api'
 import useAuthStore from '../features/auth/store'
+import { rememberPaymentIntent } from '../features/payment/paymentIntent'
 import LoadingSpinner from '../shared/ui/LoadingSpinner'
 
 const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY
@@ -128,6 +129,11 @@ export default function PaymentPage() {
       const payment = tossPayments.payment({ customerKey: ANONYMOUS })
 
       const payAmount = concert.discountedPrice ?? concert.price
+      const userId = user?.id
+      if (!userId || useAuthStore.getState().user?.id !== userId) {
+        throw new Error('로그인 정보를 다시 확인해 주세요.')
+      }
+      rememberPaymentIntent({ orderId: payOrderId, concertId, amount: payAmount, userId })
 
       await payment.requestPayment({
         method: 'CARD',

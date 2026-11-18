@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { tossConfirm, getMyPayment, getBookingDetail } from '../booking/api'
+import { claimPaymentApproval, readPaymentIntent } from './paymentIntent'
 
 const approvals = new Map()
-function approveOnce(key, concertId, body) {
+function approveOnce(key, concertId, body, user) {
   if (!approvals.has(key)) {
+    if (!claimPaymentApproval(body.orderId, readPaymentIntent(body.orderId), { ...body, concertId, user })) return null
     const promise = tossConfirm(concertId, body)
     approvals.set(key, promise)
     const remove = () => { if (approvals.get(key) === promise) approvals.delete(key) }
@@ -15,7 +17,7 @@ const positive = (n) => Number.isSafeInteger(n) && n > 0
 const temporary = (error) => !error.response || [408, 409, 429].includes(error.response.status) || error.response.status >= 500
 const initial = { payment: null, booking: null, checking: true, paused: false, reason: null, lastUpdatedAt: null }
 
-export function usePaymentRecovery({ concertId, orderId, paymentKey, amountText, user, token }) {
+export function usePaymentRecovery({ concertId, orderId, paymentKey, amountText, user, authenticated, lookupOnly }) {
   const [state, setState] = useState(initial)
   const owner = useRef(user)
   const resumeRef = useRef(null)
@@ -87,26 +89,36 @@ export function usePaymentRecovery({ concertId, orderId, paymentKey, amountText,
     }
     async function start() {
       if (!alive) return
-      if (!token || owner.current !== user) { pause('identity'); return }
+      if (!authenticated || owner.current !== user) { pause('identity'); return }
       const amount = Number(amountText)
       if (!positive(Number(concertId)) || !/^\d+$/.test(amountText ?? '') || !positive(amount) || amount > 2147483647
-          || !orderId || orderId.length < 6 || orderId.length > 64 || !paymentKey?.trim() || paymentKey.length > 200) { pause('invalid'); return }
+          || !orderId || orderId.length < 6 || orderId.length > 64) { pause('invalid'); return }
+      const intent = readPaymentIntent(orderId)
+      if (intent && intent.userId !== user) { pause('identity'); return }
       try {
-        const key = JSON.stringify([user, token, concertId, orderId, paymentKey, amount])
-        const response = await approveOnce(key, concertId, { paymentKey, orderId, amount })
+        const key = JSON.stringify([user, concertId, orderId, paymentKey, amount])
+        const approval = !lookupOnly && paymentKey?.trim() && paymentKey.length <= 200
+          ? approveOnce(key, concertId, { paymentKey, orderId, amount }, user) : null
+        if (!approval) {
+          beginWindow()
+          read()
+          return
+        }
+        const response = await approval
         if (!alive) return
         beginWindow(); applyPayment(response.data)
         if (!settle()) { publish({ checking: true, paused: false, reason: null }); read() }
       } catch (error) {
         if (!alive) return
         beginWindow()
-        if (!error.invalid && temporary(error)) read()
+        if (error.code === 'ERR_CANCELED') pause('auth')
+        else if (!error.invalid && (error.authRestored || temporary(error))) read()
         else onFailure(error)
       }
     }
     Promise.resolve().then(start)
     return () => { alive = false; stopTimers(); controller?.abort(); resumeRef.current = null }
-  }, [concertId, orderId, paymentKey, amountText, user, token])
+  }, [concertId, orderId, paymentKey, amountText, user, authenticated, lookupOnly])
   const resume = useCallback(() => resumeRef.current?.(), [])
   return { ...state, resume }
 }

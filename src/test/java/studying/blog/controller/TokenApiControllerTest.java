@@ -1,6 +1,7 @@
 package studying.blog.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -27,8 +29,10 @@ import java.time.Duration;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -44,6 +48,8 @@ class TokenApiControllerTest {
     @Autowired private UserRepository userRepository;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
     @MockitoSpyBean private RefreshTokenService refreshTokenService;
+
+    private static final String ORIGIN = "http://localhost:3000";
 
     private User user;
 
@@ -61,6 +67,7 @@ class TokenApiControllerTest {
 
         var response = reissue(refreshToken)
                 .andExpect(status().isCreated())
+                .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andReturn().getResponse();
 
@@ -83,7 +90,7 @@ class TokenApiControllerTest {
         };
         refreshTokenRepository.save(new RefreshToken(user.getId(), token));
 
-        reissue(token).andExpect(status().isBadRequest());
+        reissue(token).andExpect(status().isUnauthorized());
         verifyNoInteractions(refreshTokenService);
     }
 
@@ -91,17 +98,40 @@ class TokenApiControllerTest {
     void unregisteredAndReplacedRefreshTokensAreRejected() throws Exception {
         String old = tokenProvider.generateRefreshToken(user, Duration.ofDays(13));
         String replacement = tokenProvider.generateRefreshToken(user, Duration.ofDays(14));
-        reissue(old).andExpect(status().isBadRequest());
+        reissue(old).andExpect(status().isUnauthorized());
 
         var record = refreshTokenRepository.save(new RefreshToken(user.getId(), old));
         refreshTokenRepository.save(record.update(replacement));
-        reissue(old).andExpect(status().isBadRequest());
+        reissue(old).andExpect(status().isUnauthorized());
         reissue(replacement).andExpect(status().isCreated());
+    }
+
+    @Test
+    void missingOrDifferentOriginAndBodyOnlyTokenAreRejectedBeforeLookup() throws Exception {
+        String token = tokenProvider.generateRefreshToken(user, Duration.ofDays(14));
+        refreshTokenRepository.save(new RefreshToken(user.getId(), token));
+        var cookie = new Cookie("refresh_token", token);
+        mockMvc.perform(post("/api/token").cookie(cookie)).andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/token").cookie(cookie).header("Origin", "http://localhost:5173"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/token").header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("refreshToken", token))))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(refreshTokenService);
+    }
+
+    @Test
+    void aStorageFailureReturns503WithoutClearingTheCookie() throws Exception {
+        String token = tokenProvider.generateRefreshToken(user, Duration.ofDays(14));
+        doThrow(new DataAccessResourceFailureException("test read failure"))
+                .when(refreshTokenService).findByRefreshToken(token);
+        reissue(token).andExpect(status().isServiceUnavailable())
+                .andExpect(header().doesNotExist("Set-Cookie"));
     }
 
     private ResultActions reissue(String token) throws Exception {
         return mockMvc.perform(post("/api/token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(Map.of("refreshToken", token))));
+                .header("Origin", ORIGIN).cookie(new Cookie("refresh_token", token)));
     }
 }

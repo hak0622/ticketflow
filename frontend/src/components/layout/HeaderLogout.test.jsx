@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import useAuthStore from '../../features/auth/store'
+import { setAccessToken } from '../../features/auth/session'
 import Header from './Header'
 
 let fetchMock
@@ -12,7 +13,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock)
   const claims = { id: 7, exp: Math.floor(Date.now() / 1000) + 600, token_use: 'access', role: 'USER' }
   const payload = Buffer.from(JSON.stringify(claims)).toString('base64url')
-  useAuthStore.getState().setToken(`header.${payload}.signature`)
+  setAccessToken(`header.${payload}.signature`)
 })
 
 afterEach(() => {

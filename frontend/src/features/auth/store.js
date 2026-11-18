@@ -1,8 +1,7 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 
 // 화면 인증 상태에 사용할 정보만 읽는다. JWT 서명은 서버에서 검증한다.
-function readAccessToken(token) {
+export function readAccessToken(token) {
   try {
     const parts = token.split('.')
     if (parts.length !== 3 || parts.some(part => !/^[A-Za-z0-9_-]+$/.test(part))) return null
@@ -21,24 +20,11 @@ function readAccessToken(token) {
   }
 }
 
-const useAuthStore = create(
-  persist(
-    (set) => ({
-      token: null,
-      user: null,
-      setToken: (token) => {
-        const user = readAccessToken(token)
-        set({ token: user ? token : null, user })
-      },
-      logout: () => set({ token: null, user: null }),
-    }),
-    {
-      name: 'auth-storage',
-      onRehydrateStorage: () => (state) => {
-        if (state?.token || state?.user) state.setToken(state.token)
-      },
-    },
-  ),
-)
+const useAuthStore = create(set => ({
+  token: null,
+  user: null,
+
+  logout: () => set({ token: null, user: null }),
+}))
 
 export default useAuthStore

@@ -1,16 +1,17 @@
 import { serverLogout } from './api'
-import { clearAuthSession, getAccessToken, setAccessToken } from './session'
+import { beginLogout, finishLogout, setAccessToken } from './session'
 
 export function applyOAuthToken(token) {
-  setAccessToken(token)
-  return Boolean(token) && getAccessToken() === token
-}
-
-export function clearClientAuth() {
-  clearAuthSession()
+  return setAccessToken(token, true)
 }
 
 export async function performLogout() {
-  await serverLogout()
-  clearClientAuth()
+  const attempt = beginLogout()
+  let succeeded = false
+  try {
+    await serverLogout()
+    succeeded = true
+  } finally {
+    finishLogout(attempt, succeeded)
+  }
 }

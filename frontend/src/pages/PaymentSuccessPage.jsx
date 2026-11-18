@@ -2,16 +2,21 @@ import { useEffect } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import useAuthStore from '../features/auth/store'
 import { usePaymentRecovery } from '../features/payment/usePaymentRecovery'
+import { paymentLookupPath } from '../features/payment/paymentIntent'
 
 export default function PaymentSuccessPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const { token, user } = useAuthStore()
+  const authenticated = Boolean(token)
   const result = usePaymentRecovery({ concertId: params.get('concertId'), orderId: params.get('orderId'),
-    paymentKey: params.get('paymentKey'), amountText: params.get('amount'), token, user: user?.sub })
-  useEffect(() => { if (!token) navigate('/login') }, [token, navigate])
+    paymentKey: params.get('paymentKey'), amountText: params.get('amount'), authenticated, user: user?.id,
+    lookupOnly: params.get('mode') === 'lookup' })
+  useEffect(() => {
+    if (!authenticated) navigate('/login', { replace: true, state: { from: paymentLookupPath(params) } })
+  }, [authenticated, navigate, params])
   const { payment, booking, checking, paused, reason, lastUpdatedAt, resume } = result
-  let title = '결제 승인 처리 중입니다'
+  let title = '결제 상태를 확인하고 있습니다.'
   if (payment?.status === 'COMPLETED') title = '결제 완료! 예매가 확정되었습니다.'
   else if (payment?.status === 'CANCELED') title = '결제 취소가 확인되었습니다.'
   else if (payment?.status === 'FAILED') title = '결제 실패가 확인되었습니다.'

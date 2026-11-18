@@ -14,6 +14,8 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import AdminConcertPage from './pages/AdminConcertPage'
 import AuthCallbackPage from './pages/AuthCallbackPage'
+import AuthGate from './features/auth/AuthGate'
+import useAuthStore from './features/auth/store'
 
 function Layout() {
   const { pathname } = useLocation()
@@ -42,11 +44,12 @@ function Layout() {
 }
 
 export default function App() {
+  const userId = useAuthStore(state => state.user?.id)
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
-        <Route path="*" element={<Layout />} />
+        <Route path="*" element={<AuthGate><Layout key={userId ?? 'anonymous'} /></AuthGate>} />
       </Routes>
     </BrowserRouter>
   )

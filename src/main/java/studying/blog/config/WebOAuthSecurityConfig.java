@@ -71,6 +71,7 @@ public class WebOAuthSecurityConfig {
         sessionPostCors.setAllowCredentials(true);
         source.registerCorsConfiguration("/oauth2/exchange", sessionPostCors);
         source.registerCorsConfiguration("/logout", sessionPostCors);
+        source.registerCorsConfiguration("/api/token", sessionPostCors);
         source.registerCorsConfiguration("/**", config);
         return source;
     }

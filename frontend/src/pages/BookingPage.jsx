@@ -38,6 +38,7 @@ export default function BookingPage() {
   const { id: concertId } = useParams()
   const navigate           = useNavigate()
   const { token, user }    = useAuthStore()
+  const authenticated = Boolean(token)
 
   const [concert, setConcert]     = useState(null)
   const [loading, setLoading]     = useState(true)
@@ -47,19 +48,19 @@ export default function BookingPage() {
 
   /* 비로그인 */
   useEffect(() => {
-    if (!token) {
+    if (!authenticated) {
       navigate('/login', { state: { from: `/concerts/${concertId}/booking` } })
     }
-  }, [token, navigate, concertId])
+  }, [authenticated, navigate, concertId])
 
   /* 공연 정보 조회 */
   useEffect(() => {
-    if (!token) return
+    if (!authenticated) return
     getConcert(concertId)
       .then((res) => setConcert(res.data))
       .catch(() => setError('공연 정보를 불러올 수 없습니다.'))
       .finally(() => setLoading(false))
-  }, [concertId, token])
+  }, [concertId, authenticated])
 
   // Keep the same ID across uncertain responses, reloads, and retries for this login/concert.
   const requestStorageKey = `booking-request:${user?.sub}:${concertId}`
@@ -110,11 +111,11 @@ export default function BookingPage() {
     setSubmitting(false)
     setRecovering(false)
     const saved = sessionStorage.getItem(requestStorageKey)
-    if (token && saved) { pollStarted.current = Date.now(); inspectRequest(saved) }
+    if (authenticated && saved) { pollStarted.current = Date.now(); inspectRequest(saved) }
     return () => { alive.current = false; requestGeneration.current += 1; clearTimeout(pollTimer.current) }
     // Request identity is scoped to this login and concert.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestStorageKey, token])
+  }, [requestStorageKey, authenticated])
   const handleBook = async () => {
     const generation = requestGeneration.current
     if (submittingRef.current) return
@@ -154,6 +155,13 @@ export default function BookingPage() {
       } else if (status === 403) {
         setError(serverMsg || '예매가 불가능한 공연입니다.')
       } else if (status === 401) {
+        if (err.authRestored) {
+          pollStarted.current = Date.now()
+          await inspectRequest(sessionStorage.getItem(requestStorageKey), generation)
+          submittingRef.current = false
+          setSubmitting(false)
+          return
+        }
         navigate('/login', { state: { from: `/concerts/${concertId}/booking` } })
         return
       } else {
