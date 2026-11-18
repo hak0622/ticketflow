@@ -62,7 +62,7 @@ class PaymentStageOneIntegrationTest extends IntegrationTestSupport {
                 ? "{\"orderId\":\"" + key + "\",\"paymentKey\":\"unused\",\"amount\":90000}"
                 : "{\"idempotencyKey\":\"" + key + "\",\"paymentMethod\":\"CARD\"}";
         var response = mvc.perform(post("/api/concerts/" + target.getId() + (tossApi ? "/payment/toss-confirm" : "/payment"))
-                .header("Authorization", "Bearer " + tokens.generateToken(caller, Duration.ofHours(1)))
+                .header("Authorization", "Bearer " + tokens.generateAccessToken(caller, Duration.ofHours(1)))
                 .contentType(MediaType.APPLICATION_JSON).content(body));
         if (mismatch.equals("same")) {
             response.andExpect(status().isOk()).andExpect(jsonPath("$.paymentId").value(payment.getId()))

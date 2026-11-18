@@ -44,14 +44,14 @@ public class TestJwtSupportService {
         StringJoiner lines = new StringJoiner("\n", "", "\n");
         lines.add("email,userId,token");
         for (User user : users) {
-            String token = tokenProvider.generateToken(user, Duration.ofMinutes(properties.getTokenExpirationMinutes()));
+            String token = tokenProvider.generateAccessToken(user, Duration.ofMinutes(properties.getTokenExpirationMinutes()));
             lines.add(user.getEmail() + "," + user.getId() + "," + token);
         }
         return lines.toString();
     }
 
     private TestJwtIssueResponse issue(User user) {
-        String accessToken = tokenProvider.generateToken(
+        String accessToken = tokenProvider.generateAccessToken(
                 user,
                 Duration.ofMinutes(properties.getTokenExpirationMinutes())
         );

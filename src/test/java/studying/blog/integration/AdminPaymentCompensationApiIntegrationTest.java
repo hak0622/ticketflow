@@ -154,6 +154,6 @@ class AdminPaymentCompensationApiIntegrationTest extends IntegrationTestSupport 
     }
 
     private String authorizationHeader(User user) {
-        return "Bearer " + tokenProvider.generateToken(user, Duration.ofHours(1));
+        return "Bearer " + tokenProvider.generateAccessToken(user, Duration.ofHours(1));
     }
 }

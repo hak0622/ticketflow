@@ -34,10 +34,10 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException{
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
         User user = userService.findByEmail((String) oAuth2User.getAttributes().get("email"));
-        String refreshToken = tokenProvider.generateToken(user,REFRESH_TOKEN_DURATION);
+        String refreshToken = tokenProvider.generateRefreshToken(user, REFRESH_TOKEN_DURATION);
         saveRefreshToken(user.getId(),refreshToken);
         addRefreshTokenToCookie(request,response,refreshToken);
-        String accessToken = tokenProvider.generateToken(user, ACCESS_TOKEN_DURATION);
+        String accessToken = tokenProvider.generateAccessToken(user, ACCESS_TOKEN_DURATION);
         String targetUrl = getTargetUrl(accessToken);
         clearAuthenticationAttributes(request,response);
         getRedirectStrategy().sendRedirect(request,response,targetUrl);

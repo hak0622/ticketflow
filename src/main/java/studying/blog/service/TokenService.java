@@ -1,5 +1,6 @@
 package studying.blog.service;
 
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import studying.blog.config.TokenProvider;
@@ -15,13 +16,15 @@ public class TokenService {
     private final UserService userService;
 
     public String createNewAccessToken(String refreshToken){
-        if(!tokenProvider.validToken(refreshToken)){
-            throw new IllegalArgumentException("Unexpected token");
+        try {
+            tokenProvider.validateRefreshToken(refreshToken);
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new IllegalArgumentException("Unexpected token", e);
         }
 
         Long userId = refreshTokenService.findByRefreshToken(refreshToken).getUserId();
         User user = userService.findById(userId);
 
-        return tokenProvider.generateToken(user, Duration.ofHours(2));
+        return tokenProvider.generateAccessToken(user, Duration.ofHours(2));
     }
 }

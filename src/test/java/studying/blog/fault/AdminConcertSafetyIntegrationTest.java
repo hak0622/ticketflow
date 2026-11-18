@@ -52,7 +52,7 @@ class AdminConcertSafetyIntegrationTest extends IntegrationTestSupport {
         String name = UUID.randomUUID().toString();
         return users.save(User.builder().email(name + "@test.invalid").nickname(name).role(role).build());
     }
-    String bearer(User user) { return "Bearer " + tokens.generateToken(user, Duration.ofMinutes(10)); }
+    String bearer(User user) { return "Bearer " + tokens.generateAccessToken(user, Duration.ofMinutes(10)); }
     Map<String, Object> payload(Concert concert, int total) {
         var data = new HashMap<String, Object>();
         data.put("title", "changed-title"); data.put("eventAt", concert.getEventAt().toString());

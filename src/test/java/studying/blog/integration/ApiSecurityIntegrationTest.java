@@ -1,12 +1,18 @@
 package studying.blog.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import studying.blog.config.JwtProperties;
 import studying.blog.config.TokenProvider;
 import studying.blog.domain.Concert;
 import studying.blog.domain.Role;
@@ -15,6 +21,8 @@ import studying.blog.repository.UserRepository;
 import studying.blog.support.IntegrationTestSupport;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -37,6 +45,8 @@ class ApiSecurityIntegrationTest extends IntegrationTestSupport {
 
     @Autowired
     private TokenProvider tokenProvider;
+    @Autowired
+    private JwtProperties jwtProperties;
 
     @Test
     void bookingApi_withoutToken_returns401Json() throws Exception {
@@ -103,6 +113,45 @@ class ApiSecurityIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.error").value("FORBIDDEN"));
     }
 
+    @Test
+    void adminApiRejectsAdminRefreshTokenAndAcceptsAdminAccessToken() throws Exception {
+        User admin = savedUser("security-admin", Role.ADMIN);
+        assertAdminUnauthorized(tokenProvider.generateRefreshToken(admin, Duration.ofDays(14)));
+        mockMvc.perform(get("/api/admin/concerts").header("Authorization", authorizationHeader(admin)))
+                .andExpect(status().isOk());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missing purpose", "unknown purpose", "expired", "missing expiration",
+            "missing issuer", "wrong issuer", "wrong signature"})
+    void adminApiRejectsInvalidClaimsAndSignatures(String failure) throws Exception {
+        User admin = savedUser("security-invalid", Role.ADMIN);
+        var builder = Jwts.builder()
+                .setSubject(admin.getEmail())
+                .setIssuer(jwtProperties.getIssuer())
+                .setExpiration(Date.from(Instant.now().plusSeconds(3600)))
+                .claim("id", admin.getId()).claim("role", Role.ADMIN.name()).claim("token_use", "access");
+        switch (failure) {
+            case "missing purpose" -> builder.claim("token_use", null);
+            case "unknown purpose" -> builder.claim("token_use", "unknown");
+            case "expired" -> builder.setExpiration(Date.from(Instant.now().minusSeconds(60)));
+            case "missing expiration" -> builder.setExpiration(null);
+            case "missing issuer" -> builder.setIssuer(null);
+            case "wrong issuer" -> builder.setIssuer("another-issuer");
+            case "wrong signature" -> { }
+            default -> throw new AssertionError(failure);
+        }
+        var key = failure.equals("wrong signature") ? Keys.secretKeyFor(SignatureAlgorithm.HS256)
+                : jwtProperties.signingKey();
+        assertAdminUnauthorized(builder.signWith(key, SignatureAlgorithm.HS256).compact());
+    }
+
+    private void assertAdminUnauthorized(String token) throws Exception {
+        mockMvc.perform(get("/api/admin/concerts").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+    }
+
     private User savedUser(String prefix, Role role) {
         String uniq = prefix + "-" + System.nanoTime();
         return userRepository.save(User.builder()
@@ -114,6 +163,6 @@ class ApiSecurityIntegrationTest extends IntegrationTestSupport {
     }
 
     private String authorizationHeader(User user) {
-        return "Bearer " + tokenProvider.generateToken(user, Duration.ofHours(1));
+        return "Bearer " + tokenProvider.generateAccessToken(user, Duration.ofHours(1));
     }
 }

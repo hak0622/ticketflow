@@ -33,7 +33,7 @@ class PaymentMockDisabledIntegrationTest extends IntegrationTestSupport {
         User user = users.save(User.builder().email(id + "@test.com").nickname(id).role(Role.USER).build());
         Concert concert = savedConcert("Mock disabled", 10, 1);
         Booking booking = savedPendingBooking(concert, user.getId());
-        String auth = "Bearer " + tokens.generateToken(user, Duration.ofHours(1));
+        String auth = "Bearer " + tokens.generateAccessToken(user, Duration.ofHours(1));
         mvc.perform(post("/api/concerts/" + concert.getId() + "/payment").header("Authorization", auth)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"idempotencyKey\":\"" + id + "\"}"))
                 .andExpect(status().isForbidden());

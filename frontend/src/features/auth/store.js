@@ -1,18 +1,24 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-/** JWT payload 디코딩 (라이브러리 없이 atob 사용) */
-function decodeToken(token) {
+// 화면 인증 상태에 사용할 정보만 읽는다. JWT 서명은 서버에서 검증한다.
+function readAccessToken(token) {
   try {
-    const payload = token.split('.')[1]
-    return JSON.parse(atob(payload))
+    const parts = token.split('.')
+    if (parts.length !== 3 || parts.some(part => !/^[A-Za-z0-9_-]+$/.test(part))) return null
+
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const base64 = payload.padEnd(Math.ceil(payload.length / 4) * 4, '=')
+    const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0))
+    const user = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+
+    if (user?.token_use !== 'access' || !Number.isFinite(user.exp) || user.exp <= Date.now() / 1000) {
+      return null
+    }
+    return user
   } catch {
     return null
   }
-}
-
-function isExpired(user) {
-  return user?.exp && user.exp * 1000 < Date.now()
 }
 
 const useAuthStore = create(
@@ -20,31 +26,19 @@ const useAuthStore = create(
     (set) => ({
       token: null,
       user: null,
-
       setToken: (token) => {
-        const user = decodeToken(token)
-        if (isExpired(user)) {
-          set({ token: null, user: null })
-          return
-        }
-        set({ token, user })
+        const user = readAccessToken(token)
+        set({ token: user ? token : null, user })
       },
-
       logout: () => set({ token: null, user: null }),
     }),
     {
-      name: 'auth-storage', // localStorage 키
-      // 재수화(rehydrate) 시 만료된 토큰 자동 제거
+      name: 'auth-storage',
       onRehydrateStorage: () => (state) => {
-        if (state?.token) {
-          const user = decodeToken(state.token)
-          if (isExpired(user)) {
-            state.logout()
-          }
-        }
+        if (state?.token || state?.user) state.setToken(state.token)
       },
-    }
-  )
+    },
+  ),
 )
 
 export default useAuthStore

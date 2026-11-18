@@ -27,12 +27,8 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             if (token != null) {
-                if (tokenProvider.validToken(token)) {
-                    Authentication authentication = tokenProvider.getAuthentication(token);
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                } else {
-                    SecurityContextHolder.clearContext();
-                }
+                Authentication authentication = tokenProvider.getAccessAuthentication(token);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         } catch (JwtException | IllegalArgumentException e) {
             SecurityContextHolder.clearContext();

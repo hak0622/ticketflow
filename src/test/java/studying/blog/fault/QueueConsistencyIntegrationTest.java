@@ -74,7 +74,7 @@ class QueueConsistencyIntegrationTest extends IntegrationTestSupport {
     String ticket(Long cid,long uid) { return "admitted:concert:"+cid+":user:"+uid; }
     Map<String,Object> http(String verb,Long cid,User u) throws Exception {
         var request=verb.equals("POST")?post("/api/concerts/{id}/queue",cid):get("/api/concerts/{id}/queue/me",cid);
-        if(u!=null) request.header("Authorization","Bearer "+tokens.generateToken(u,Duration.ofMinutes(10)));
+        if(u!=null) request.header("Authorization","Bearer "+tokens.generateAccessToken(u,Duration.ofMinutes(10)));
         var result=mvc.perform(request).andReturn();
         var body=json.readValue(result.getResponse().getContentAsString().isBlank()?"{}":result.getResponse().getContentAsString(),Map.class);
         event("http",Map.of("method",verb,"concert",cid,"status",result.getResponse().getStatus(),"body",body));

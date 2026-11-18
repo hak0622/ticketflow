@@ -41,7 +41,7 @@ public class TestJwtCommandLineRunner implements CommandLineRunner {
         lines.add("email,userId,token");
 
         for (User user : users) {
-            String token = tokenProvider.generateToken(
+            String token = tokenProvider.generateAccessToken(
                     user,
                     Duration.ofMinutes(properties.getTokenExpirationMinutes())
             );
