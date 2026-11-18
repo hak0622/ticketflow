@@ -10,10 +10,9 @@
   }
 
   async function logout(redirectTo) {
+    const response = await fetch("/logout", { method: "POST", redirect: "error" });
+    if (response.status !== 204) throw new Error("Logout did not complete");
     clearToken();
-    try {
-      await fetch("/logout", { method: "POST" });
-    } catch (e) {}
     location.href = redirectTo || "/login";
   }
 

@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -22,7 +23,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import studying.blog.config.oauth.OAuth2SuccessHandler;
 import studying.blog.config.oauth.OAuth2UserCustomService;
 import studying.blog.config.oauth.OAuthLoginExchange;
-import studying.blog.repository.RefreshTokenRepository;
+import studying.blog.config.oauth.RefreshTokenCookie;
+import studying.blog.service.RefreshTokenService;
 import studying.blog.service.UserService;
 
 import java.io.IOException;
@@ -35,7 +37,8 @@ public class WebOAuthSecurityConfig {
 
     private final OAuth2UserCustomService oAuth2UserCustomService;
     private final TokenProvider tokenProvider;
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenService refreshTokens;
+    private final RefreshTokenCookie refreshCookie;
     private final UserService userService;
 
     private final OAuthLoginExchange loginExchange;
@@ -67,6 +70,7 @@ public class WebOAuthSecurityConfig {
         sessionPostCors.setAllowedMethods(List.of("POST"));
         sessionPostCors.setAllowCredentials(true);
         source.registerCorsConfiguration("/oauth2/exchange", sessionPostCors);
+        source.registerCorsConfiguration("/logout", sessionPostCors);
         source.registerCorsConfiguration("/**", config);
         return source;
     }
@@ -121,10 +125,7 @@ public class WebOAuthSecurityConfig {
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
-                .logout(logout -> logout
-                        .logoutUrl("/logout")
-                        .logoutSuccessUrl("/login")
-                );
+                .logout(AbstractHttpConfigurer::disable);
 
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
@@ -150,7 +151,8 @@ public class WebOAuthSecurityConfig {
     public OAuth2SuccessHandler oAuth2SuccessHandler() {
         return new OAuth2SuccessHandler(
                 tokenProvider,
-                refreshTokenRepository,
+                refreshTokens,
+                refreshCookie,
                 userService,
                 loginExchange
         );

@@ -41,11 +41,13 @@ export const loginWithGoogle = () => {
   window.location.href = '/oauth2/authorization/google'
 }
 
-/**
- * 로그아웃 - GET /logout
- */
-export const serverLogout = () =>
-  axios.get('/logout', {
-    maxRedirects: 0,
-    withCredentials: true,
-  }).catch(() => {})
+export async function serverLogout() {
+  const response = await fetch('/logout', {
+    method: 'POST',
+    credentials: 'same-origin',
+    cache: 'no-store',
+    redirect: 'error',
+    signal: AbortSignal.timeout(10000),
+  })
+  if (response.status !== 204) throw new Error('Logout did not complete')
+}

@@ -13,20 +13,25 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.session.Session;
 import org.springframework.session.SessionRepository;
 import org.springframework.session.web.http.CookieSerializer;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import studying.blog.BlogApplication;
+import studying.blog.config.TokenProvider;
 import studying.blog.domain.Role;
 import studying.blog.domain.User;
 import studying.blog.repository.RefreshTokenRepository;
 import studying.blog.repository.UserRepository;
+import studying.blog.service.RefreshTokenService;
 
 import java.io.IOException;
 import java.net.CookieManager;
@@ -42,6 +47,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.Future;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -202,6 +209,112 @@ class OAuthSessionIntegrationTest {
     }
 
     @Test
+    void logoutRevokesTheRefreshTokenAndTheOAuthSession() throws Exception {
+        var browser = new Browser();
+        var callback = login(browser);
+        String token = browser.refreshToken();
+        assertRefreshCookie(callback, false);
+        assertThat(reissue(token).statusCode()).isEqualTo(201);
+
+        var logout = browser.logout(appA, FRONTEND_URL);
+        assertThat(logout.statusCode()).isEqualTo(204);
+        assertRefreshCookie(logout, true);
+        assertThat(reissue(token).statusCode()).isEqualTo(400);
+        assertExchangeStatus(browser.exchange(appB, FRONTEND_URL), 401);
+        assertThat(browser.logout(appB, FRONTEND_URL).statusCode()).isEqualTo(204);
+    }
+
+    @Test
+    void getAndOffOriginLogoutLeaveTheSessionAndTokenUsable() throws Exception {
+        var browser = new Browser();
+        login(browser);
+        String token = browser.refreshToken();
+        assertThat(browser.get(appA, "/logout").statusCode()).isEqualTo(405);
+        assertThat(browser.logout(appB, null).statusCode()).isEqualTo(403);
+        assertThat(browser.logout(appA, "https://untrusted.example").statusCode()).isEqualTo(403);
+        assertThat(reissue(token).statusCode()).isEqualTo(201);
+        issuedAccessToken(browser.exchange(appB, FRONTEND_URL));
+    }
+
+    @Test
+    void logoutWithAnOlderBrowserCookieDoesNotRevokeTheReplacementToken() throws Exception {
+        var olderBrowser = new Browser();
+        login(olderBrowser);
+        String original = olderBrowser.refreshToken();
+        var newerBrowser = new Browser();
+        login(newerBrowser);
+        String replacement = newerBrowser.refreshToken();
+        assertThat(original.equals(replacement)).isFalse();
+
+        assertThat(olderBrowser.logout(appB, FRONTEND_URL).statusCode()).isEqualTo(204);
+        assertThat(reissue(original).statusCode()).isEqualTo(400);
+        assertThat(reissue(replacement).statusCode()).isEqualTo(201);
+        issuedAccessToken(newerBrowser.exchange(appB, FRONTEND_URL));
+    }
+
+    @Test
+    void oldLogoutWaitingForTheRefreshRowRechecksTheCommittedValue() throws Exception {
+        var browser = new Browser();
+        login(browser);
+        String original = browser.refreshToken();
+        var user = appA.getBean(UserRepository.class).findByEmail(ROLE_EMAIL).orElseThrow();
+        var replacement = appA.getBean(TokenProvider.class).generateRefreshToken(user, Duration.ofDays(14));
+        var transaction = new TransactionTemplate(appA.getBean(PlatformTransactionManager.class));
+        var jdbc = appA.getBean(JdbcTemplate.class);
+        var worker = Executors.newSingleThreadExecutor();
+        try {
+            Future<HttpResponse<String>> logout = transaction.execute(status -> {
+                appA.getBean(RefreshTokenService.class).saveForLogin(user.getId(), replacement);
+                var request = worker.submit(() -> browser.logout(appB, FRONTEND_URL));
+                assertWaitingOnRefreshRow(jdbc, request);
+                return request;
+            });
+            assertThat(logout.get(15, TimeUnit.SECONDS).statusCode()).isEqualTo(204);
+        } finally {
+            worker.shutdownNow();
+        }
+        assertThat(reissue(original).statusCode()).isEqualTo(400);
+        assertThat(reissue(replacement).statusCode()).isEqualTo(201);
+    }
+
+    private static void assertWaitingOnRefreshRow(JdbcTemplate jdbc, Future<?> logout) {
+        Instant deadline = Instant.now().plusSeconds(5);
+        while (Instant.now().isBefore(deadline) && !logout.isDone()) {
+            boolean waiting = jdbc.queryForList("SHOW FULL PROCESSLIST").stream().anyMatch(row ->
+                    row.get("Info") instanceof String sql
+                            && sql.toLowerCase(Locale.ROOT).contains("from refresh_token")
+                            && sql.toLowerCase(Locale.ROOT).contains("for update"));
+            if (waiting) return;
+            java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(20));
+        }
+        throw new AssertionError("The logout did not reach the refresh row lock");
+    }
+
+    @Test
+    void databaseRevocationFailureKeepsTheCookieAndSessionForRetry() throws Exception {
+        var browser = new Browser();
+        login(browser);
+        String token = browser.refreshToken();
+        var jdbc = appA.getBean(JdbcTemplate.class);
+        jdbc.execute("""
+                CREATE TRIGGER reject_refresh_delete BEFORE DELETE ON refresh_token
+                FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'test revocation failure'
+                """);
+        try {
+            var failed = browser.logout(appB, FRONTEND_URL);
+            assertThat(failed.statusCode()).isEqualTo(503);
+            assertThat(failed.headers().allValues("set-cookie"))
+                    .noneMatch(value -> value.startsWith("refresh_token="));
+            assertThat(reissue(token).statusCode()).isEqualTo(201);
+            issuedAccessToken(browser.exchange(appB, FRONTEND_URL));
+        } finally {
+            jdbc.execute("DROP TRIGGER reject_refresh_delete");
+        }
+        assertThat(browser.logout(appB, FRONTEND_URL).statusCode()).isEqualTo(204);
+        assertThat(reissue(token).statusCode()).isEqualTo(400);
+    }
+
+    @Test
     void redisExpiryEndsTheExchangeWhileTheGoogleSessionRemains() throws Exception {
         var redis = appA.getBean(StringRedisTemplate.class);
         var existing = redis.keys("oauth:exchange:*");
@@ -315,6 +428,16 @@ class OAuthSessionIntegrationTest {
                 .timeout(Duration.ofSeconds(10)).header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json)).build();
         return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private static void assertRefreshCookie(HttpResponse<?> response, boolean deleted) {
+        var cookie = response.headers().allValues("set-cookie").stream()
+                .filter(value -> value.startsWith("refresh_token=")).findFirst().orElseThrow();
+        assertThat(cookie.contains("HttpOnly")).isTrue();
+        assertThat(cookie.contains("SameSite=Lax")).isTrue();
+        assertThat(cookie.contains("Path=/")).isTrue();
+        assertThat(cookie.contains("; Secure")).isFalse();
+        assertThat(cookie.contains(deleted ? "Max-Age=0" : "Max-Age=1209600")).isTrue();
     }
 
     private static void assertCleanCallback(HttpResponse<?> response) {
@@ -458,5 +581,17 @@ class OAuthSessionIntegrationTest {
             return client.send(request.POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
         }
 
+        HttpResponse<String> logout(ServletWebServerApplicationContext app, String origin)
+                throws IOException, InterruptedException {
+            var request = HttpRequest.newBuilder(URI.create(address(app) + "/logout")).timeout(Duration.ofSeconds(10));
+            if (origin != null) request.header("Origin", origin);
+            return client.send(request.POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+        }
+
+        String refreshToken() {
+            return cookies.getCookieStore().getCookies().stream()
+                    .filter(cookie -> cookie.getName().equals("refresh_token"))
+                    .findFirst().map(HttpCookie::getValue).orElseThrow();
+        }
     }
 }

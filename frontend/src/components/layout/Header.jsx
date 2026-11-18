@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { HiOutlineTicket } from 'react-icons/hi2'
 import { HiOutlineArrowRightOnRectangle, HiOutlineArrowLeftOnRectangle, HiOutlineCog6Tooth } from 'react-icons/hi2'
@@ -12,14 +12,28 @@ export default function Header() {
   const location = useLocation()
   const currentKeyword = new URLSearchParams(location.search).get('keyword') || ''
   const [searchKeyword, setSearchKeyword] = useState(currentKeyword)
+  const logoutInProgress = useRef(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [logoutFailed, setLogoutFailed] = useState(false)
 
   useEffect(() => {
     setSearchKeyword(currentKeyword)
   }, [currentKeyword])
 
   const handleLogout = async () => {
-    await performLogout()
-    navigate('/', { replace: true })
+    if (logoutInProgress.current) return
+    logoutInProgress.current = true
+    setLoggingOut(true)
+    setLogoutFailed(false)
+    try {
+      await performLogout()
+      navigate('/', { replace: true })
+    } catch {
+      setLogoutFailed(true)
+    } finally {
+      logoutInProgress.current = false
+      setLoggingOut(false)
+    }
   }
 
   const moveToSearchResult = () => {
@@ -87,10 +101,14 @@ export default function Header() {
             {token ? (
               <button
                 onClick={handleLogout}
-                className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+                disabled={loggingOut}
+                aria-label={loggingOut ? '로그아웃 중' : '로그아웃'}
+                className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 <HiOutlineArrowRightOnRectangle className="w-5 h-5" />
-                <span className="text-[10px] font-medium hidden md:block">로그아웃</span>
+                <span className="text-[10px] font-medium hidden md:block">
+                  {loggingOut ? '로그아웃 중' : '로그아웃'}
+                </span>
               </button>
             ) : (
               <Link
@@ -125,6 +143,12 @@ export default function Header() {
           </div>
         </div>
       </div>
+
+      {logoutFailed && token && (
+        <p role="alert" className="mx-auto max-w-screen-xl px-4 pb-2 text-sm text-red-600">
+          로그아웃 완료를 확인하지 못했습니다. 다시 시도해 주세요.
+        </p>
+      )}
 
       {/* ── 카테고리 탭 행 ── */}
       <CategoryNav />

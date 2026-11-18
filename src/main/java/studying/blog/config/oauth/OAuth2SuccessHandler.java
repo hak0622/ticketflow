@@ -9,9 +9,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import studying.blog.config.TokenProvider;
-import studying.blog.domain.RefreshToken;
-import studying.blog.repository.RefreshTokenRepository;
-import studying.blog.util.CookieUtil;
+import studying.blog.service.RefreshTokenService;
 import studying.blog.service.UserService;
 
 import java.io.IOException;
@@ -24,7 +22,8 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     public static final Duration ACCESS_TOKEN_DURATION = Duration.ofDays(1);
 
     private final TokenProvider tokenProvider;
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenService refreshTokens;
+    private final RefreshTokenCookie refreshCookie;
     private final UserService userService;
     private final OAuthLoginExchange exchange;
 
@@ -36,14 +35,10 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         try {
             OAuth2User oauthUser = (OAuth2User) authentication.getPrincipal();
             var user = userService.findByEmail(oauthUser.getAttribute("email"));
-            Duration lifetime = Duration.ofDays(14);
-            String refreshToken = tokenProvider.generateRefreshToken(user, lifetime);
-            var record = refreshTokenRepository.findByUserId(user.getId())
-                    .map(existing -> existing.update(refreshToken))
-                    .orElseGet(() -> new RefreshToken(user.getId(), refreshToken));
-            refreshTokenRepository.save(record);
+            String refreshToken = tokenProvider.generateRefreshToken(user, RefreshTokenCookie.LIFETIME);
+            refreshTokens.saveForLogin(user.getId(), refreshToken);
             exchange.prepare(request.getSession().getId(), user.getId());
-            CookieUtil.addCookie(response, "refresh_token", refreshToken, (int) lifetime.toSeconds());
+            refreshCookie.issue(response, refreshToken);
         } catch (DataAccessException e) {
             log.warn("Could not prepare OAuth login exchange ({})", e.getClass().getSimpleName());
             getRedirectStrategy().sendRedirect(request, response, exchange.loginErrorUrl());
